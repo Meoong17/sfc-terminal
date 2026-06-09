@@ -645,6 +645,43 @@ body {
   grid-template-columns: repeat(4, 1fr);
   gap: 14px;
 }
+.help-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  padding: 12px;
+  break-inside: avoid;
+}
+.help-card.full-width {
+  grid-column: 1 / -1;
+}
+.help-title {
+  font-weight: 600;
+  font-size: 12px;
+  margin-bottom: 8px;
+}
+.help-body {
+  font-size: 10px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+.help-body ul, .help-body ol {
+  margin: 4px 0;
+  padding-left: 16px;
+}
+.help-body li {
+  margin-bottom: 2px;
+}
+.help-body code {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  background: rgba(0,230,255,0.08);
+  padding: 1px 5px;
+  border-radius: 3px;
+  color: var(--accent-cyan);
+}
+.help-body table { margin-top: 4px; }
+.help-body td { font-size: 10px; }
 
 /* ── LOADING ── */
 .loading {
@@ -1275,16 +1312,170 @@ function render(d) {
 
     <div id="helpPanel" style="display:${helpVisible ? 'block' : 'none'}">
       <div class="help-panel">
-        <h4>📖 How to Read SFC Terminal</h4>
+        <h4 style="margin-bottom:14px">📖 How to Read SFC Terminal</h4>
         <div class="help-grid">
-          <div><strong style="color:#00e68a">SFC Stress Index</strong><br>0-100% composite. &lt;25% Normal, 25-50% Elevated, &gt;50% Critical.</div>
-          <div><strong style="color:#00e68a">DVOL</strong><br>Deribit implied volatility. &gt;100% indicates panic/capitulation.</div>
-          <div><strong style="color:#00e68a">Floor Price</strong><br>Mathematical support level based on ATH + market conditions.</div>
-          <div><strong style="color:#00e68a">RSI-14</strong><br>Relative Strength Index. &lt;30 oversold, &gt;70 overbought.</div>
-          <div><strong style="color:#00e68a">SOPR</strong><br>Spent Output Profit Ratio. &lt;0.97 capitulation, &gt;1.03 distribution.</div>
-          <div><strong style="color:#00e68a">Composite Confidence</strong><br>Signal strength from all 6 methods + technicals.</div>
-          <div><strong style="color:#00e68a">Method Consensus</strong><br>How strongly the 6 models agree on the stress level.</div>
-          <div><strong style="color:#00e68a">Liquidation Heatmap</strong><br>Derived from DVOL, SOPR, and RSI to gauge squeeze risk.</div>
+
+          <div class="help-card">
+            <div class="help-title" style="color:#00e6ff">📊 SFC Stress Index</div>
+            <div class="help-body">
+              <strong>0–100% composite stress probability.</strong> The core metric — combines 6 models into a single score.
+              <ul>
+                <li><span style="color:#00e68a">Normal</span> (0-25%) — calm market, standard allocation</li>
+                <li><span style="color:#ffb347">Elevated</span> (25-50%) — caution warranted, reduce risk</li>
+                <li><span style="color:#ff3355">Critical</span> (50-100%) — high stress, consider hedging/cash</li>
+              </ul>
+              <em>Effective SFC = SFC Base + News Stress + Liquidity Modifier. Use this for decisions.</em>
+            </div>
+          </div>
+
+          <div class="help-card">
+            <div class="help-title" style="color:#00e68a">🎯 6-Method Ensemble</div>
+            <div class="help-body">
+              Six independent models estimating the same stress probability. Each uses a different approach:
+              <ul>
+                <li><strong>KLR</strong> — Kernel Logistic: factor-weighted signal detection</li>
+                <li><strong>Logit</strong> — Logistic regression: z-score to probability mapping</li>
+                <li><strong>Bayesian</strong> — Prior + multiplier: starts at 4% base, adjusts per factor</li>
+                <li><strong>EWC</strong> — Equal-Weighted Composite: weighted absolute factor magnitude</li>
+                <li><strong>QREG</strong> — Quantile Regression: non-linear z-score interpolation</li>
+                <li><strong>Regime</strong> — Regime score: extreme condition + coherence detection</li>
+              </ul>
+              <strong>Consensus</strong> = how tightly the 6 methods cluster (standard deviation / 0.20).
+              Higher = more agreement = more reliable signal.
+            </div>
+          </div>
+
+          <div class="help-card">
+            <div class="help-title" style="color:#4a9eff">📉 BTC Price vs SFC Floor</div>
+            <div class="help-body">
+              <strong>Floor Price</strong> = ATH × φ × (1 − dv_sfc), where φ represents market structure decay and dv_sfc is current volatility stress.
+              <ul>
+                <li>Price <strong>above</strong> floor → normal zone, buffer increases with distance</li>
+                <li>Price <strong>approaching</strong> floor → heightened risk, nearing support</li>
+                <li>Price <strong>below</strong> floor → extreme conditions, historical rarity</li>
+              </ul>
+              Floor adapts daily from dynamic ATH via CoinGecko.
+            </div>
+          </div>
+
+          <div class="help-card">
+            <div class="help-title" style="color:#a855f7">📈 Momentum & Cost Basis</div>
+            <div class="help-body">
+              <strong>RSI-14</strong> — Relative Strength Index. Measures speed/change of price movements.
+              <ul>
+                <li><span style="color:#00e68a">&lt;30</span> Oversold — market may be due for a bounce; also signals bearish momentum</li>
+                <li><span style="color:#8892a8">30-70</span> Neutral — normal conditions</li>
+                <li><span style="color:#ff3355">&gt;70</span> Overbought — market may be due for a pullback</li>
+              </ul>
+              <strong>SOPR Proxy</strong> — Spent Output Profit Ratio. On-chain metric of aggregate profit-taking.
+              <ul>
+                <li><span style="color:#00e68a">&lt;0.97</span> Capitulation — sellers at a loss, potential bottom</li>
+                <li><span style="color:#8892a8">0.97-1.03</span> Neutral — balanced spending</li>
+                <li><span style="color:#ff3355">&gt;1.03</span> Distribution — profit-taking, potential top</li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="help-card">
+            <div class="help-title" style="color:#ffb347">🔥 Liquidation Heatmap</div>
+            <div class="help-body">
+              <strong>Pressure:</strong>
+              <ul>
+                <li><span style="color:#ff3355">LONG_SQUEEZE</span> — Shorts pressuring longs (RSI oversold + SOPR capitulation)</li>
+                <li><span style="color:#00e68a">SHORT_SQUEEZE</span> — Longs pressuring shorts (RSI overbought + SOPR distribution)</li>
+                <li><span style="color:#ffb347">BALANCED</span> — No directional squeeze pressure</li>
+              </ul>
+              <strong>Liq. Density</strong> = DVOL / 150. Higher vol = denser liquidation clusters.<br>
+              <strong>Cascade Risk</strong> = SOPR score × 0.3 + DVOL/200. Probability of cascading liquidations.<br>
+              <strong>Put/Call</strong> ratios from Deribit options:
+              <ul>
+                <li>&lt;1.0 = more calls than puts (bullish positioning)</li>
+                <li>&gt;1.0 = more puts than calls (bearish positioning)</li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="help-card">
+            <div class="help-title" style="color:#00e68a">⚡ Composite Confidence</div>
+            <div class="help-body">
+              <strong>How much to trust the SFC signal.</strong> Ranges 5-95%. Calculated as:
+              <br><code>Base 30% + Method_Agree×15% + SFC_Health×8% − Penalties</code>
+              <br><br>
+              <strong>Penalties reduce confidence when:</strong>
+              <ul>
+                <li>Cascade risk &gt;50% → −10%</li>
+                <li>RSI extreme (&lt;25 or &gt;75) → −8%</li>
+                <li>Liquidation squeeze active → −6%</li>
+                <li>FNG Extreme (&lt;15 or &gt;85) → −6%</li>
+                <li>SOPR capitulation (&lt;0.98) → −5%</li>
+                <li>Regime transition &gt;50% → −5%</li>
+                <li>High volatility &gt;80% → −5%</li>
+                <li>Very negative news → −4%</li>
+              </ul>
+              <em>Low confidence doesn't mean the signal is wrong — it means conditions are extreme and caution is warranted.</em>
+            </div>
+          </div>
+
+          <div class="help-card">
+            <div class="help-title" style="color:#ffb347">🎯 Signal & Recommendation</div>
+            <div class="help-body">
+              <strong>State:</strong> Overall market regime classification.
+              <ul>
+                <li><span style="color:#00e68a">NORMAL OSCILLATION</span> — Standard conditions</li>
+                <li><span style="color:#ffb347">STRUCTURAL DECAY</span> — Weakening fundamentals</li>
+                <li><span style="color:#ff3355">VOLATILITY BREAKDOWN</span> — High vol regime</li>
+              </ul>
+              <strong>Transition Risk</strong> — Probability of regime shift. &gt;50% = high chance of regime change.<br>
+              <strong>Readiness</strong> = Confidence × (1 − SFC/100). Overall preparedness score.<br>
+              <strong>BTC vs Floor</strong> — How far price is above/below mathematical support.
+            </div>
+          </div>
+
+          <div class="help-card">
+            <div class="help-title" style="color:#ffb347">📰 News Sentiment</div>
+            <div class="help-body">
+              Aggregate sentiment from 12+ RSS news sources updated every 5 minutes.
+              <ul>
+                <li>Includes: CoinTelegraph, CoinDesk, Decrypt, FT, Investing.com, Reddit (BTC, Crypto, WSB), Google News (BTC, Fed, Crisis)</li>
+                <li><span style="color:#ff3355">Negative</span> sentiment increases SFC stress contribution</li>
+                <li>Each headline scored bullish/bearish via keyword dictionary</li>
+                <li>Black swan events (hacks, bans, crashes) trigger SHOCK_MATRIX</li>
+              </ul>
+              Headlines rotate in the slide bar — click any dot to jump to a story.
+            </div>
+          </div>
+
+          <div class="help-card">
+            <div class="help-title" style="color:#8892a8">🔧 Data Sources & Refresh</div>
+            <div class="help-body">
+              <table style="width:100%;font-size:10px;border-collapse:collapse">
+                <tr><td style="padding:2px 4px;border-bottom:1px solid rgba(255,255,255,0.05)"><strong>BTC Price</strong></td><td style="padding:2px 4px;border-bottom:1px solid rgba(255,255,255,0.05)">CoinMarketCap → CoinGecko</td><td style="padding:2px 4px;border-bottom:1px solid rgba(255,255,255,0.05)">5 min</td></tr>
+                <tr><td style="padding:2px 4px;border-bottom:1px solid rgba(255,255,255,0.05)"><strong>ATH</strong></td><td style="padding:2px 4px;border-bottom:1px solid rgba(255,255,255,0.05)">CoinGecko</td><td style="padding:2px 4px;border-bottom:1px solid rgba(255,255,255,0.05)">5 min</td></tr>
+                <tr><td style="padding:2px 4px;border-bottom:1px solid rgba(255,255,255,0.05)"><strong>FNG</strong></td><td style="padding:2px 4px;border-bottom:1px solid rgba(255,255,255,0.05)">alternative.me</td><td style="padding:2px 4px;border-bottom:1px solid rgba(255,255,255,0.05)">5 min</td></tr>
+                <tr><td style="padding:2px 4px;border-bottom:1px solid rgba(255,255,255,0.05)"><strong>M2 / DXY</strong></td><td style="padding:2px 4px;border-bottom:1px solid rgba(255,255,255,0.05)">FRED API</td><td style="padding:2px 4px;border-bottom:1px solid rgba(255,255,255,0.05)">5 min</td></tr>
+                <tr><td style="padding:2px 4px;border-bottom:1px solid rgba(255,255,255,0.05)"><strong>DVOL / Options</strong></td><td style="padding:2px 4px;border-bottom:1px solid rgba(255,255,255,0.05)">Deribit</td><td style="padding:2px 4px;border-bottom:1px solid rgba(255,255,255,0.05)">5 min</td></tr>
+                <tr><td style="padding:2px 4px;border-bottom:1px solid rgba(255,255,255,0.05)"><strong>News</strong></td><td style="padding:2px 4px;border-bottom:1px solid rgba(255,255,255,0.05)">12+ RSS feeds</td><td style="padding:2px 4px;border-bottom:1px solid rgba(255,255,255,0.05)">5 min</td></tr>
+                <tr><td style="padding:2px 4px"><strong>Refresh</strong></td><td style="padding:2px 4px">Auto-fetch every 30s</td><td style="padding:2px 4px">30s</td></tr>
+              </table>
+              <br>
+              <em style="font-size:10px">Local cron collects every 5 min → GitHub Actions deploys. Dashboard auto-refreshes via fetch.</em>
+            </div>
+          </div>
+
+          <div class="help-card full-width">
+            <div class="help-title" style="color:#00e6ff">💡 Quick Reference: Reading the Dashboard</div>
+            <div class="help-body" style="font-size:10px">
+              <ol>
+                <li><strong>Start with SFC Stress Index</strong> — is the market Normal, Elevated, or Critical?</li>
+                <li><strong>Check Consensus</strong> — do all 6 methods agree? If consensus is high (&gt;60%), trust the signal more.</li>
+                <li><strong>Verify with Liquidation Heatmap</strong> — is there a squeeze? High cascade risk?</li>
+                <li><strong>Read Composite Confidence</strong> — if confidence is low (&lt;30%), the SFC signal may be misleading due to extreme conditions.</li>
+                <li><strong>Check Transition Risk</strong> — is a regime shift likely? &gt;50% means prepare for change.</li>
+                <li><strong>Scan News Sentiment</strong> — negative sentiment confirms bearish pressure; positive sentiment may signal relief.</li>
+              </ol>
+            </div>
+          </div>
+
         </div>
       </div>
     </div>
