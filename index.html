@@ -674,6 +674,10 @@ function sfcKpiAccent(s) { if (s >= 50) return 'accent-red'; if (s >= 25) return
 /* ── CHART HELPERS ── */
 function pushHistory(btc, floor) {
   if (!btc || !floor) return;
+  // Seed with a prior point so chart renders immediately (minimum 2 points)
+  if (historyPoints.length === 0) {
+    historyPoints.push({ t: Date.now() - 60000, btc, floor });
+  }
   const last = historyPoints[historyPoints.length - 1];
   if (last && last.btc === btc && last.floor === floor) return;
   historyPoints.push({ t: Date.now(), btc, floor });
