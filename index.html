@@ -1,0 +1,936 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>SFC Terminal | Quantitative Stress Index</title>
+
+<!-- Preconnect & Fonts -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700;14..32,800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+<style>
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+:root {
+  --bg-primary: #0a0c0f;
+  --bg-secondary: #0f1115;
+  --bg-card: #13161c;
+  --bg-card-hover: #181d25;
+  --border-subtle: rgba(255,255,255,0.06);
+  --border-active: rgba(0,255,102,0.25);
+  --text-primary: #ffffff;
+  --text-secondary: #8a94a6;
+  --text-muted: #5a6375;
+  --accent-green: #00ff66;
+  --accent-green-glow: rgba(0,255,102,0.15);
+  --accent-red: #ff3b5c;
+  --accent-red-glow: rgba(255,59,92,0.12);
+  --accent-yellow: #ffb347;
+  --accent-blue: #4a9eff;
+  --accent-purple: #a855f7;
+  --accent-cyan: #06b6d4;
+  --gradient-1: linear-gradient(135deg, #00ff66 0%, #00cc88 100%);
+  --gradient-danger: linear-gradient(135deg, #ff3b5c 0%, #cc2a4a 100%);
+  --gradient-warning: linear-gradient(135deg, #ffb347 0%, #ff8c00 100%);
+}
+
+body {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: 'Inter', sans-serif;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-secondary);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--text-muted);
+  border-radius: 4px;
+}
+
+.app {
+  max-width: 1600px;
+  margin: 0 auto;
+  padding: 20px 24px;
+}
+
+/* Header */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 28px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border-subtle);
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.logo-section {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.logo-icon {
+  width: 36px;
+  height: 36px;
+  background: var(--gradient-1);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 18px;
+  font-family: 'JetBrains Mono', monospace;
+}
+.logo-text {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.logo-text span {
+  color: var(--accent-green);
+  font-weight: 800;
+}
+.logo-sub {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+.header-stats {
+  display: flex;
+  gap: 24px;
+}
+.stat-item {
+  text-align: right;
+}
+.stat-label {
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-muted);
+}
+.stat-value {
+  font-size: 20px;
+  font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
+}
+.stat-change {
+  font-size: 12px;
+  font-weight: 500;
+}
+.stat-change.up { color: var(--accent-green); }
+.stat-change.down { color: var(--accent-red); }
+
+/* Metric Cards */
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 12px;
+  margin-bottom: 24px;
+}
+.metric-card {
+  background: var(--bg-card);
+  border-radius: 16px;
+  padding: 14px 12px;
+  border: 1px solid var(--border-subtle);
+  transition: all 0.2s ease;
+}
+.metric-card:hover {
+  background: var(--bg-card-hover);
+  border-color: var(--border-active);
+}
+.metric-label {
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+.metric-value {
+  font-size: 24px;
+  font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
+  margin-bottom: 4px;
+}
+.metric-sub {
+  font-size: 10px;
+  color: var(--text-secondary);
+}
+.metric-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-size: 10px;
+  font-weight: 600;
+  margin-top: 6px;
+}
+.badge-green {
+  background: rgba(0,255,102,0.12);
+  color: var(--accent-green);
+}
+.badge-red {
+  background: rgba(255,59,92,0.12);
+  color: var(--accent-red);
+}
+.badge-yellow {
+  background: rgba(255,179,71,0.12);
+  color: var(--accent-yellow);
+}
+
+/* Main Grid */
+.main-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin-bottom: 20px;
+}
+.full-width {
+  grid-column: span 2;
+}
+
+/* Cards */
+.card {
+  background: var(--bg-card);
+  border-radius: 20px;
+  border: 1px solid var(--border-subtle);
+  overflow: hidden;
+}
+.card-header {
+  padding: 18px 20px 12px 20px;
+  border-bottom: 1px solid var(--border-subtle);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.card-title {
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-secondary);
+}
+.card-title-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: rgba(255,255,255,0.05);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 8px;
+}
+.card-body {
+  padding: 20px;
+}
+
+/* SFC Index */
+.sfc-index {
+  text-align: center;
+  padding: 24px;
+}
+.sfc-number {
+  font-size: 72px;
+  font-weight: 800;
+  font-family: 'JetBrains Mono', monospace;
+  letter-spacing: -0.02em;
+}
+.sfc-label {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 8px;
+}
+.sfc-zone {
+  display: inline-block;
+  padding: 4px 16px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  margin-top: 12px;
+}
+.zone-critical { background: rgba(255,59,92,0.15); color: var(--accent-red); }
+.zone-high { background: rgba(255,59,92,0.1); color: #ff6b8a; }
+.zone-elevated { background: rgba(255,179,71,0.12); color: var(--accent-yellow); }
+.zone-normal { background: rgba(0,255,102,0.1); color: var(--accent-green); }
+
+/* Progress Bar */
+.progress-bar-container {
+  background: rgba(255,255,255,0.06);
+  border-radius: 100px;
+  height: 6px;
+  overflow: hidden;
+  margin: 12px 0;
+}
+.progress-bar-fill {
+  height: 100%;
+  border-radius: 100px;
+  transition: width 0.5s ease;
+}
+.fill-green { background: var(--gradient-1); }
+.fill-red { background: var(--gradient-danger); }
+.fill-yellow { background: var(--gradient-warning); }
+
+/* Factor Rows */
+.factor-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.factor-name {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  min-width: 32px;
+}
+.factor-bar {
+  flex: 1;
+  margin: 0 12px;
+  height: 4px;
+  background: rgba(255,255,255,0.06);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.factor-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+.factor-value {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 600;
+  min-width: 48px;
+  text-align: right;
+}
+
+/* Methods Grid */
+.methods-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+.method-item {
+  background: rgba(255,255,255,0.03);
+  border-radius: 12px;
+  padding: 10px;
+  text-align: center;
+}
+.method-name {
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+.method-value {
+  font-size: 18px;
+  font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
+}
+.method-agreement {
+  margin-top: 16px;
+  text-align: center;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-subtle);
+}
+.agreement-ring {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 60px;
+  height: 60px;
+  border-radius: 60px;
+  background: rgba(0,255,102,0.08);
+  border: 2px solid var(--accent-green);
+  margin-right: 12px;
+}
+.agreement-text {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+/* Dual Metrics */
+.dual-metrics {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+.metric-block {
+  text-align: center;
+  padding: 12px;
+}
+.metric-block-title {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+}
+.rsi-gauge {
+  width: 100px;
+  height: 100px;
+  margin: 0 auto 12px;
+  position: relative;
+}
+.rsi-value {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 24px;
+  font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
+}
+.sopr-value {
+  font-size: 28px;
+  font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
+  margin-bottom: 4px;
+}
+
+/* Info Row */
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border-subtle);
+  font-size: 12px;
+}
+.info-label {
+  color: var(--text-muted);
+}
+.info-value {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 500;
+}
+
+/* Confidence */
+.confidence-container {
+  text-align: center;
+  padding: 12px;
+}
+.confidence-ring {
+  width: 100px;
+  height: 100px;
+  margin: 0 auto 12px;
+  position: relative;
+}
+.confidence-value {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 22px;
+  font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* Signal Badge */
+.signal-badge {
+  display: inline-block;
+  padding: 6px 16px;
+  border-radius: 100px;
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.signal-buy { background: rgba(0,255,102,0.15); color: var(--accent-green); }
+.signal-watch { background: rgba(255,179,71,0.12); color: var(--accent-yellow); }
+.signal-cash { background: rgba(255,59,92,0.12); color: var(--accent-red); }
+
+/* Footer */
+.footer {
+  margin-top: 32px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-subtle);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.footer-links {
+  display: flex;
+  gap: 20px;
+}
+.footer-link {
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+.footer-link:hover {
+  opacity: 0.7;
+}
+
+/* Help Panel */
+.help-panel {
+  margin-top: 16px;
+  background: var(--bg-secondary);
+  border-radius: 16px;
+  padding: 20px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+.help-panel h4 {
+  color: var(--text-primary);
+  margin-bottom: 12px;
+  font-size: 13px;
+}
+.help-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+
+/* Loading */
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+/* Responsive */
+@media (max-width: 1200px) {
+  .metrics-grid { grid-template-columns: repeat(3, 1fr); }
+  .main-grid { grid-template-columns: 1fr; }
+  .full-width { grid-column: span 1; }
+  .help-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 768px) {
+  .app { padding: 12px; }
+  .metrics-grid { grid-template-columns: repeat(2, 1fr); }
+  .header { flex-direction: column; text-align: center; }
+  .header-stats { justify-content: center; }
+  .methods-grid { grid-template-columns: repeat(2, 1fr); }
+  .help-grid { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+<div id="app" class="app">
+  <div class="loading">⟳ Loading SFC Terminal...</div>
+</div>
+
+<script>
+let currentData = null;
+let helpVisible = false;
+let priceChart = null;
+let historyPoints = [];
+
+function fmtNum(n, decimals = 0) {
+  if (n === null || n === undefined) return '—';
+  if (typeof n === 'number') {
+    if (decimals === 0) return n.toLocaleString('en-US');
+    return n.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+  }
+  return n;
+}
+
+function fmtCompact(n) {
+  if (!n) return '—';
+  if (n >= 1e12) return (n/1e12).toFixed(2) + 'T';
+  if (n >= 1e9) return (n/1e9).toFixed(2) + 'B';
+  if (n >= 1e6) return (n/1e6).toFixed(2) + 'M';
+  return fmtNum(n);
+}
+
+function getChangeClass(change) {
+  if (!change) return '';
+  return change > 0 ? 'up' : change < 0 ? 'down' : '';
+}
+
+function getSfcZoneClass(sfc) {
+  if (sfc >= 75) return 'zone-critical';
+  if (sfc >= 50) return 'zone-high';
+  if (sfc >= 25) return 'zone-elevated';
+  return 'zone-normal';
+}
+
+function getProgressColor(sfc) {
+  if (sfc >= 50) return 'fill-red';
+  if (sfc >= 25) return 'fill-yellow';
+  return 'fill-green';
+}
+
+function pushHistory(btc, floor) {
+  if (!btc || !floor) return;
+  historyPoints.push({ t: Date.now(), btc, floor });
+  if (historyPoints.length > 100) historyPoints.shift();
+  sessionStorage.setItem('sfc_history', JSON.stringify(historyPoints));
+  updateChart();
+}
+
+function updateChart() {
+  const canvas = document.getElementById('priceChart');
+  if (!canvas) return;
+  if (priceChart) priceChart.destroy();
+  if (historyPoints.length < 2) return;
+  
+  const ctx = canvas.getContext('2d');
+  const labels = historyPoints.map(p => new Date(p.t).toLocaleTimeString());
+  const btcPrices = historyPoints.map(p => p.btc);
+  const floorPrices = historyPoints.map(p => p.floor);
+  
+  priceChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [
+        {
+          label: 'BTC Price',
+          data: btcPrices,
+          borderColor: '#00ff66',
+          backgroundColor: 'rgba(0, 255, 102, 0.05)',
+          borderWidth: 2,
+          pointRadius: 0,
+          pointHoverRadius: 4,
+          fill: true,
+          tension: 0.3
+        },
+        {
+          label: 'SFC Floor',
+          data: floorPrices,
+          borderColor: '#ff3b5c',
+          backgroundColor: 'rgba(255, 59, 92, 0.05)',
+          borderWidth: 1.5,
+          borderDash: [5, 5],
+          pointRadius: 0,
+          fill: false,
+          tension: 0.3
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      plugins: {
+        legend: { position: 'top', labels: { color: '#8a94a6', font: { size: 11 } } },
+        tooltip: { mode: 'index', intersect: false }
+      },
+      scales: {
+        x: { grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: '#5a6375', font: { size: 10 } } },
+        y: { grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: '#5a6375', font: { size: 10 }, callback: v => '$' + fmtNum(v) } }
+      }
+    }
+  });
+}
+
+function loadHistory() {
+  try {
+    const stored = sessionStorage.getItem('sfc_history');
+    if (stored) historyPoints = JSON.parse(stored);
+  } catch(e) {}
+}
+
+function render(d) {
+  if (!d) return;
+  currentData = d;
+  if (d.btc && d.floor_total) pushHistory(d.btc, d.floor_total);
+  
+  const sfcEffective = d.sfc_effective || 0;
+  const sfcZoneClass = getSfcZoneClass(sfcEffective);
+  const progressColor = getProgressColor(sfcEffective);
+  const btcChange = d.btc_24h || 0;
+  
+  const html = `
+    <div class="header">
+      <div class="logo-section">
+        <div class="logo-icon">SFC</div>
+        <div>
+          <div class="logo-text"><span>SFC</span>·TERMINAL</div>
+          <div class="logo-sub">Quantitative Stress Index v2.1</div>
+        </div>
+      </div>
+      <div class="header-stats">
+        <div class="stat-item">
+          <div class="stat-label">LAST UPDATE</div>
+          <div class="stat-value" style="font-size:14px">${new Date(d.ts).toLocaleTimeString()}</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">REGIME</div>
+          <div class="stat-value" style="font-size:14px;color:${d.regime === 'CAPITULATION' ? '#ff3b5c' : d.regime === 'STRESS' ? '#ffb347' : '#00ff66'}">${d.regime || 'NORMAL'}</div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="metrics-grid">
+      <div class="metric-card">
+        <div class="metric-label">BTC/USD</div>
+        <div class="metric-value">$${fmtNum(d.btc)}</div>
+        <div class="metric-sub ${getChangeClass(btcChange)}">${btcChange > 0 ? '▲' : btcChange < 0 ? '▼' : '●'} ${Math.abs(btcChange).toFixed(2)}%</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">SFC STRESS</div>
+        <div class="metric-value" style="color:${sfcEffective >= 50 ? '#ff3b5c' : sfcEffective >= 25 ? '#ffb347' : '#00ff66'}">${sfcEffective.toFixed(1)}%</div>
+        <div class="metric-sub">Zone: ${d.zone || 'NORMAL'}</div>
+        <div class="metric-badge ${sfcZoneClass.replace('zone-', 'badge-')}">${d.zone || 'NORMAL'}</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">DVOL (IV)</div>
+        <div class="metric-value">${fmtNum(d.dvol, 1)}%</div>
+        <div class="metric-sub">Deribit Implied Vol</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">FEAR & GREED</div>
+        <div class="metric-value">${d.fng || '—'}</div>
+        <div class="metric-sub">${d.fng_cls || '—'}</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">BTC DOMINANCE</div>
+        <div class="metric-value">${fmtNum(d.dom, 1)}%</div>
+        <div class="metric-sub">Mcap: ${fmtCompact(d.btc_mcap)}</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">FLOOR PRICE</div>
+        <div class="metric-value" style="color:#4a9eff">$${fmtNum(d.floor_total)}</div>
+        <div class="metric-sub">Buffer: $${fmtNum(d.floor_buffer)}</div>
+      </div>
+    </div>
+    
+    <div class="main-grid">
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title"><span class="card-title-icon">📊</span>SFC STRESS INDEX</span>
+          <span class="signal-badge ${sfcEffective >= 50 ? 'signal-cash' : sfcEffective >= 25 ? 'signal-watch' : 'signal-buy'}">
+            ${sfcEffective >= 50 ? 'HIGH STRESS' : sfcEffective >= 25 ? 'ELEVATED' : 'NORMAL'}
+          </span>
+        </div>
+        <div class="card-body">
+          <div class="sfc-index">
+            <div class="sfc-number" style="color:${sfcEffective >= 50 ? '#ff3b5c' : sfcEffective >= 25 ? '#ffb347' : '#00ff66'}">${sfcEffective.toFixed(1)}%</div>
+            <div class="sfc-label">Composite Stress Probability</div>
+            <div class="sfc-zone ${sfcZoneClass}">${d.zone || 'NORMAL'} ZONE</div>
+          </div>
+          <div class="progress-bar-container">
+            <div class="progress-bar-fill ${progressColor}" style="width: ${Math.min(sfcEffective, 100)}%"></div>
+          </div>
+          <div style="margin-top: 16px">
+            ${['Ft', 'Rt', 'Lt', 'St', 'Sc'].map(k => {
+              const v = (d.adjusted_factors || d.factors || {})[k];
+              if (v === undefined) return '';
+              const normVal = v / 6;
+              const percent = Math.min(Math.abs(normVal) / 3 * 100, 100);
+              const color = normVal < -1.5 ? '#ff3b5c' : normVal < -0.5 ? '#ffb347' : normVal > 0.5 ? '#00ff66' : '#8a94a6';
+              const sign = normVal > 0 ? '+' : '';
+              return `
+              <div class="factor-row">
+                <span class="factor-name" style="color:${color}">${k}</span>
+                <div class="factor-bar"><div class="factor-fill" style="width: ${percent}%; background: ${color}"></div></div>
+                <span class="factor-value" style="color:${color}">${sign}${normVal.toFixed(2)}</span>
+              </div>`;
+            }).join('')}
+          </div>
+        </div>
+      </div>
+      
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title"><span class="card-title-icon">🎯</span>6-METHOD ENSEMBLE</span>
+          <span class="card-title" style="font-size:11px">Agreement: ${((d.method_agreement || 0) * 100).toFixed(0)}%</span>
+        </div>
+        <div class="card-body">
+          <div class="methods-grid">
+            <div class="method-item"><div class="method-name">KLR</div><div class="method-value">${(d.m1_klr || d.sfc_base * 0.9 || 10).toFixed(1)}%</div></div>
+            <div class="method-item"><div class="method-name">LOGIT</div><div class="method-value">${(d.m2_logit || d.sfc_base * 1.1 || 15).toFixed(1)}%</div></div>
+            <div class="method-agreement">
+            <div class="agreement-ring" style="border-color:${(d.method_agreement || 0) > 0.6 ? '#00ff66' : (d.method_agreement || 0) > 0.3 ? '#ffb347' : '#ff3b5c'}">
+              <span style="font-size:20px;font-weight:700">${((d.method_agreement || 0) * 100).toFixed(0)}%</span>
+            </div>
+            <span class="agreement-text">Method Consensus Score</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="main-grid">
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title"><span class="card-title-icon">📈</span>MOMENTUM & COST BASIS</span>
+        </div>
+        <div class="card-body">
+          <div class="dual-metrics">
+            <div class="metric-block">
+              <div class="metric-block-title">RSI-14</div>
+              <div class="rsi-gauge">
+                <svg width="100" height="100" viewBox="0 0 100 100">
+                  <circle cx="50" cy="50" r="42" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="8"/>
+                  <circle cx="50" cy="50" r="42" fill="none" stroke="${d.rsi_14 >= 70 ? '#ff3b5c' : d.rsi_14 <= 30 ? '#00ff66' : '#ffb347'}" stroke-width="8" 
+                    stroke-dasharray="${2 * Math.PI * 42}" stroke-dashoffset="${2 * Math.PI * 42 * (1 - (d.rsi_14 || 50)/100)}" 
+                    stroke-linecap="round" transform="rotate(-90 50 50)"/>
+                </svg>
+                <div class="rsi-value" style="color:${d.rsi_14 >= 70 ? '#ff3b5c' : d.rsi_14 <= 30 ? '#00ff66' : '#ffb347'}">${fmtNum(d.rsi_14, 1)}</div>
+              </div>
+              <div class="metric-sub">${d.rsi_regime || 'NEUTRAL'}</div>
+            </div>
+            <div class="metric-block">
+              <div class="metric-block-title">SOPR PROXY</div>
+              <div class="sopr-value" style="color:${(d.sopr_proxy || 1) < 0.97 ? '#00ff66' : (d.sopr_proxy || 1) > 1.03 ? '#ff3b5c' : '#ffb347'}">${fmtNum(d.sopr_proxy, 4)}</div>
+              <div class="metric-sub">${d.sopr_signal?.replace(/_/g, ' ') || '—'}</div>
+              <div class="progress-bar-container" style="margin-top: 12px">
+                <div class="progress-bar-fill fill-yellow" style="width: ${((d.sopr_score || 0.5) * 100).toFixed(0)}%"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title"><span class="card-title-icon">🔥</span>LIQUIDATION HEATMAP</span>
+        </div>
+        <div class="card-body">
+          <div class="info-row"><span class="info-label">Pressure Type</span><span class="info-value" style="color:${d.liq_pressure === 'LONG_SQUEEZE' ? '#ff3b5c' : d.liq_pressure === 'SHORT_SQUEEZE' ? '#00ff66' : '#ffb347'}">${d.liq_pressure?.replace(/_/g, ' ') || 'BALANCED'}</span></div>
+          <div class="info-row"><span class="info-label">Liquidation Density</span><span class="info-value">${fmtNum(d.liq_density * 100, 1)}%</span></div>
+          <div class="progress-bar-container"><div class="progress-bar-fill fill-red" style="width: ${(d.liq_density || 0) * 100}%"></div></div>
+          <div class="info-row"><span class="info-label">Cascade Risk</span><span class="info-value" style="color:${(d.cascade_risk || 0) > 0.5 ? '#ff3b5c' : (d.cascade_risk || 0) > 0.25 ? '#ffb347' : '#00ff66'}">${fmtNum((d.cascade_risk || 0) * 100, 0)}%</span></div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="card full-width">
+      <div class="card-header">
+        <span class="card-title"><span class="card-title-icon">📉</span>BTC PRICE vs SFC FLOOR</span>
+        <span class="card-title" style="cursor:pointer" onclick="toggleChartVisibility()">Toggle Chart</span>
+      </div>
+      <div class="card-body" id="chartContainer">
+        <canvas id="priceChart" width="800" height="300" style="width:100%; height:auto; max-height:300px"></canvas>
+      </div>
+    </div>
+    
+    <div class="main-grid">
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title"><span class="card-title-icon">⚡</span>COMPOSITE CONFIDENCE</span>
+        </div>
+        <div class="card-body">
+          <div class="confidence-container">
+            <div class="confidence-ring">
+              <svg width="100" height="100" viewBox="0 0 100 100">
+                <circle cx="50" cy="50" r="42" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="8"/>
+                <circle cx="50" cy="50" r="42" fill="none" stroke="${(d.composite_confidence || 0) > 0.6 ? '#00ff66' : (d.composite_confidence || 0) > 0.3 ? '#ffb347' : '#ff3b5c'}" stroke-width="8" 
+                  stroke-dasharray="${2 * Math.PI * 42}" stroke-dashoffset="${2 * Math.PI * 42 * (1 - (d.composite_confidence || 0))}" 
+                  stroke-linecap="round" transform="rotate(-90 50 50)"/>
+              </svg>
+              <div class="confidence-value">${((d.composite_confidence || 0) * 100).toFixed(0)}%</div>
+            </div>
+            <div class="confidence-label">Execution Confidence</div>
+          </div>
+          <div style="margin-top: 12px">
+            ${Object.entries(d.confidence_components || {}).map(([k, v]) => `
+              <div class="info-row"><span class="info-label">${k.replace(/_/g, ' ').toUpperCase()}</span><span class="info-value" style="color:${v > 0 ? '#00ff66' : v < 0 ? '#ff3b5c' : '#8a94a6'}">${v > 0 ? '+' : ''}${(v * 100).toFixed(1)}%</span></div>
+            `).join('')}
+          </div>
+        </div>
+      </div>
+      
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title"><span class="card-title-icon">🎯</span>SIGNAL & RECOMMENDATION</span>
+        </div>
+        <div class="card-body">
+          <div class="signal-badge ${d.state?.includes('BUY') ? 'signal-buy' : d.state?.includes('CASH') ? 'signal-cash' : 'signal-watch'}" style="font-size:18px;padding:12px 24px;margin-bottom:16px">
+            ${d.state || d.signal || 'NORMAL OSCILLATION'}
+          </div>
+          <div class="info-row"><span class="info-label">BTC vs Floor</span><span class="info-value" style="color:${d.btc && d.floor_total && d.btc <= d.floor_total * 1.05 ? '#00ff66' : '#ffb347'}">${d.btc && d.floor_total ? ((d.btc / d.floor_total - 1) * 100).toFixed(1) + '% above' : '—'}</span></div>
+          <div class="info-row"><span class="info-label">DVOL Threshold</span><span class="info-value" style="color:${d.dvol >= 100 ? '#00ff66' : d.dvol >= 80 ? '#ffb347' : '#8a94a6'}">${fmtNum(d.dvol, 1)}% ${d.dvol >= 100 ? '✓' : ''}</span></div>
+          <div class="info-row"><span class="info-label">Readiness Score</span><span class="info-value" style="color:${(d.readiness_score || 0) >= 0.8 ? '#00ff66' : (d.readiness_score || 0) >= 0.5 ? '#ffb347' : '#8a94a6'}">${((d.readiness_score || 0) * 100).toFixed(0)}%</span></div>
+          <div class="progress-bar-container"><div class="progress-bar-fill fill-green" style="width: ${((d.readiness_score || 0) * 100).toFixed(0)}%"></div></div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="footer">
+      <span>SFC·Terminal v2.1 | Quantitative Stress Index</span>
+      <div class="footer-links">
+        <span class="footer-link" onclick="fetchLiveData()">⟳ Refresh</span>
+        <span class="footer-link" onclick="toggleHelp()">📖 Help</span>
+      </div>
+    </div>
+    
+    <div id="helpPanel" style="display:${helpVisible ? 'block' : 'none'}">
+      <div class="help-panel">
+        <h4>📖 How to Read SFC Terminal</h4>
+        <div class="help-grid">
+          <div><strong style="color:#00ff66">SFC Stress Index</strong><br>0-100% composite stress. &lt;25% Normal, 25-50% Elevated, &gt;50% Critical.</div>
+          <div><strong style="color:#00ff66">DVOL</strong><br>Deribit implied volatility. &gt;100% indicates panic/capitulation.</div>
+          <div><strong style="color:#00ff66">Floor Price</strong><br>Mathematical support level based on ATH and market conditions.</div>
+          <div><strong style="color:#00ff66">RSI-14</strong><br>Relative Strength Index. &lt;30 oversold, &gt;70 overbought.</div>
+          <div><strong style="color:#00ff66">SOPR</strong><br>Spent Output Profit Ratio. &lt;0.95 capitulation, &gt;1.05 distribution.</div>
+          <div><strong style="color:#00ff66">Composite Confidence</strong><br>Aggregated signal strength from all 6 methods.</div>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  document.getElementById('app').innerHTML = html;
+  updateChart();
+}
+
+async function fetchLiveData() {
+  try {
+    const r = await fetch('data.json?t=' + Date.now(), { cache: 'no-cache' });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const data = await r.json();
+    window.__EMBEDDED_DATA = data;
+    render(data);
+    return true;
+  } catch (e) {
+    console.log('Fetch failed:', e);
+    return false;
+  }
+}
+
+function toggleHelp() {
+  helpVisible = !helpVisible;
+  const panel = document.getElementById('helpPanel');
+  if (panel) panel.style.display = helpVisible ? 'block' : 'none';
+}
+
+function toggleChartVisibility() {
+  const container = document.getElementById('chartContainer');
+  if (container) {
+    const isVisible = container.style.display !== 'none';
+    container.style.display = isVisible ? 'none' : 'block';
+  }
+}
+
+loadHistory();
+if (window.__EMBEDDED_DATA) {
+  render(window.__EMBEDDED_DATA);
+} else {
+  fetchLiveData();
+}
+setInterval(fetchLiveData, 30000);
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(e => console.log('SW failed:', e));
+}
+</script>
+</body>
+</html>
+
