@@ -4,7 +4,7 @@ inject_data.py — Inject live data.json into index.html for offline-first servi
 Uses placeholder comment marker for reliable injection.
 """
 
-import json, sys
+import json, re, sys
 
 
 def inject_data_into_html(data_path, html_path, output_path=None):
@@ -26,31 +26,44 @@ def inject_data_into_html(data_path, html_path, output_path=None):
         return False
 
     data_json = json.dumps(data)
+    new_html = html
 
-    # Find the placeholder marker and replace the null after it
+    # Strategy 1: Find placeholder comment + null marker
     marker = "/* __EMBEDDED_DATA_PLACEHOLDER__ */\nconst __EMBEDDED_DATA = null;"
-    replacement = f"/* __EMBEDDED_DATA_PLACEHOLDER__ */\nconst __EMBEDDED_DATA = {data_json};"
-
-    new_html = html.replace(marker, replacement)
-
-    if new_html == html:
-        # Fallback: try to find any const __EMBEDDED_DATA = null;
-        fallback = "const __EMBEDDED_DATA = null;"
-        fallback_repl = f"const __EMBEDDED_DATA = {data_json};"
-        new_html = html.replace(fallback, fallback_repl)
-
-    if new_html == html:
-        print(f"⚠ Could not find __EMBEDDED_DATA placeholder in {html_path}", file=sys.stderr)
-        return False
-
-    try:
+    if marker in html:
+        replacement = f"/* __EMBEDDED_DATA_PLACEHOLDER__ */\nconst __EMBEDDED_DATA = {data_json};"
+        new_html = html.replace(marker, replacement)
+        print(f"✅ Injected via placeholder (strategy 1)", file=sys.stderr)
         with open(output_path, 'w') as f:
             f.write(new_html)
         print(f"✅ Injected {len(data)} fields into {output_path}", file=sys.stderr)
         return True
-    except Exception as e:
-        print(f"⚠ Failed to write {output_path}: {e}", file=sys.stderr)
-        return False
+
+    # Strategy 2: Find placeholder comment + any existing data assignment
+    pattern = r'(/\* __EMBEDDED_DATA_PLACEHOLDER__ \*/\nconst __EMBEDDED_DATA = )\{.*?\};'
+    match = re.search(pattern, new_html, re.DOTALL)
+    if match:
+        replacement = f"{match.group(1)}{data_json};"
+        new_html = new_html[:match.start()] + replacement + new_html[match.end():]
+        print(f"✅ Injected via regex (strategy 2)", file=sys.stderr)
+        with open(output_path, 'w') as f:
+            f.write(new_html)
+        print(f"✅ Injected {len(data)} fields into {output_path}", file=sys.stderr)
+        return True
+
+    # Strategy 3: Generic fallback — find any `const __EMBEDDED_DATA =`
+    pattern3 = r'const __EMBEDDED_DATA\s*=\s*\{.*?\};'
+    match3 = re.search(pattern3, new_html, re.DOTALL)
+    if match3:
+        new_html = new_html[:match3.start()] + f"const __EMBEDDED_DATA = {data_json};" + new_html[match3.end():]
+        print(f"✅ Injected via generic const match (strategy 3)", file=sys.stderr)
+        with open(output_path, 'w') as f:
+            f.write(new_html)
+        print(f"✅ Injected {len(data)} fields into {output_path}", file=sys.stderr)
+        return True
+
+    print(f"⚠ Could not find __EMBEDDED_DATA in {html_path}", file=sys.stderr)
+    return False
 
 
 if __name__ == "__main__":
