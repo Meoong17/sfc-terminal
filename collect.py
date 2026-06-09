@@ -506,6 +506,7 @@ out = {
     "ath": ath,
     "ath_date": ath_date,
     "rsi_14": rsi_14,
+    "rsi_regime": "OVERSOLD" if rsi_14 is not None and rsi_14 < 30 else "OVERBOUGHT" if rsi_14 is not None and rsi_14 > 70 else "NEUTRAL",
     "sopr_proxy": sopr_proxy,
     "sopr_signal": sopr_signal,
     "sopr_score": sopr_score,

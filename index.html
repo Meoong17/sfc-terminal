@@ -581,6 +581,9 @@ function getProgressColor(sfc) {
 
 function pushHistory(btc, floor) {
   if (!btc || !floor) return;
+  // Skip duplicate consecutive points
+  const last = historyPoints[historyPoints.length - 1];
+  if (last && last.btc === btc && last.floor === floor) return;
   historyPoints.push({ t: Date.now(), btc, floor });
   if (historyPoints.length > 100) historyPoints.shift();
   sessionStorage.setItem('sfc_history', JSON.stringify(historyPoints));
