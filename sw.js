@@ -1,9 +1,12 @@
 /**
- * Service Worker v7 — Offline-first + real-time data sync
+ * Service Worker v8 — Stale-while-revalidate + version check
+ * Never serve data.json older than 30 minutes without attempting refresh
  */
 
-const CACHE_NAME = "sfc-terminal-v7";
-const DATA_CACHE = "sfc-data-v1";
+const CACHE_NAME = "sfc-terminal-v8";
+const DATA_CACHE = "sfc-data-v2";
+const MAX_DATA_AGE_MS = 30 * 60 * 1000; // 30 minutes
+
 const STATIC_ASSETS = [
   "/",
   "index.html",
@@ -37,17 +40,41 @@ self.addEventListener("fetch", e => {
   const url = new URL(e.request.url);
 
   if (url.pathname.includes("data.json")) {
+    // Stale-while-revalidate: serve cached instantly, update in background
     e.respondWith(
-      fetch(e.request)
-        .then(res => {
+      caches.open(DATA_CACHE).then(async cache => {
+        const cachedResponse = await cache.match(e.request);
+        const networkFetch = fetch(e.request).then(res => {
           if (res.ok) {
-            caches.open(DATA_CACHE).then(c => c.put(e.request, res.clone()));
+            cache.put(e.request, res.clone());
           }
           return res;
-        })
-        .catch(() => {
-          return caches.match(e.request) || caches.match("/index.html").then(r => r ? new Response("Data unavailable - using cached version", {status: 200}) : r);
-        })
+        }).catch(() => cachedResponse);
+
+        if (!cachedResponse) {
+          return networkFetch;
+        }
+
+        // Check if cached version is too old
+        const cachedDate = cachedResponse.headers.get("date");
+        if (cachedDate) {
+          const age = Date.now() - new Date(cachedDate).getTime();
+          if (age > MAX_DATA_AGE_MS) {
+            console.log("[SW] Cached data is stale, forcing refresh");
+            return networkFetch;
+          }
+        }
+
+        // Serve cached, refresh in background
+        // We still fire networkFetch for the next visit
+        fetch(e.request).then(res => {
+          if (res.ok) {
+            cache.put(e.request, res.clone());
+          }
+        }).catch(() => {});
+
+        return cachedResponse;
+      })
     );
     return;
   }
@@ -80,4 +107,4 @@ self.addEventListener("message", e => {
   }
 });
 
-console.log("[SW] Service Worker loaded");
+console.log("[SW] Service Worker v8 loaded");

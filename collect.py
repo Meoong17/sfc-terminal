@@ -31,6 +31,21 @@ def get_btc():
     except:
         return None, None, None
 
+def get_ath():
+    """Fetch dynamic ATH from CoinGecko — fallback to hardcoded 126272"""
+    try:
+        r = requests.get("https://api.coingecko.com/api/v3/coins/bitcoin?localization=false&tickers=false&community_data=false&developer_data=false", timeout=10)
+        d = r.json()
+        ath = d.get("market_data", {}).get("ath", {}).get("usd")
+        ath_date = d.get("market_data", {}).get("ath_date", {}).get("usd", "")
+        if ath and ath > 0:
+            print(f"[SFC] ATH fetched: ${ath:,.0f} on {ath_date}", file=sys.stderr)
+            return int(ath), ath_date
+    except Exception as e:
+        print(f"[SFC] ATH fetch failed, using fallback: {e}", file=sys.stderr)
+    FALLBACK_ATH = 126272
+    return FALLBACK_ATH, ""
+
 def get_fng():
     try:
         r = requests.get("https://api.alternative.me/fng/?limit=1", timeout=10)
@@ -302,17 +317,16 @@ def calculate_sfc_ensemble(factors):
 # 3. MAIN
 # ============================================================
 
-P_ATH = 126272
 DVOL_BASELINE = 50
 
-def compute_floor(dvol, sfc_pct):
+def compute_floor(dvol, sfc_pct, ath):
     if sfc_pct is not None:
         dv = 0.10 + (sfc_pct / 100.0) * 0.75
     else:
         dv = 0.80
     phi = DVOL_BASELINE / max(dvol or DVOL_BASELINE, DVOL_BASELINE)
-    buf = int(P_ATH * (1 - dv))
-    total = int(P_ATH * (1 - dv) * phi)
+    buf = int(ath * (1 - dv))
+    total = int(ath * (1 - dv) * phi)
     return buf, total, round(dv, 3), round(phi, 3)
 
 def determine_state(dvol, sfc_pct, btc=None, floor_total=None):
@@ -367,6 +381,7 @@ dvol = get_dvol()
 m2_val, m2_yoy, _ = get_m2_data()
 dxy = get_dxy()
 pc_oi, pc_vol = get_put_call_ratio()
+ath, ath_date = get_ath()
 
 ohlcv = get_btc_ohlcv_daily(days=30)
 closes_all = [c["close"] for c in ohlcv] if ohlcv else []
@@ -396,8 +411,8 @@ if m2_yoy is not None:
 effective_sfc = min(sfc_pct + news_stress + liq_mod, 100.0) if sfc_pct is not None else None
 effective_sfc = max(effective_sfc, 0.0) if effective_sfc else None
 
-# Floor and state
-fb, ft, dv_sfc, phi = compute_floor(dvol, effective_sfc)
+# Floor and state (dynamic ATH)
+fb, ft, dv_sfc, phi = compute_floor(dvol, effective_sfc, ath)
 state, signal = determine_state(dvol, effective_sfc, btc, ft)
 
 regime, regime_prob, transition_risk = detect_regime(dvol, effective_sfc, news_stress, news_sentiment)
@@ -405,7 +420,54 @@ regime, regime_prob, transition_risk = detect_regime(dvol, effective_sfc, news_s
 # Technical indicators
 sopr_proxy, sopr_signal, sopr_score = compute_sopr_proxy(closes_7d, closes_30d, btc)
 
-# Composite confidence
+# Composite confidence — dynamic components
+# RSI confidence: oversold (<30) = bullish confidence, overbought (>70) = bearish
+if rsi_14 is not None:
+    if rsi_14 < 25:
+        rsi_conf = 0.15   # oversold → higher confidence (potential bounce)
+    elif rsi_14 < 35:
+        rsi_conf = 0.08
+    elif rsi_14 > 75:
+        rsi_conf = -0.10  # overbought → lower confidence
+    elif rsi_14 > 65:
+        rsi_conf = -0.05
+    else:
+        rsi_conf = 0.03
+else:
+    rsi_conf = 0.05
+
+# DVOL confidence: high vol confirms stress signal
+if dvol is not None:
+    if dvol >= 100:
+        dvol_conf = 0.10  # confirms capitulation signal
+    elif dvol >= 80:
+        dvol_conf = 0.05
+    elif dvol < 40:
+        dvol_conf = 0.08  # low vol = calm = confident in normal regime
+    else:
+        dvol_conf = 0.0
+else:
+    dvol_conf = 0.0
+
+# Dynamic liquidation indicators
+if dvol is not None:
+    liq_density = round(min(dvol / 150.0, 1.0), 3)
+    cascade_risk = round(min((sopr_score or 0.5) * 0.3 + (dvol / 200.0), 0.95), 3)
+else:
+    liq_density = 0.15
+    cascade_risk = 0.1
+
+# Liquidation pressure based on RSI + trend
+if rsi_14 is not None:
+    if rsi_14 < 25 and sopr_proxy and sopr_proxy < 0.97:
+        liq_pressure = "LONG_SQUEEZE"
+    elif rsi_14 > 70 and sopr_proxy and sopr_proxy > 1.03:
+        liq_pressure = "SHORT_SQUEEZE"
+    else:
+        liq_pressure = "BALANCED"
+else:
+    liq_pressure = "BALANCED"
+
 composite_confidence = min(0.5 + (method_agreement * 0.3) + (1.0 - (effective_sfc/100)) * 0.2, 0.95)
 composite_confidence = max(0.05, composite_confidence)
 
@@ -441,20 +503,21 @@ out = {
     "state": state,
     "signal": signal,
     "factors": factors_raw,
-    "ath": P_ATH,
+    "ath": ath,
+    "ath_date": ath_date,
     "rsi_14": rsi_14,
     "sopr_proxy": sopr_proxy,
     "sopr_signal": sopr_signal,
     "sopr_score": sopr_score,
-    "cascade_risk": 0.1,
-    "liq_density": 0.24,
-    "liq_pressure": "BALANCED",
+    "cascade_risk": cascade_risk,
+    "liq_density": liq_density,
+    "liq_pressure": liq_pressure,
     "composite_confidence": round(composite_confidence, 3),
     "confidence_components": {
         "method_agree": round(method_agreement, 3),
-        "rsi": 0.05,
+        "rsi": round(rsi_conf, 3),
         "sopr": round(sopr_score * 0.15, 3),
-        "dvol": 0.0
+        "dvol": round(dvol_conf, 3)
     },
     "m5_qreg": round(m5_qreg, 1),
     "m6_regime_score": round(m6_regime, 1),
@@ -465,4 +528,4 @@ out = {
 }
 
 print(json.dumps(out, indent=2))
-print(f"\n✅ BTC=${btc:,.0f} | SFC={effective_sfc:.1f}% | Zone={zone} | RSI={rsi_14} | SOPR={sopr_proxy} | News={news_stress:.1f} | {regime}", file=sys.stderr)
+print(f"\n✅ BTC=${btc:,.0f} | SFC={effective_sfc:.1f}% | Zone={zone} | RSI={rsi_14} | SOPR={sopr_proxy} | News={news_stress:.1f} | {regime} | ATH=${ath:,}", file=sys.stderr)

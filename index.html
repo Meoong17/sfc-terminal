@@ -537,6 +537,8 @@ body {
 </div>
 
 <script>
+/* __EMBEDDED_DATA_PLACEHOLDER__ */
+const __EMBEDDED_DATA = null;
 let currentData = null;
 let helpVisible = false;
 let priceChart = null;
@@ -669,11 +671,15 @@ function render(d) {
       <div class="header-stats">
         <div class="stat-item">
           <div class="stat-label">LAST UPDATE</div>
-          <div class="stat-value" style="font-size:14px">${new Date(d.ts).toLocaleTimeString()}</div>
+          <div class="stat-value" style="font-size:14px">${d.ts ? new Date(d.ts).toLocaleTimeString() : '—'}</div>
         </div>
         <div class="stat-item">
           <div class="stat-label">REGIME</div>
-          <div class="stat-value" style="font-size:14px;color:${d.regime === 'CAPITULATION' ? '#ff3b5c' : d.regime === 'STRESS' ? '#ffb347' : '#00ff66'}">${d.regime || 'NORMAL'}</div>
+          <div class="stat-value" style="font-size:14px;color:${d.regime === 'CAPITULATION' ? '#ff3b5c' : d.regime === 'STRESS' ? '#ffb347' : '#00ff66'}">${d.regime || 'NORMAL'} (${d.regime_prob ? (d.regime_prob*100).toFixed(0) : '—'}%)</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">ATH</div>
+          <div class="stat-value" style="font-size:14px;color:#ffb347">$${fmtNum(d.ath)}</div>
         </div>
       </div>
     </div>
