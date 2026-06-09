@@ -41,6 +41,7 @@ jobs:
     - name: Run data collector
       id: collect
       env:
+        CMC_API_KEY: ${{ secrets.CMC_API_KEY }}
         FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
         CRYPTOPANIC_KEY: ${{ secrets.CRYPTOPANIC_KEY }}
       run: |
