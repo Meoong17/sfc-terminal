@@ -522,6 +522,7 @@ out = {
     "m5_qreg": round(m5_qreg, 1),
     "m6_regime_score": round(m6_regime, 1),
     "method_agreement": round(method_agreement, 3),
+    "readiness_score": round(composite_confidence * (1.0 - min(effective_sfc/100 if effective_sfc else 0, 0.5)), 3),
     "shock_factor": shock_factor,
     "shock_event": shock_event,
     "shock_severity": shock_severity,
