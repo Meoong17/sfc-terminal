@@ -1247,33 +1247,6 @@ function render(d) {
       </div>
     </div>
 
-    ${d.shock_severity && d.shock_severity !== 'NONE' ? `
-    <div class="card full-row" style="margin-bottom:20px;border-color:${d.shock_severity === 'CRITICAL' ? 'rgba(255,51,85,0.4)' : 'rgba(255,179,71,0.3)'}">
-      <div class="card-hd">
-        <span class="card-title"><span class="card-title-icon">🛡️</span>Cyber Security Alert</span>
-        <span class="security-chip ${d.shock_severity === 'CRITICAL' ? 'critical' : d.shock_severity === 'HIGH' ? 'high' : 'medium'}">${d.shock_severity}</span>
-      </div>
-      <div class="card-bd">
-        ${d.shock_event ? `<div class="security-event-text">🚨 ${d.shock_event}</div>` : ''}
-        <div class="info-row" style="margin-top:6px">
-          <span class="info-label">Threat Impact</span>
-          <span class="info-val" style="color:${d.shock_factor < 0 ? '#ff3355' : '#00e68a'}">${d.shock_factor > 0 ? '+' : ''}${(d.shock_factor * 100).toFixed(0)}%</span>
-        </div>
-      </div>
-    </div>` : `
-    <div class="card full-row" style="margin-bottom:20px;border-color:rgba(0,230,138,0.1)">
-      <div class="card-hd">
-        <span class="card-title"><span class="card-title-icon">🛡️</span>Cyber Security</span>
-        <span class="security-chip safe">No Threats</span>
-      </div>
-      <div class="card-bd">
-        <div class="info-row">
-          <span class="info-label">Latest threats monitored via ${d.news_stats?.sources_hit || 0} news sources</span>
-          <span class="info-val" style="color:var(--accent-green)">✅ Secure</span>
-        </div>
-      </div>
-    </div>`}
-
     ${headlines.length ? `
     <div class="card full-row news-ticker">
       <div class="card-hd">
