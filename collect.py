@@ -23,10 +23,53 @@ except ImportError:
 # 1. LIVE DATA COLLECTION
 # ============================================================
 
+CMC_HEADERS = {}
+CMC_KEY = os.getenv("CMC_API_KEY", "")
+if CMC_KEY:
+    CMC_HEADERS = {"X-CMC_PRO_API_KEY": CMC_KEY, "Accept": "application/json"}
+
+def get_cmc_price():
+    """Fetch BTC price, 24h change, market cap from CoinMarketCap (primary)"""
+    if not CMC_KEY:
+        return None, None, None
+    try:
+        r = requests.get(
+            "https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest?symbol=BTC&convert=USD",
+            headers=CMC_HEADERS, timeout=10
+        )
+        if r.status_code != 200:
+            return None, None, None
+        d = r.json()["data"]["BTC"]["quote"]["USD"]
+        return d["price"], d.get("percent_change_24h", 0), d.get("market_cap", 0)
+    except:
+        return None, None, None
+
+def get_cmc_dominance():
+    """Fetch BTC dominance from CoinMarketCap (primary)"""
+    if not CMC_KEY:
+        return None
+    try:
+        r = requests.get(
+            "https://pro-api.coinmarketcap.com/v1/global-metrics/quotes/latest",
+            headers=CMC_HEADERS, timeout=10
+        )
+        if r.status_code != 200:
+            return None
+        return r.json()["data"]["btc_dominance"]
+    except:
+        return None
+
 def get_btc():
+    """BTC price — try CoinMarketCap first, fallback to CoinGecko"""
+    cmc_btc, cmc_chg, cmc_mcap = get_cmc_price()
+    if cmc_btc is not None:
+        print(f"[SFC] BTC from CMC: ${cmc_btc:,.0f}", file=sys.stderr)
+        return cmc_btc, cmc_chg, cmc_mcap
+    # Fallback: CoinGecko
     try:
         r = requests.get("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd&include_24hr_change=true&include_market_cap=true", timeout=10)
         d = r.json()["bitcoin"]
+        print(f"[SFC] BTC from CoinGecko (fallback): ${d['usd']:,.0f}", file=sys.stderr)
         return d["usd"], d.get("usd_24h_change", 0), d.get("usd_market_cap", 0)
     except:
         return None, None, None
@@ -55,9 +98,16 @@ def get_fng():
         return None, None
 
 def get_dom():
+    """BTC dominance — try CoinMarketCap first, fallback to CoinGecko"""
+    cmc_dom = get_cmc_dominance()
+    if cmc_dom is not None:
+        print(f"[SFC] Dominance from CMC: {cmc_dom:.1f}%", file=sys.stderr)
+        return cmc_dom
     try:
         r = requests.get("https://api.coingecko.com/api/v3/global", timeout=10)
-        return r.json()["data"]["market_cap_percentage"]["btc"]
+        d = r.json()["data"]["market_cap_percentage"]["btc"]
+        print(f"[SFC] Dominance from CoinGecko (fallback): {d:.1f}%", file=sys.stderr)
+        return d
     except:
         return None
 
