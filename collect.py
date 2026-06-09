@@ -311,7 +311,7 @@ def calculate_sfc_ensemble(factors):
     
     zone = "CRITICAL" if p_ens > 0.75 else "HIGH" if p_ens > 0.5 else "ELEVATED" if p_ens > 0.25 else "NORMAL"
     
-    return p_ens * 100, zone, factors, norm, p_quantile * 100, p_regime * 100, method_agreement
+    return p_ens * 100, zone, factors, norm, p_klr, p_logit, p_bayes, p_ewc, p_quantile * 100, p_regime * 100, method_agreement
 
 # ============================================================
 # 3. MAIN
@@ -393,7 +393,7 @@ rsi_14 = compute_rsi(closes_all, period=14)
 factors = score_factors_from_market(btc, chg, dom, dvol, fng, pc_oi, m2_yoy, dxy)
 
 # Calculate SFC ensemble
-sfc_pct, zone, factors_raw, norm_factors, m5_qreg, m6_regime, method_agreement = calculate_sfc_ensemble(factors)
+sfc_pct, zone, factors_raw, norm_factors, m1_klr, m2_logit, m3_bayes, m4_ewc, m5_qreg, m6_regime, method_agreement = calculate_sfc_ensemble(factors)
 
 # News aggregation
 print("[SFC] Aggregating news...", file=sys.stderr)
@@ -580,6 +580,10 @@ out = {
         "cascade_penalty": round(-(0.10 if cascade_risk > 0.5 else 0.05 if cascade_risk > 0.35 else 0.0), 3),
         "fear_penalty": round(-(0.06 if fng is not None and fng < 15 else 0.0), 3)
     },
+    "m1_klr": round(m1_klr * 100, 1),
+    "m2_logit": round(m2_logit * 100, 1),
+    "m3_bayes": round(m3_bayes * 100, 1),
+    "m4_ewc": round(m4_ewc * 100, 1),
     "m5_qreg": round(m5_qreg, 1),
     "m6_regime_score": round(m6_regime, 1),
     "method_agreement": round(method_agreement, 3),

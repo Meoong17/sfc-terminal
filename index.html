@@ -1107,10 +1107,10 @@ function render(d) {
         <div class="card-bd">
           <canvas id="methodChart" width="400" height="160" style="width:100%;height:auto;max-height:160px;margin-bottom:12px"></canvas>
           <div class="methods-grid" style="margin-bottom:10px">
-            <div class="method-cell"><div class="method-name">KLR</div><div class="method-val" style="color:#00e68a">${(d.sfc_base * 0.9).toFixed(1)}%</div></div>
-            <div class="method-cell"><div class="method-name">LOGIT</div><div class="method-val" style="color:#4a9eff">${(d.sfc_base * 1.1).toFixed(1)}%</div></div>
-            <div class="method-cell"><div class="method-name">BAYES</div><div class="method-val" style="color:#a855f7">${(d.sfc_base * 0.85).toFixed(1)}%</div></div>
-            <div class="method-cell"><div class="method-name">EWC</div><div class="method-val" style="color:#ffb347">${(d.sfc_base * 0.7).toFixed(1)}%</div></div>
+            <div class="method-cell"><div class="method-name">KLR</div><div class="method-val" style="color:#00e68a">${fmtNum(d.m1_klr ?? d.sfc_base * 0.9, 1)}%</div></div>
+            <div class="method-cell"><div class="method-name">LOGIT</div><div class="method-val" style="color:#4a9eff">${fmtNum(d.m2_logit ?? d.sfc_base * 1.1, 1)}%</div></div>
+            <div class="method-cell"><div class="method-name">BAYES</div><div class="method-val" style="color:#a855f7">${fmtNum(d.m3_bayes ?? d.sfc_base * 0.85, 1)}%</div></div>
+            <div class="method-cell"><div class="method-name">EWC</div><div class="method-val" style="color:#ffb347">${fmtNum(d.m4_ewc ?? d.sfc_base * 0.7, 1)}%</div></div>
             <div class="method-cell"><div class="method-name">QREG</div><div class="method-val" style="color:#00e6ff">${fmtNum(d.m5_qreg, 1)}%</div></div>
             <div class="method-cell"><div class="method-name">REGIME</div><div class="method-val" style="color:#ff3355">${fmtNum(d.m6_regime_score, 1)}%</div></div>
           </div>
