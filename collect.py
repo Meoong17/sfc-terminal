@@ -529,8 +529,9 @@ def calculate_m11_var(rets):
     """M11: VaR + Expected Shortfall — tail risk"""
     if rets is None or len(rets) < 30: return None, None
     import numpy as np
-    var_95 = np.percentile(rets, 5)
-    tail = rets[rets <= var_95]
+    arr = np.array(rets, dtype=float)
+    var_95 = np.percentile(arr, 5)
+    tail = arr[arr <= var_95]
     es = np.mean(tail) if len(tail) > 0 else var_95
     if es < -0.15: score = 0.85
     elif es < -0.10: score = 0.65
