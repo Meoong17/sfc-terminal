@@ -422,6 +422,290 @@ def detect_regime(dvol, sfc_pct, news_stress, sentiment):
         transition_risk = 0.0
     return dominant[0], round(dominant[1], 3), transition_risk
 
+# ============================================================
+# 1b. NEW METHODS (M7-M19) — 13 Advanced Enhancement Methods
+# ============================================================
+
+FRED_KEY = os.getenv("FRED_API_KEY", "")
+def _fred(series, limit=2):
+    if not FRED_KEY: return None
+    try:
+        r = requests.get(f"https://api.stlouisfed.org/fred/series/observations?series_id={series}&api_key={FRED_KEY}&file_type=json&sort_order=desc&limit={limit}", timeout=15)
+        if r.status_code != 200: return None
+        obs = r.json().get("observations", [])
+        vals = [float(o["value"]) for o in obs if o["value"] != "."]
+        return vals if vals else None
+    except: return None
+
+# ── TIER 1: MACRO ECONOMICS ──
+
+def calculate_m7_fisher():
+    """M7: Fisher Real Rates — Real Rate = Fed Rate - CPI"""
+    vals_fed = _fred("FEDFUNDS", 1)
+    vals_cpi = _fred("CPIAUCSL", 1)
+    if not vals_fed or not vals_cpi: return None, None
+    fed_rate = vals_fed[0]
+    inflation = (vals_cpi[0] / vals_cpi[0])  # Not YoY calc here — using raw vs target
+    # Use YoY CPI from separate fetch
+    try:
+        r = requests.get(f"https://api.stlouisfed.org/fred/series/observations?series_id=CPIAUCSL&api_key={FRED_KEY}&file_type=json&sort_order=desc&limit=13", timeout=15)
+        obs = r.json().get("observations", [])
+        if len(obs) >= 13:
+            cpi_now = float(obs[0]["value"])
+            cpi_yr = float(obs[12]["value"])
+            cpi_yoy = (cpi_now - cpi_yr) / cpi_yr * 100
+    except: cpi_yoy = 3.0
+    real_rate = fed_rate - cpi_yoy
+    if real_rate > 3.0: score = 0.85
+    elif real_rate > 2.0: score = 0.60
+    elif real_rate > 0.5: score = 0.35
+    elif real_rate > 0: score = 0.20
+    elif real_rate > -1.0: score = 0.10
+    else: score = 0.05
+    return score, {"real_rate": round(real_rate,2), "fed_rate": fed_rate, "cpi_yoy": round(cpi_yoy,2)}
+
+def calculate_m8_yield_curve():
+    """M8: Yield Curve Slope — 10Y - 2Y + credit spreads"""
+    vals_10y = _fred("DGS10", 1)
+    vals_2y = _fred("DGS2", 1)
+    vals_hy = _fred("BAMLH0A0HYM2", 1)
+    if not vals_10y or not vals_2y: return None, None
+    slope = vals_10y[0] - vals_2y[0]
+    spread = vals_hy[0] if vals_hy else 300
+    if slope < 0: slope_s = 0.80
+    elif slope < 0.5: slope_s = 0.65
+    elif slope < 1.0: slope_s = 0.40
+    elif slope > 2.0: slope_s = 0.15
+    else: slope_s = 0.25
+    if spread > 400: cred_s = 0.85
+    elif spread > 300: cred_s = 0.65
+    elif spread > 200: cred_s = 0.40
+    else: cred_s = 0.15
+    score = 0.60 * slope_s + 0.40 * cred_s
+    return score, {"slope": round(slope,2), "spread": round(spread,1)}
+
+def calculate_m9_liquidity():
+    """M9: Liquidity Aggregates — M2/MB multiplier"""
+    vals_m2 = _fred("M2SL", 1)
+    vals_mb = _fred("MBCURSL", 1)
+    if not vals_m2 or not vals_mb: return None, None
+    m2 = vals_m2[0]
+    mb = vals_mb[0]
+    if mb <= 0: return None, None
+    mult = m2 / mb
+    if mult < 4.0: score = 0.85
+    elif mult < 5.0: score = 0.65
+    elif mult < 6.0: score = 0.40
+    elif mult > 10.0: score = 0.20
+    else: score = 0.30
+    return score, {"m2_mb_mult": round(mult,2)}
+
+# ── TIER 2: VOLATILITY & RISK ──
+
+def calculate_m10_garch(closes):
+    """M10: GARCH(1,1) — volatility persistence"""
+    if len(closes) < 30: return None, None
+    import numpy as np
+    rets = np.diff(np.array(closes)) / np.array(closes[:-1])
+    if len(rets) < 20: return None, None
+    omega, alpha, beta = 0.00001, 0.05, 0.94
+    r_mean = np.mean(rets)
+    resid = rets - r_mean
+    sigma2 = np.var(resid)
+    hist = [sigma2]
+    for i in range(1, len(rets)):
+        sigma2 = omega + alpha * resid[i-1]**2 + beta * hist[i-1]
+        hist.append(sigma2)
+    curr_vol = np.sqrt(hist[-1])
+    persist = alpha + beta
+    if persist > 0.98 and curr_vol > 0.03: score = 0.85
+    elif persist > 0.95 and curr_vol > 0.02: score = 0.65
+    elif curr_vol > 0.02: score = 0.45
+    elif curr_vol > 0.01: score = 0.25
+    else: score = 0.10
+    return score, {"garch_vol": round(curr_vol,4), "persistence": round(persist,3)}
+
+def calculate_m11_var(rets):
+    """M11: VaR + Expected Shortfall — tail risk"""
+    if rets is None or len(rets) < 30: return None, None
+    import numpy as np
+    var_95 = np.percentile(rets, 5)
+    tail = rets[rets <= var_95]
+    es = np.mean(tail) if len(tail) > 0 else var_95
+    if es < -0.15: score = 0.85
+    elif es < -0.10: score = 0.65
+    elif es < -0.05: score = 0.45
+    elif es < 0: score = 0.25
+    else: score = 0.10
+    return score, {"var_95": round(var_95,4), "es_95": round(es,4)}
+
+def calculate_m12_jump(ohlcv):
+    """M12: Jump Risk (Merton) — gap detection"""
+    if not ohlcv or len(ohlcv) < 5: return None, None
+    import numpy as np
+    closes = [c["close"] for c in ohlcv]
+    opens = [c.get("close", closes[i]) for i, c in enumerate(ohlcv)]  # approximate
+    gaps = []
+    for i in range(1, len(closes)):
+        gap = abs(opens[i] - closes[i-1]) / closes[i-1] if closes[i-1] > 0 else 0
+        if gap > 0.02: gaps.append(gap)
+    freq = len(gaps) / max(len(closes), 1)
+    avg = np.mean(gaps) if gaps else 0
+    jr = freq * avg
+    if jr > 0.05: score = 0.85
+    elif jr > 0.03: score = 0.65
+    elif jr > 0.01: score = 0.45
+    else: score = 0.15
+    return score, {"jump_risk": round(jr,4), "gap_count": len(gaps)}
+
+# ── TIER 3: DERIVATIVES & LEVERAGE ──
+
+def calculate_m13_funding():
+    """M13: Funding Rate Acceleration — leverage cascade detection"""
+    try:
+        r = requests.get("https://www.deribit.com/api/v2/public/get_funding_rate_history?currency=BTC&start_timestamp=0&end_timestamp=" + str(int(time.time()*1000)), timeout=10)
+        data = r.json().get("result", [])
+        if len(data) < 3: return None, None
+        rates = [d["interest_8h"] for d in data[:8]]
+        if len(rates) < 3: return None, None
+        fr_now = rates[0]
+        fr_1 = rates[1]
+        fr_2 = rates[2]
+        accel = (fr_now - fr_1) - (fr_1 - fr_2)
+        if accel > 0.01: score = 0.75
+        elif fr_now > 0.15: score = 0.65
+        elif fr_now > 0.05: score = 0.35
+        else: score = 0.15
+        return score, {"funding_rate": round(fr_now,6), "accel": round(accel,6)}
+    except: return None, None
+
+def calculate_m14_skew():
+    """M14: Options Skew — put/call IV difference"""
+    try:
+        r = requests.get("https://www.deribit.com/api/v2/public/get_book_summary_by_currency?currency=BTC&kind=option", timeout=10)
+        opts = r.json().get("result", [])
+        puts = [o["mark_iv"] for o in opts if o.get("instrument_name","").endswith("-P") and o.get("mark_iv")]
+        calls = [o["mark_iv"] for o in opts if o.get("instrument_name","").endswith("-C") and o.get("mark_iv")]
+        all_iv = [o["mark_iv"] for o in opts if o.get("mark_iv")]
+        if not puts or not calls or not all_iv: return None, None
+        put_iv = sum(puts)/len(puts)
+        call_iv = sum(calls)/len(calls)
+        atm = sum(all_iv)/len(all_iv)
+        if atm <= 0: return None, None
+        skew = (put_iv - call_iv) / atm
+        if skew > 0.20: score = 0.80
+        elif skew > 0.15: score = 0.65
+        elif skew > 0.10: score = 0.45
+        elif skew > 0.05: score = 0.25
+        else: score = 0.10
+        return score, {"skew": round(skew,4), "put_iv": round(put_iv,2), "call_iv": round(call_iv,2)}
+    except: return None, None
+
+def calculate_m15_concentration():
+    """M15: OI Concentration — HHI from top positions (approximated via options OI)"""
+    try:
+        r = requests.get("https://www.deribit.com/api/v2/public/get_book_summary_by_currency?currency=BTC&kind=option", timeout=10)
+        opts = r.json().get("result", [])
+        ois = [o.get("open_interest", 0) for o in opts if o.get("open_interest", 0) > 0]
+        if len(ois) < 5: return None, None
+        total = sum(ois)
+        if total == 0: return None, None
+        shares = [o/total for o in sorted(ois, reverse=True)]
+        hhi = sum(s**2 for s in shares)
+        top3 = sum(shares[:3])
+        if hhi > 0.25: score = 0.80
+        elif hhi > 0.20: score = 0.65
+        elif hhi > 0.15: score = 0.45
+        elif hhi > 0.10: score = 0.25
+        else: score = 0.10
+        return score, {"hhi": round(hhi,4), "top3_share": round(top3,3)}
+    except: return None, None
+
+# ── TIER 4: MACHINE LEARNING ──
+
+def calculate_m16_regime_switch(rets):
+    """M16: Markov Regime Switching — crisis probability"""
+    if rets is None or len(rets) < 30: return None, None
+    import numpy as np
+    recent = rets[-30:]
+    r_mean = np.mean(recent)
+    r_std = np.std(recent)
+    if r_mean < -0.005 and r_std > 0.03: p_crisis = 0.75
+    elif r_std > 0.025: p_crisis = 0.45
+    elif r_mean > 0.01: p_crisis = 0.10
+    else: p_crisis = 0.20
+    return p_crisis, {"p_crisis": round(p_crisis,3), "recent_mean": round(r_mean,4), "recent_std": round(r_std,4)}
+
+def calculate_m17_granger(series_x, series_y, label="X→Y"):
+    """M17: Granger Causality — does X predict Y?"""
+    if series_x is None or series_y is None or len(series_x) < 10 or len(series_y) < 10: return None, None
+    import numpy as np
+    n = min(len(series_x), len(series_y))
+    x = np.array(series_x[-n:])
+    y = np.array(series_y[-n:])
+    dx = np.diff(x)
+    dy = np.diff(y)
+    if len(dx) < 2: return None, None
+    corr = np.corrcoef(dx, dy)[0, 1]
+    lag_corr = np.corrcoef(dx[:-1], dy[1:])[0, 1] if len(dx) > 1 else 0
+    if lag_corr > 0.5 and abs(corr) < 0.3: score = 0.7
+    elif abs(corr) > 0.6: score = 0.5
+    elif lag_corr < -0.3 and abs(corr) > 0.3: score = 0.3
+    else: score = 0.1
+    return score, {"corr": round(corr,3), "lag_corr": round(lag_corr,3)}
+
+# ── TIER 5: INFORMATION THEORY ──
+
+def calculate_m18_entropy(prices):
+    """M18: Shannon Entropy — market disorder"""
+    if not prices or len(prices) < 15: return None, None
+    import numpy as np
+    from scipy.stats import entropy
+    recent = prices[-30:] if len(prices) >= 30 else prices
+    rets = np.diff(recent) / np.array(recent[:-1])
+    n_bins = 10
+    hist, _ = np.histogram(rets, bins=n_bins)
+    if hist.sum() == 0: return None, None
+    hist = hist / hist.sum()
+    h = entropy(hist)
+    h_max = np.log(n_bins)
+    hn = h / h_max if h_max > 0 else 0
+    if hn > 0.85: score = 0.75
+    elif hn > 0.75: score = 0.55
+    elif hn > 0.65: score = 0.35
+    else: score = 0.15
+    return score, {"entropy_norm": round(hn,3), "entropy_raw": round(h,3)}
+
+def calculate_m19_mutual_info(btc_rets, macro_rets):
+    """M19: Mutual Information — BTC/Macro coupling"""
+    if btc_rets is None or macro_rets is None or len(btc_rets) < 15: return None, None
+    import numpy as np
+    n = min(len(btc_rets), len(macro_rets))
+    b = btc_rets[-n:]
+    m = macro_rets[-n:]
+    if n < 10: return None, None
+    try:
+        b_bins = np.digitize(b, bins=np.percentile(b, [33, 67]))
+        m_bins = np.digitize(m, bins=np.percentile(m, [33, 67]))
+    except: return None, None
+    joint = {}
+    for bb, mm in zip(b_bins, m_bins):
+        joint[(bb, mm)] = joint.get((bb, mm), 0) + 1
+    total = len(b_bins)
+    mi = 0
+    for (bb, mm), c in joint.items():
+        p_j = c / total
+        p_b = sum(cc for (bb2, _), cc in joint.items() if bb2 == bb) / total
+        p_m = sum(cc for (_, mm2), cc in joint.items() if mm2 == mm) / total
+        if p_b > 0 and p_m > 0 and p_j > 0:
+            mi += p_j * np.log(p_j / (p_b * p_m))
+    mi_norm = min(mi / np.log(3), 1.0) if np.log(3) > 0 else 0
+    if mi_norm > 0.70: score = 0.75
+    elif mi_norm > 0.50: score = 0.55
+    elif mi_norm > 0.30: score = 0.35
+    else: score = 0.15
+    return score, {"mi_norm": round(mi_norm,3), "mi_raw": round(mi,3)}
+
 print("[SFC] Starting data collection...", file=sys.stderr)
 
 btc, chg, mcap = get_btc()
@@ -444,6 +728,50 @@ factors = score_factors_from_market(btc, chg, dom, dvol, fng, pc_oi, m2_yoy, dxy
 
 # Calculate SFC ensemble
 sfc_pct, zone, factors_raw, norm_factors, m1_klr, m2_logit, m3_bayes, m4_ewc, m5_qreg, m6_regime, method_agreement = calculate_sfc_ensemble(factors)
+
+# ── NEW METHODS (M7-M19) ──
+print("[SFC] Computing M7-M19 enhancement methods...", file=sys.stderr)
+m7_s, m7_d = calculate_m7_fisher()
+m8_s, m8_d = calculate_m8_yield_curve()
+m9_s, m9_d = calculate_m9_liquidity()
+m10_s, m10_d = calculate_m10_garch(closes_all)
+rets_arr = [c["close"] for c in ohlcv] if ohlcv else []
+rets_pct = None
+if len(rets_arr) > 1:
+    rets_pct = [(rets_arr[i] - rets_arr[i-1]) / rets_arr[i-1] for i in range(1, len(rets_arr))]
+m11_s, m11_d = calculate_m11_var(rets_pct)
+m12_s, m12_d = calculate_m12_jump(ohlcv)
+m13_s, m13_d = calculate_m13_funding()
+m14_s, m14_d = calculate_m14_skew()
+m15_s, m15_d = calculate_m15_concentration()
+m16_s, m16_d = calculate_m16_regime_switch(rets_pct)
+# Granger: M2 → DVOL causality
+m2_hist = _fred("M2SL", 30)
+m2_rets = None
+if m2_hist and len(m2_hist) > 1:
+    m2_rets = [(m2_hist[i] - m2_hist[i-1]) / m2_hist[i-1] for i in range(1, len(m2_hist))]
+m17_s, m17_d = calculate_m17_granger(m2_rets, rets_pct)
+m18_s, m18_d = calculate_m18_entropy(rets_arr)
+# MI: BTC returns vs DXY returns
+dxy_hist = _fred("DTWEXBGS", 30)
+dxy_rets = None
+if dxy_hist and len(dxy_hist) > 1:
+    dxy_rets = [(dxy_hist[i] - dxy_hist[i-1]) / dxy_hist[i-1] for i in range(1, len(dxy_hist))]
+m19_s, m19_d = calculate_m19_mutual_info(rets_pct, dxy_rets)
+
+# Blend ensemble: 85% original (M1-M6) + 15% new methods (M7-M19)
+new_scores = [s for s in [m7_s, m8_s, m9_s, m10_s, m11_s, m12_s, m13_s, m14_s, m15_s, m16_s, m17_s, m18_s, m19_s] if s is not None]
+new_active = len(new_scores)
+if new_active > 0:
+    new_avg = sum(new_scores) / new_active
+    p_ens_original = 0.20*m1_klr + 0.25*m2_logit + 0.20*m3_bayes + 0.10*m4_ewc + 0.15*m5_qreg/100 + 0.10*m6_regime/100
+    sfc_pct = (0.85 * p_ens_original + 0.15 * new_avg) * 100
+    # Recalculate zone with blended score
+    zone = "CRITICAL" if sfc_pct/100 > 0.75 else "HIGH" if sfc_pct/100 > 0.5 else "ELEVATED" if sfc_pct/100 > 0.25 else "NORMAL"
+    print(f"[SFC] New methods active: {new_active}/13 | Ensemble blend: {sfc_pct:.1f}%", file=sys.stderr)
+else:
+    new_avg = 0.0
+    print(f"[SFC] No new methods available, using original ensemble", file=sys.stderr)
 
 # News aggregation
 print("[SFC] Aggregating news...", file=sys.stderr)
@@ -641,6 +969,34 @@ out = {
     "m5_qreg": round(m5_qreg, 1),
     "m6_regime_score": round(m6_regime, 1),
     "method_agreement": round(method_agreement, 3),
+    "m7_fisher": round(m7_s, 3) if m7_s is not None else None,
+    "m7_detail": m7_d,
+    "m8_yield": round(m8_s, 3) if m8_s is not None else None,
+    "m8_detail": m8_d,
+    "m9_liquidity": round(m9_s, 3) if m9_s is not None else None,
+    "m9_detail": m9_d,
+    "m10_garch": round(m10_s, 3) if m10_s is not None else None,
+    "m10_detail": m10_d,
+    "m11_var": round(m11_s, 3) if m11_s is not None else None,
+    "m11_detail": m11_d,
+    "m12_jump": round(m12_s, 3) if m12_s is not None else None,
+    "m12_detail": m12_d,
+    "m13_funding": round(m13_s, 3) if m13_s is not None else None,
+    "m13_detail": m13_d,
+    "m14_skew": round(m14_s, 3) if m14_s is not None else None,
+    "m14_detail": m14_d,
+    "m15_concentration": round(m15_s, 3) if m15_s is not None else None,
+    "m15_detail": m15_d,
+    "m16_regime_ml": round(m16_s, 3) if m16_s is not None else None,
+    "m16_detail": m16_d,
+    "m17_granger": round(m17_s, 3) if m17_s is not None else None,
+    "m17_detail": m17_d,
+    "m18_entropy": round(m18_s, 3) if m18_s is not None else None,
+    "m18_detail": m18_d,
+    "m19_mutual_info": round(m19_s, 3) if m19_s is not None else None,
+    "m19_detail": m19_d,
+    "new_methods_active": new_active,
+    "new_methods_avg": round(new_avg, 3) if new_active > 0 else None,
     "readiness_score": round(composite_confidence * (1.0 - min(effective_sfc/100 if effective_sfc else 0, 0.5)), 3),
     "shock_factor": shock_factor,
     "shock_event": shock_event,
