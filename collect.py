@@ -453,6 +453,10 @@ news_stress, news_headlines, news_sentiment, articles_scored, news_stats = get_n
 # Black swan detection
 shock_factor, shock_event, shock_severity = detect_black_swan_v2(articles_scored)
 
+# Count security-related headlines (hacks, exploits, breaches, etc.)
+SEC_KEYWORDS = ['hack','exploit','rug','scam','breach','attack','phish','malware','ransom','fraud','theft','ransomware','exploit']
+sec_events = sum(1 for a in articles_scored if any(kw in a['title'].lower() for kw in SEC_KEYWORDS))
+
 # Compute effective SFC
 liq_mod = 0.0
 if m2_yoy is not None:
@@ -641,6 +645,7 @@ out = {
     "shock_factor": shock_factor,
     "shock_event": shock_event,
     "shock_severity": shock_severity,
+    "sec_events": sec_events,
 }
 
 print(json.dumps(out, indent=2))
