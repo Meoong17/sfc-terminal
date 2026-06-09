@@ -1,45 +1,45 @@
 {
-  "ts": "2026-06-09T21:25:13.179760+00:00",
-  "btc": 61871.33497976237,
-  "btc_24h": -2.82105862,
-  "btc_mcap": 1239845064465.6013,
+  "ts": "2026-06-09T21:30:29.214008+00:00",
+  "btc": 61768.13456870372,
+  "btc_24h": -3.02456998,
+  "btc_mcap": 1237777022449.9614,
   "fng": 10,
   "fng_cls": "Extreme Fear",
   "dom": 58.0,
-  "dvol": 57.73,
-  "sfc_base": 10.284930916477265,
-  "sfc_effective": 18.584930916477266,
-  "news_stress": 6.5,
+  "dvol": 57.81,
+  "sfc_base": 11.021294552840901,
+  "sfc_effective": 17.6212945528409,
+  "news_stress": 4.8,
   "news_headlines": [
     "\ud83d\udd34[Ft][FT] Nasdaq slips in volatile trading as 2026 high-flyers pull back",
     "\ud83d\udd34[Lt][Investing.co] US Fed to release 2026 bank stress test results on June 24",
     "\ud83d\udd34[Lt][Investing.co] Dollar edges lower amid shaky Middle East truce, US inflation data in view",
     "\ud83d\udd34[Lt][Investing.co] Fed to release bank stress test results on June 24",
-    "\ud83d\udd34[Lt][Investing.co] Frigorifico Concepcion hires advisers to review debt structure",
     "\ud83d\udd34[Rt][Google:BTC] Bitcoin\u2019s Worst Week Since FTX Crash Signals More Pain Ahead - Yahoo Financ",
     "\u26aa[Rt][CoinTelegrap] Solana Institute CEO says CLARITY Act must shield open-source developers",
-    "\u26aa[Rt][CoinTelegrap] Bitcoin may act as a \u2018canary in the coal mine\u2019 as risk-off pressure spreads"
+    "\u26aa[Rt][CoinTelegrap] Bitcoin may act as a \u2018canary in the coal mine\u2019 as risk-off pressure spreads",
+    "\u26aa[Rt][CoinTelegrap] BBB refers prediction market Kalshi to state regulators over ad inquiry"
   ],
-  "news_sentiment": -0.167,
+  "news_sentiment": -0.105,
   "news_stats": {
-    "total_articles": 36,
-    "sources_hit": 11,
-    "stress_raw": 6.5,
-    "stress_capped": 6.5
+    "total_articles": 38,
+    "sources_hit": 12,
+    "stress_raw": 4.75,
+    "stress_capped": 4.8
   },
   "m2_yoy": 4.72,
   "liq_mod": 1.8,
   "zone": "NORMAL",
-  "floor_buffer": 95898,
-  "floor_total": 83057,
-  "regime": "STRESS",
-  "regime_prob": 0.362,
-  "transition_risk": 0.285,
+  "floor_buffer": 96809,
+  "floor_total": 83730,
+  "regime": "NORMAL",
+  "regime_prob": 0.4,
+  "transition_risk": 0.6,
   "dxy": 120.08,
   "pc_oi": 0.64,
-  "pc_vol": 0.68,
-  "dv_sfc": 0.239,
-  "phi": 0.866,
+  "pc_vol": 0.67,
+  "dv_sfc": 0.232,
+  "phi": 0.865,
   "state": "NORMAL OSCILLATION",
   "signal": "Standard allocation",
   "factors": {
@@ -51,15 +51,15 @@
   },
   "ath": 126080,
   "ath_date": "2025-10-06T18:57:42.558Z",
-  "rsi_14": 20.52,
+  "rsi_14": 20.4,
   "rsi_regime": "OVERSOLD",
-  "sopr_proxy": 0.8984,
+  "sopr_proxy": 0.897,
   "sopr_signal": "EXTREME_CAPITULATION",
   "sopr_score": 0.95,
   "cascade_risk": 0.574,
   "liq_density": 0.385,
   "liq_pressure": "LONG_SQUEEZE",
-  "composite_confidence": 0.139,
+  "composite_confidence": 0.09,
   "confidence_components": {
     "method_agree": 0.828,
     "rsi": -0.07,
@@ -75,12 +75,8 @@
   "m5_qreg": 10.0,
   "m6_regime_score": 1.2,
   "method_agreement": 0.828,
-  "m7_fisher": 0.1,
-  "m7_detail": {
-    "real_rate": -0.15,
-    "fed_rate": 3.63,
-    "cpi_yoy": 3.78
-  },
+  "m7_fisher": null,
+  "m7_detail": null,
   "m8_yield": 0.45,
   "m8_detail": {
     "slope": 0.41,
@@ -98,18 +94,18 @@
     "var_95": -0.0425,
     "es_95": -0.0555
   },
-  "m12_jump": 0.15,
+  "m12_jump": 0.45,
   "m12_detail": {
-    "jump_risk": 0.0095,
-    "gap_count": 8
+    "jump_risk": 0.0101,
+    "gap_count": 9
   },
   "m13_funding": null,
   "m13_detail": null,
   "m14_skew": 0.1,
   "m14_detail": {
     "skew": 0.0,
-    "put_iv": 56.8,
-    "call_iv": 56.8
+    "put_iv": 56.88,
+    "call_iv": 56.88
   },
   "m15_concentration": 0.1,
   "m15_detail": {
@@ -120,12 +116,12 @@
   "m16_detail": {
     "p_crisis": 0.2,
     "recent_mean": -0.0092,
-    "recent_std": 0.02
+    "recent_std": 0.0201
   },
   "m17_granger": 0.1,
   "m17_detail": {
-    "corr": -0.533,
-    "lag_corr": 0.336
+    "corr": -0.534,
+    "lag_corr": 0.335
   },
   "m18_entropy": 0.75,
   "m18_detail": {
@@ -137,9 +133,9 @@
     "mi_norm": 0.024,
     "mi_raw": 0.026
   },
-  "new_methods_active": 11,
-  "new_methods_avg": 0.291,
-  "readiness_score": 0.113,
+  "new_methods_active": 10,
+  "new_methods_avg": 0.34,
+  "readiness_score": 0.074,
   "shock_factor": 0.15,
   "shock_event": "Investing.com: Dollar edges lower amid shaky Middle East truce, US inflatio",
   "shock_severity": "MEDIUM",
