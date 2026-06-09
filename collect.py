@@ -421,29 +421,33 @@ regime, regime_prob, transition_risk = detect_regime(dvol, effective_sfc, news_s
 sopr_proxy, sopr_signal, sopr_score = compute_sopr_proxy(closes_7d, closes_30d, btc)
 
 # Composite confidence — dynamic components
-# RSI confidence: oversold (<30) = bullish confidence, overbought (>70) = bearish
+# RSI confidence: extremes = momentum/extreme = unpredictable = lower confidence
 if rsi_14 is not None:
-    if rsi_14 < 25:
-        rsi_conf = 0.15   # oversold → higher confidence (potential bounce)
-    elif rsi_14 < 35:
-        rsi_conf = 0.08
-    elif rsi_14 > 75:
-        rsi_conf = -0.10  # overbought → lower confidence
-    elif rsi_14 > 65:
-        rsi_conf = -0.05
+    if rsi_14 < 20:
+        rsi_conf = -0.10   # severely oversold → very uncertain
+    elif rsi_14 < 30:
+        rsi_conf = -0.07   # oversold → uncertain
+    elif rsi_14 < 40:
+        rsi_conf = -0.03   # approaching oversold → slightly uncertain
+    elif rsi_14 > 80:
+        rsi_conf = -0.10   # severely overbought → very uncertain
+    elif rsi_14 > 70:
+        rsi_conf = -0.07   # overbought → uncertain
+    elif rsi_14 > 60:
+        rsi_conf = -0.03   # approaching overbought → slightly uncertain
     else:
-        rsi_conf = 0.03
+        rsi_conf = 0.03    # neutral RSI = calm = confident
 else:
-    rsi_conf = 0.05
+    rsi_conf = 0.0
 
-# DVOL confidence: high vol confirms stress signal
+# DVOL confidence: high vol = chaos = low confidence, low vol = calm = confident
 if dvol is not None:
-    if dvol >= 100:
-        dvol_conf = 0.10  # confirms capitulation signal
-    elif dvol >= 80:
-        dvol_conf = 0.05
+    if dvol > 100:
+        dvol_conf = -0.10  # extreme vol → chaos
+    elif dvol > 80:
+        dvol_conf = -0.06  # high vol → uncertain
     elif dvol < 40:
-        dvol_conf = 0.08  # low vol = calm = confident in normal regime
+        dvol_conf = 0.05   # low vol → calm, confident
     else:
         dvol_conf = 0.0
 else:
@@ -468,8 +472,62 @@ if rsi_14 is not None:
 else:
     liq_pressure = "BALANCED"
 
-composite_confidence = min(0.5 + (method_agreement * 0.3) + (1.0 - (effective_sfc/100)) * 0.2, 0.95)
-composite_confidence = max(0.05, composite_confidence)
+# Composite confidence — multi-factor penalized model
+# Base: method agreement + market calmness
+cc_base = 0.30
+cc_base += method_agreement * 0.15   # methods agree → more reliable
+cc_base += max(0, 1.0 - (effective_sfc/100)) * 0.08  # low stress → more reliable
+
+# Penalties — reduce confidence when conditions contradict SFC signal
+cc_penalty = 0.0
+
+# Cascade risk — high cascade = signal less reliable
+if cascade_risk > 0.5:
+    cc_penalty += 0.10
+elif cascade_risk > 0.35:
+    cc_penalty += 0.05
+
+# RSI extremes — extreme momentum = unpredictable
+if rsi_14 is not None:
+    if rsi_14 < 25:
+        cc_penalty += 0.08
+    elif rsi_14 < 35:
+        cc_penalty += 0.04
+    elif rsi_14 > 75:
+        cc_penalty += 0.08
+    elif rsi_14 > 65:
+        cc_penalty += 0.04
+
+# Liquidation squeeze — one-sided pressure = unreliable signal
+if liq_pressure in ('LONG_SQUEEZE', 'SHORT_SQUEEZE'):
+    cc_penalty += 0.06
+
+# Extreme fear/greed — emotional market = unpredictable
+if fng is not None and fng < 15:
+    cc_penalty += 0.06
+elif fng is not None and fng > 85:
+    cc_penalty += 0.04
+
+# SOPR capitulation — on-chain stress
+if sopr_proxy is not None and sopr_proxy < 0.98:
+    cc_penalty += 0.05
+
+# Very negative news sentiment
+if news_sentiment < -0.5:
+    cc_penalty += 0.04
+elif news_sentiment < -0.3:
+    cc_penalty += 0.02
+
+# High volatility
+if dvol is not None and dvol > 80:
+    cc_penalty += 0.05
+
+# Regime transition — risk of regime flip
+if transition_risk > 0.5:
+    cc_penalty += 0.05
+
+composite_confidence = max(0.05, min(cc_base - cc_penalty, 0.95))
+composite_confidence = round(composite_confidence, 3)
 
 # Build output
 out = {
@@ -513,12 +571,14 @@ out = {
     "cascade_risk": cascade_risk,
     "liq_density": liq_density,
     "liq_pressure": liq_pressure,
-    "composite_confidence": round(composite_confidence, 3),
+    "composite_confidence": composite_confidence,
     "confidence_components": {
         "method_agree": round(method_agreement, 3),
         "rsi": round(rsi_conf, 3),
-        "sopr": round(sopr_score * 0.15, 3),
-        "dvol": round(dvol_conf, 3)
+        "sopr": round(-0.05 if sopr_proxy is not None and sopr_proxy < 0.98 else 0.0, 3),
+        "dvol": round(dvol_conf, 3),
+        "cascade_penalty": round(-(0.10 if cascade_risk > 0.5 else 0.05 if cascade_risk > 0.35 else 0.0), 3),
+        "fear_penalty": round(-(0.06 if fng is not None and fng < 15 else 0.0), 3)
     },
     "m5_qreg": round(m5_qreg, 1),
     "m6_regime_score": round(m6_regime, 1),
