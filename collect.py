@@ -530,4 +530,7 @@ out = {
 }
 
 print(json.dumps(out, indent=2))
-print(f"\n✅ BTC=${btc:,.0f} | SFC={effective_sfc:.1f}% | Zone={zone} | RSI={rsi_14} | SOPR={sopr_proxy} | News={news_stress:.1f} | {regime} | ATH=${ath:,}", file=sys.stderr)
+btc_str = f"${btc:,.0f}" if btc is not None else "N/A"
+rsi_str = f"{rsi_14}" if rsi_14 is not None else "N/A"
+sopr_str = f"{sopr_proxy}" if sopr_proxy is not None else "N/A"
+print(f"\n✅ BTC={btc_str} | SFC={effective_sfc:.1f}% | Zone={zone} | RSI={rsi_str} | SOPR={sopr_str} | News={news_stress:.1f} | {regime}", file=sys.stderr)
