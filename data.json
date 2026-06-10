@@ -1,14 +1,14 @@
 {
-  "ts": "2026-06-10T04:45:22.088455+00:00",
-  "btc": 61192.016160353705,
-  "btc_24h": -3.14314074,
-  "btc_mcap": 1226232135542.734,
+  "ts": "2026-06-10T04:50:19.688058+00:00",
+  "btc": 61308.05695698238,
+  "btc_24h": -3.15743642,
+  "btc_mcap": 1228557487161.925,
   "fng": 9,
   "fng_cls": "Extreme Fear",
-  "dom": 58.0,
-  "dvol": 59.51,
-  "sfc_base": 11.312136216309241,
-  "sfc_effective": 19.212136216309244,
+  "dom": 58.1,
+  "dvol": 59.52,
+  "sfc_base": 11.400241929393648,
+  "sfc_effective": 19.300241929393646,
   "news_stress": 6.1,
   "news_headlines": [
     "\ud83d\udd34[Lt][Investing.co] Analysis-RBNZ\u2019s inflation focus tested as rate hikes risk stoking jobs cris",
@@ -30,30 +30,30 @@
   "m2_yoy": 4.72,
   "liq_mod": 1.8,
   "zone": "NORMAL",
-  "floor_buffer": 7054,
-  "floor_total": 54138,
+  "floor_buffer": 7100,
+  "floor_total": 54208,
   "regime": "STRESS",
-  "regime_prob": 0.371,
-  "transition_risk": 0.294,
+  "regime_prob": 0.372,
+  "transition_risk": 0.295,
   "dxy": 120.08,
   "pc_oi": 0.64,
   "pc_vol": 0.74,
-  "dv_sfc": 0.115,
+  "dv_sfc": 0.116,
   "phi": 1.0,
   "state": "NORMAL OSCILLATION",
   "signal": "Standard allocation",
   "factors": {
-    "Lt": -1.0289934226343282,
-    "St": -0.4084620504629375,
+    "Lt": -1.0320368671421196,
+    "St": -0.41647388070151115,
     "Rt": 2.78241770175211,
-    "Ft": 0.4896802826501534,
+    "Ft": 0.4888042184552206,
     "Sc": -2.893765347489998
   },
   "ath": 126080,
   "ath_date": "2025-10-06T18:57:42.558Z",
-  "rsi_14": 20.02,
+  "rsi_14": 20.14,
   "rsi_regime": "OVERSOLD",
-  "sopr_proxy": 0.8962,
+  "sopr_proxy": 0.8978,
   "sopr_signal": "EXTREME_CAPITULATION",
   "sopr_score": 0.95,
   "cascade_risk": 0.583,
@@ -69,7 +69,7 @@
     "fear_penalty": -0.06
   },
   "m1_klr": 14.5,
-  "m2_logit": 7.7,
+  "m2_logit": 7.8,
   "m3_bayes": 4.0,
   "m4_ewc": 6.6,
   "m5_qreg": 8.1,
@@ -108,8 +108,8 @@
   "m14_skew": 0.1,
   "m14_detail": {
     "skew": 0.0,
-    "put_iv": 59.2,
-    "call_iv": 59.2
+    "put_iv": 59.21,
+    "call_iv": 59.21
   },
   "m15_concentration": 0.1,
   "m15_detail": {
@@ -119,13 +119,13 @@
   "m16_regime_ml": 0.2,
   "m16_detail": {
     "p_crisis": 0.2,
-    "recent_mean": -0.0094,
+    "recent_mean": -0.0093,
     "recent_std": 0.0201
   },
   "m17_granger": 0.1,
   "m17_detail": {
-    "corr": 0.343,
-    "lag_corr": 0.139
+    "corr": 0.344,
+    "lag_corr": 0.14
   },
   "m18_entropy": 0.75,
   "m18_detail": {
@@ -140,14 +140,14 @@
   "new_methods_active": 11,
   "new_methods_avg": 0.318,
   "inst_methods_active": 12,
-  "inst_methods_avg": 0.332,
+  "inst_methods_avg": 0.349,
   "total_methods_active": 29,
-  "m20_obi": 0.35,
+  "m20_obi": 0.55,
   "m20_detail": {
-    "obi": 0.8679,
-    "obi_norm": 0.9339,
-    "bid_vol": 4.1,
-    "ask_vol": 0.29
+    "obi": -0.427,
+    "obi_norm": 0.2865,
+    "bid_vol": 0.44,
+    "ask_vol": 1.11
   },
   "m21_trade_flow": 0.3,
   "m21_detail": {
@@ -158,29 +158,29 @@
   "m22_spread": 0.18,
   "m22_detail": {
     "spread_bps": 0.0016,
-    "range_bps": 448.51,
-    "bid": 61224.78,
-    "ask": 61224.79
+    "range_bps": 447.67,
+    "bid": 61340.0,
+    "ask": 61340.01
   },
   "m23_liquidity": 0.8,
   "m23_detail": {
-    "slippage_pct": 2.505,
+    "slippage_pct": 5.0,
     "levels_used_buy": 999,
-    "levels_used_sell": 86,
-    "mid_price": 61224.79
+    "levels_used_sell": 999,
+    "mid_price": 61340.01
   },
   "m24_cape": 0.1,
   "m24_detail": {
-    "cape": 0.6589,
-    "current_price": 61368.02,
-    "sma_1y_realized": 93134.84
+    "cape": 0.658,
+    "current_price": 61280.44,
+    "sma_1y_realized": 93134.6
   },
   "m25_minsky": 0.15,
   "m25_detail": {
     "funding_rate": 0,
     "funding_8h": 1.2e-07,
     "accel": 1.4e-05,
-    "oi_futures": 2307476290,
+    "oi_futures": 2307432420,
     "minsky_stage": "NORMAL"
   },
   "m26_kahneman": 0.325,
@@ -188,16 +188,16 @@
     "loss_aversion": 0.55,
     "anchoring": 0.15,
     "fear": 0.2,
-    "realized_price": 72401.35,
+    "realized_price": 72398.43,
     "ath": 126080.0,
-    "pl_pct": -15.48
+    "pl_pct": -15.32
   },
   "m27_taleb": 0.432,
   "m27_detail": {
     "dvol": 59.52,
-    "skewness": -0.0757,
+    "skewness": -0.0775,
     "max_drawdown": 0.2591,
-    "vol_7d_ann": 0.5328,
+    "vol_7d_ann": 0.5326,
     "vol_90d_ann": 0.5952,
     "term": "3M>1W",
     "tail_danger": "NORMAL"
@@ -229,20 +229,20 @@
   },
   "m31_altman": 0.15,
   "m31_detail": {
-    "z_score": 7.662,
+    "z_score": 7.721,
     "x1_liquidity": 0.0,
     "x2_network": 4.0,
     "x3_efficiency": 1,
-    "x4_oi_ratio": 0.622,
-    "x5_turnover": 6.051,
+    "x4_oi_ratio": 0.609,
+    "x5_turnover": 6.177,
     "zone": "SAFE"
   },
-  "ml_ensemble_score": 0.191,
+  "ml_ensemble_score": 0.194,
   "ml_ensemble_confidence": 0.8,
-  "ml_ensemble_msg": "WeightedAvg=0.191",
+  "ml_ensemble_msg": "WeightedAvg=0.194",
   "ml_accuracy": 1.0,
-  "ml_total_labeled": 7,
-  "ml_correct": 7,
+  "ml_total_labeled": 9,
+  "ml_correct": 9,
   "m1_m6_weight_pct": 85.0,
   "m7_m19_weight_pct": 10.0,
   "m20_m31_weight_pct": 5.0,
