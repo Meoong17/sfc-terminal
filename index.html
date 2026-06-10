@@ -849,6 +849,11 @@ function sfcKpiAccent(v) {
 function getChgCls(v) {
   return v > 0 ? 'chg-pos' : v < 0 ? 'chg-neg' : 'chg-zero';
 }
+let helpVisible = false;
+let currentData = null;
+let factorChart = null;
+let methodChart = null;
+let priceChart = null;
 function sfcColor(v) {
   return v >= 50 ? 'var(--accent-red)' : v >= 25 ? 'var(--accent-yellow)' : 'var(--accent-green)';
 }
