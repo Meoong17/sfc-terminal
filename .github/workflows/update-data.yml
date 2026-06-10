@@ -52,10 +52,10 @@ jobs:
         python inject_data.py data.json index.html index.html
         echo "Data injected into index.html"
 
-    - name: Check if data changed
+    - name: Check if data or index changed
       id: check-data
       run: |
-        git diff --quiet data.json && echo "updated=false" >> $GITHUB_OUTPUT || echo "updated=true" >> $GITHUB_OUTPUT
+        git diff --quiet && echo "updated=false" >> $GITHUB_OUTPUT || echo "updated=true" >> $GITHUB_OUTPUT
 
     - name: Commit and push changes
       if: steps.check-data.outputs.updated == 'true'
