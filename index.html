@@ -846,6 +846,9 @@ function fmtNum(n, d2) {
 function sfcKpiAccent(v) {
   return v >= 50 ? 'accent-red' : v >= 25 ? 'accent-yellow' : 'accent-green';
 }
+function getChgCls(v) {
+  return v > 0 ? 'chg-pos' : v < 0 ? 'chg-neg' : 'chg-zero';
+}
 
 function buildFactorChart(d) {
   const canvas = document.getElementById('factorChart');
