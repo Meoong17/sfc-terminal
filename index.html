@@ -1946,6 +1946,9 @@ initPaperTrading();
 if (typeof __EMBEDDED_DATA !== 'undefined' && __EMBEDDED_DATA) {
   render(__EMBEDDED_DATA);
   setTimeout(startNewsSlide, 100);
+} else if (window.__EMBEDDED_DATA) {
+  render(window.__EMBEDDED_DATA);
+  setTimeout(startNewsSlide, 100);
 } else {
   fetchLiveData().then(() => setTimeout(startNewsSlide, 100));
 }
