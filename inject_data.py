@@ -29,9 +29,9 @@ def inject_data_into_html(data_path, html_path, output_path=None):
     new_html = html
 
     # Strategy 1: Find placeholder comment + null marker
-    marker = "/* __EMBEDDED_DATA_PLACEHOLDER__ */\nconst __EMBEDDED_DATA = null;"
+    marker = "/* __EMBEDDED_DATA_PLACEHOLDER__ */\nvar __EMBEDDED_DATA = null;"
     if marker in html:
-        replacement = f"/* __EMBEDDED_DATA_PLACEHOLDER__ */\nconst __EMBEDDED_DATA = {data_json};"
+        replacement = f"/* __EMBEDDED_DATA_PLACEHOLDER__ */\nvar __EMBEDDED_DATA = {data_json};"
         new_html = html.replace(marker, replacement)
         print(f"✅ Injected via placeholder (strategy 1)", file=sys.stderr)
         with open(output_path, 'w') as f:
@@ -40,10 +40,10 @@ def inject_data_into_html(data_path, html_path, output_path=None):
         return True
 
     # Strategy 2: Find placeholder comment + any existing data assignment
-    pattern = r'(/\* __EMBEDDED_DATA_PLACEHOLDER__ \*/\nconst __EMBEDDED_DATA = )\{.*?\};'
+    pattern = r'(/\* __EMBEDDED_DATA_PLACEHOLDER__ \*/\n)(?:const|var|let) __EMBEDDED_DATA = \{.*?\};'
     match = re.search(pattern, new_html, re.DOTALL)
     if match:
-        replacement = f"{match.group(1)}{data_json};"
+        replacement = f"{match.group(1)}var __EMBEDDED_DATA = {data_json};"
         new_html = new_html[:match.start()] + replacement + new_html[match.end():]
         print(f"✅ Injected via regex (strategy 2)", file=sys.stderr)
         with open(output_path, 'w') as f:
@@ -51,11 +51,11 @@ def inject_data_into_html(data_path, html_path, output_path=None):
         print(f"✅ Injected {len(data)} fields into {output_path}", file=sys.stderr)
         return True
 
-    # Strategy 3: Generic fallback — find any `const __EMBEDDED_DATA =`
-    pattern3 = r'const __EMBEDDED_DATA\s*=\s*\{.*?\};'
+    # Strategy 3: Generic fallback — find any `__EMBEDDED_DATA =`
+    pattern3 = r'(?:const|var|let) __EMBEDDED_DATA\s*=\s*\{.*?\};'
     match3 = re.search(pattern3, new_html, re.DOTALL)
     if match3:
-        new_html = new_html[:match3.start()] + f"const __EMBEDDED_DATA = {data_json};" + new_html[match3.end():]
+        new_html = new_html[:match3.start()] + f"var __EMBEDDED_DATA = {data_json};" + new_html[match3.end():]
         print(f"✅ Injected via generic const match (strategy 3)", file=sys.stderr)
         with open(output_path, 'w') as f:
             f.write(new_html)
