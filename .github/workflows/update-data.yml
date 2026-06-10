@@ -64,3 +64,20 @@ jobs:
         git add data.json index.html
         git commit -m "auto-update: SFC data $(date -u '+%Y-%m-%d %H:%M:%S')"
         git push
+
+    - name: Upload Pages artifact
+      uses: actions/upload-pages-artifact@v3
+      with:
+        path: .
+
+  deploy:
+    needs: collect
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: https://meoong17.github.io/sfc-terminal
+
+    steps:
+    - name: Deploy to GitHub Pages
+      id: deployment
+      uses: actions/deploy-pages@v4
