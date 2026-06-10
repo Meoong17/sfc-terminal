@@ -1,14 +1,14 @@
 {
-  "ts": "2026-06-10T05:01:34.100124+00:00",
-  "btc": 61237.768790369526,
-  "btc_24h": -3.13339304,
-  "btc_mcap": 1227148976476.0996,
+  "ts": "2026-06-10T05:05:19.825503+00:00",
+  "btc": 61235.337325194705,
+  "btc_24h": -3.10283609,
+  "btc_mcap": 1227100252133.924,
   "fng": 9,
   "fng_cls": "Extreme Fear",
-  "dom": 58.1,
-  "dvol": 59.55,
-  "sfc_base": 11.37564304734933,
-  "sfc_effective": 19.27564304734933,
+  "dom": 58.0,
+  "dvol": 59.58,
+  "sfc_base": 11.39355436119377,
+  "sfc_effective": 19.29355436119377,
   "news_stress": 6.1,
   "news_headlines": [
     "\ud83d\udd34[Lt][Investing.co] Analysis-RBNZ\u2019s inflation focus tested as rate hikes risk stoking jobs cris",
@@ -30,8 +30,8 @@
   "m2_yoy": 4.72,
   "liq_mod": 1.8,
   "zone": "NORMAL",
-  "floor_buffer": 7082,
-  "floor_total": 54155,
+  "floor_buffer": 7089,
+  "floor_total": 54146,
   "regime": "STRESS",
   "regime_prob": 0.372,
   "transition_risk": 0.295,
@@ -43,17 +43,17 @@
   "state": "NORMAL OSCILLATION",
   "signal": "Standard allocation",
   "factors": {
-    "Lt": -1.0269173426802491,
-    "St": -0.41215047219373036,
+    "Lt": -1.0204047449454037,
+    "St": -0.41027433272231884,
     "Rt": 2.78241770175211,
-    "Ft": 0.4861755125574061,
+    "Ft": 0.4835460397404785,
     "Sc": -2.893765347489998
   },
   "ath": 126080,
   "ath_date": "2025-10-06T18:57:42.558Z",
-  "rsi_14": 21.06,
+  "rsi_14": 20.06,
   "rsi_regime": "OVERSOLD",
-  "sopr_proxy": 0.8959,
+  "sopr_proxy": 0.8968,
   "sopr_signal": "EXTREME_CAPITULATION",
   "sopr_score": 0.95,
   "cascade_risk": 0.583,
@@ -93,11 +93,14 @@
     "garch_vol": 0.0241,
     "persistence": 0.99
   },
-  "m11_var": null,
-  "m11_detail": null,
+  "m11_var": 0.45,
+  "m11_detail": {
+    "var_95": -0.0425,
+    "es_95": -0.0555
+  },
   "m12_jump": 0.45,
   "m12_detail": {
-    "jump_risk": 0.0105,
+    "jump_risk": 0.0102,
     "gap_count": 9
   },
   "m13_funding": null,
@@ -105,42 +108,46 @@
   "m14_skew": 0.1,
   "m14_detail": {
     "skew": 0.0,
-    "put_iv": 59.25,
-    "call_iv": 59.25
+    "put_iv": 59.28,
+    "call_iv": 59.28
   },
   "m15_concentration": 0.1,
   "m15_detail": {
     "hhi": 0.0049,
     "top3_share": 0.045
   },
-  "m16_regime_ml": null,
-  "m16_detail": null,
+  "m16_regime_ml": 0.2,
+  "m16_detail": {
+    "p_crisis": 0.2,
+    "recent_mean": -0.0094,
+    "recent_std": 0.0201
+  },
   "m17_granger": 0.1,
   "m17_detail": {
-    "corr": 0.328,
-    "lag_corr": 0.151
+    "corr": 0.343,
+    "lag_corr": 0.139
   },
-  "m18_entropy": 0.55,
+  "m18_entropy": 0.75,
   "m18_detail": {
-    "entropy_norm": 0.831,
-    "entropy_raw": 1.914
+    "entropy_norm": 0.852,
+    "entropy_raw": 1.962
   },
   "m19_mutual_info": 0.15,
   "m19_detail": {
-    "mi_norm": 0.215,
-    "mi_raw": 0.236
+    "mi_norm": 0.091,
+    "mi_raw": 0.1
   },
-  "new_methods_active": 9,
-  "new_methods_avg": 0.294,
-  "inst_methods_active": 9,
-  "inst_methods_avg": 0.392,
-  "total_methods_active": 24,
-  "m20_obi": 0.75,
+  "new_methods_active": 11,
+  "new_methods_avg": 0.318,
+  "inst_methods_active": 12,
+  "inst_methods_avg": 0.349,
+  "total_methods_active": 29,
+  "m20_obi": 0.55,
   "m20_detail": {
-    "obi": -0.9445,
-    "obi_norm": 0.0278,
-    "bid_vol": 0.29,
-    "ask_vol": 10.05
+    "obi": -0.4173,
+    "obi_norm": 0.2913,
+    "bid_vol": 2.31,
+    "ask_vol": 5.63
   },
   "m21_trade_flow": 0.3,
   "m21_detail": {
@@ -151,31 +158,50 @@
   "m22_spread": 0.18,
   "m22_detail": {
     "spread_bps": 0.0016,
-    "range_bps": 448.17,
-    "bid": 61272.0,
-    "ask": 61272.01
+    "range_bps": 448.16,
+    "bid": 61272.99,
+    "ask": 61273.0
   },
   "m23_liquidity": 0.8,
   "m23_detail": {
-    "slippage_pct": 2.502,
-    "levels_used_buy": 25,
+    "slippage_pct": 2.505,
+    "levels_used_buy": 71,
     "levels_used_sell": 999,
-    "mid_price": 61272.01
+    "mid_price": 61272.99
   },
-  "m24_cape": null,
-  "m24_detail": null,
+  "m24_cape": 0.1,
+  "m24_detail": {
+    "cape": 0.6575,
+    "current_price": 61235.2,
+    "sma_1y_realized": 93134.47
+  },
   "m25_minsky": 0.15,
   "m25_detail": {
     "funding_rate": 0,
     "funding_8h": 1.2e-07,
     "accel": 5e-06,
-    "oi_futures": 2307487200,
+    "oi_futures": 2307438280,
     "minsky_stage": "NORMAL"
   },
-  "m26_kahneman": null,
-  "m26_detail": null,
-  "m27_taleb": null,
-  "m27_detail": null,
+  "m26_kahneman": 0.325,
+  "m26_detail": {
+    "loss_aversion": 0.55,
+    "anchoring": 0.15,
+    "fear": 0.2,
+    "realized_price": 72396.92,
+    "ath": 126080.0,
+    "pl_pct": -15.42
+  },
+  "m27_taleb": 0.432,
+  "m27_detail": {
+    "dvol": 59.58,
+    "skewness": -0.0769,
+    "max_drawdown": 0.2591,
+    "vol_7d_ann": 0.5326,
+    "vol_90d_ann": 0.5958,
+    "term": "3M>1W",
+    "tail_danger": "NORMAL"
+  },
   "m28_summers": 0.2,
   "m28_detail": {
     "real_rate": 0.63,
@@ -193,7 +219,7 @@
     "fsi_score": 0.15,
     "components": {
       "credit_growth": 4.72,
-      "asset_vol": 59.25,
+      "asset_vol": 59.28,
       "yield_curve": 0.41,
       "hy_spread": 2.8,
       "top3_concentration": 0.045,
@@ -203,20 +229,20 @@
   },
   "m31_altman": 0.15,
   "m31_detail": {
-    "z_score": 14.45,
-    "x1_liquidity": 10.0,
+    "z_score": 7.707,
+    "x1_liquidity": 0.0,
     "x2_network": 4.0,
     "x3_efficiency": 1,
-    "x4_oi_ratio": 10,
-    "x5_turnover": 2,
+    "x4_oi_ratio": 0.612,
+    "x5_turnover": 6.147,
     "zone": "SAFE"
   },
-  "ml_ensemble_score": 0.196,
+  "ml_ensemble_score": 0.194,
   "ml_ensemble_confidence": 0.8,
-  "ml_ensemble_msg": "WeightedAvg=0.196",
+  "ml_ensemble_msg": "WeightedAvg=0.194",
   "ml_accuracy": 1.0,
-  "ml_total_labeled": 14,
-  "ml_correct": 14,
+  "ml_total_labeled": 15,
+  "ml_correct": 15,
   "m1_m6_weight_pct": 85.0,
   "m7_m19_weight_pct": 10.0,
   "m20_m31_weight_pct": 5.0,
