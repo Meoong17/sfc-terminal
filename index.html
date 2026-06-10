@@ -613,6 +613,99 @@ body {
   border-left: 2px solid var(--accent-red);
 }
 
+/* ── PAPER TRADING ── */
+.paper-section {
+  background: var(--bg-card);
+  border-radius: 18px;
+  border: 1px solid var(--border-subtle);
+  overflow: hidden;
+  margin-bottom: 20px;
+  grid-column: 1 / -1;
+  transition: border-color 0.2s ease;
+}
+.paper-section:hover { border-color: var(--border-active); }
+.paper-hd {
+  padding: 16px 20px 10px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.paper-badge {
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  padding: 3px 10px;
+  border-radius: 100px;
+  background: rgba(0,230,138,0.1);
+  color: var(--accent-green);
+}
+.paper-stats {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 10px;
+  padding: 16px 20px;
+}
+.paper-stat {
+  text-align: center;
+  padding: 10px;
+  background: rgba(255,255,255,0.03);
+  border-radius: 10px;
+}
+.paper-stat-label {
+  font-size: 9px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+}
+.paper-stat-val {
+  font-size: 20px;
+  font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
+}
+.paper-log {
+  background: rgba(0,0,0,0.25);
+  border-radius: 10px;
+  margin: 0 20px 14px 20px;
+  padding: 10px;
+  height: 140px;
+  overflow-y: auto;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  line-height: 1.6;
+}
+.paper-log div {
+  padding: 3px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.03);
+  color: var(--text-secondary);
+}
+.paper-log div:last-child { border-bottom: none; }
+.paper-ctrl {
+  display: flex;
+  gap: 10px;
+  padding: 0 20px 14px 20px;
+}
+.paper-btn {
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: 1px solid rgba(0,230,138,0.3);
+  background: rgba(0,230,138,0.08);
+  color: var(--accent-green);
+}
+.paper-btn:hover { background: var(--accent-green); color: #080b11; }
+.paper-btn.danger {
+  border-color: rgba(255,51,85,0.3);
+  background: rgba(255,51,85,0.08);
+  color: var(--accent-red);
+}
+.paper-btn.danger:hover { background: var(--accent-red); color: #080b11; }
+
 /* ── FOOTER ── */
 .footer {
   margin-top: 24px;
@@ -1467,6 +1560,44 @@ function render(d) {
       </div>
     </div>
 
+    <!-- Paper Trading Simulator -->
+    <div class="paper-section">
+      <div class="paper-hd">
+        <span class="card-title"><span class="card-title-icon">📈</span>Paper Trading &mdash; <span style="font-weight:400;color:var(--text-secondary);font-size:10px">Signal-driven simulator · starting capital $10,000</span></span>
+        <span class="paper-badge" id="paperStatus">● IDLE</span>
+      </div>
+      <div class="paper-stats">
+        <div class="paper-stat">
+          <div class="paper-stat-label">Equity</div>
+          <div class="paper-stat-val" id="paperEquity" style="color:#00e68a">$10,000</div>
+        </div>
+        <div class="paper-stat">
+          <div class="paper-stat-label">Return</div>
+          <div class="paper-stat-val" id="paperReturn">0.0%</div>
+        </div>
+        <div class="paper-stat">
+          <div class="paper-stat-label">Sharpe</div>
+          <div class="paper-stat-val" id="paperSharpe" style="color:#8892a8">—</div>
+        </div>
+        <div class="paper-stat">
+          <div class="paper-stat-label">Win Rate</div>
+          <div class="paper-stat-val" id="paperWinRate" style="color:#8892a8">—</div>
+        </div>
+        <div class="paper-stat">
+          <div class="paper-stat-label">Max DD</div>
+          <div class="paper-stat-val" id="paperDD" style="color:#8892a8">—</div>
+        </div>
+      </div>
+      <div class="paper-log" id="paperLog">
+        <div>🟢 Paper trading initialized with $10,000 capital</div>
+        <div>⏳ Waiting for signal from SFC model...</div>
+      </div>
+      <div class="paper-ctrl">
+        <button class="paper-btn" onclick="resetPaperTrading()">⟳ Reset</button>
+        <button class="paper-btn danger" onclick="exportPaperTrades()">↓ Export</button>
+      </div>
+    </div>
+
     ${headlines.length ? `
     <div class="card full-row news-ticker">
       <div class="card-hd">
@@ -1651,6 +1782,7 @@ function render(d) {
   buildFactorChart(d);
   buildMethodChart(d);
   updatePriceChart();
+  processSignalFromSFC(d);
 }
 
 /* ── CHART VISIBILITY ── */
@@ -1683,8 +1815,188 @@ function toggleHelp() {
   if (p) p.style.display = helpVisible ? 'block' : 'none';
 }
 
+/* ── PAPER TRADING ENGINE ── */
+class PaperTrader {
+  constructor(capital = 10000) {
+    this.capital = capital;
+    this.initial = capital;
+    this.positions = [];
+    this.trades = [];
+    this.pnlHistory = [];
+    this.status = 'IDLE';
+  }
+  decide(signal) {
+    const { action, confidence, winProb } = signal;
+    if (confidence < 20 || (winProb || 0) < 0.3) return { action: 'CASH', size: 0, reason: 'Low confidence' };
+    if (action === 'CASH') return { action: 'CASH', size: 0, reason: 'Signal says cash' };
+    const kelly = Math.max(0, Math.min(0.25, ((winProb||0.5) * 2 - (1-(winProb||0.5))) / 2));
+    const size = this.capital * kelly;
+    if (size < 10) return { action: 'CASH', size: 0, reason: 'Size too small' };
+    return { action: action === 'BUY' ? 'LONG' : 'SHORT', size, reason: `${confidence}% conf, ${((winProb||0)*100).toFixed(0)}% win` };
+  }
+  execute(decision, price) {
+    if (decision.size <= 0) return;
+    const trade = { id: this.trades.length+1, date: new Date(), action: decision.action, size: decision.size, price, reason: decision.reason };
+    this.trades.push(trade);
+    this.positions.push({ type: decision.action, entryPrice: price, size: decision.size, entryDate: new Date() });
+    if (decision.action === 'LONG') this.capital -= decision.size;
+    else this.capital += decision.size;
+    this.status = 'IN_MARKET';
+    return trade;
+  }
+  closeAll(price) {
+    for (const pos of [...this.positions]) {
+      let pnl = 0;
+      if (pos.type === 'LONG') { pnl = (price - pos.entryPrice) / pos.entryPrice * pos.size; this.capital += pos.size + pnl; }
+      else { pnl = (pos.entryPrice - price) / pos.entryPrice * pos.size; this.capital -= pos.size - pnl; }
+      const closed = { ...pos, exitPrice: price, exitDate: new Date(), pnl: Math.round(pnl*100)/100 };
+      this.trades.push(closed);
+    }
+    this.positions = [];
+    this.status = 'IDLE';
+  }
+  updatePnL(price) {
+    let unrealized = 0;
+    for (const p of this.positions) {
+      if (p.type === 'LONG') unrealized += (price - p.entryPrice) / p.entryPrice * p.size;
+      else unrealized += (p.entryPrice - price) / p.entryPrice * p.size;
+    }
+    const equity = this.capital + unrealized;
+    this.pnlHistory.push({ date: new Date(), equity, unrealized });
+    return equity;
+  }
+  getPerf() {
+    const equity = this.pnlHistory.length > 0 ? this.pnlHistory[this.pnlHistory.length-1].equity : this.initial;
+    const totalRet = (equity - this.initial) / this.initial;
+    const closed = this.trades.filter(t => t.pnl !== undefined);
+    const wins = closed.filter(t => t.pnl > 0);
+    const rets = this.pnlHistory.map(h => (h.equity - this.initial) / this.initial);
+    const mean = rets.reduce((a,b)=>a+b,0) / (rets.length||1);
+    const std = Math.sqrt(rets.map(r => (r-mean)**2).reduce((a,b)=>a+b,0) / (rets.length||1));
+    let peak = this.initial;
+    let mdd = 0;
+    for (const h of this.pnlHistory) {
+      if (h.equity > peak) peak = h.equity;
+      mdd = Math.max(mdd, (peak - h.equity) / peak);
+    }
+    return { equity, totalReturn: totalRet, sharpe: std > 0 ? mean/std * Math.sqrt(252) : 0, winRate: closed.length > 0 ? wins.length/closed.length : 0, maxDD: mdd, trades: this.trades.length, status: this.status };
+  }
+}
+
+// Global paper trader instance
+let paperTrader = null;
+
+function initPaperTrading() {
+  paperTrader = new PaperTrader(10000);
+  // Restore from localStorage if available
+  try {
+    const saved = localStorage.getItem('sfc_paper_trades');
+    if (saved) {
+      const data = JSON.parse(saved);
+      paperTrader.capital = data.capital || 10000;
+      paperTrader.positions = data.positions || [];
+      paperTrader.trades = data.trades || [];
+      paperTrader.pnlHistory = data.pnlHistory || [];
+      paperTrader.status = data.status || 'IDLE';
+    }
+  } catch(e) {}
+  updatePaperDisplay({ equity: paperTrader.capital });
+  addPaperLog('🟢 Paper trading initialized with $10,000 capital');
+  addPaperLog('⏳ Waiting for signal from SFC model...');
+}
+
+function processSignalFromSFC(d) {
+  if (!paperTrader) return;
+  const price = d.btc || 60000;
+  const sfc = (d.sfc_effective || 0) / 100;
+  const conf = (d.composite_confidence || 0.3);
+  const winProb = Math.min(0.9, Math.max(0.1, (1 - sfc) * 0.4 + conf * 0.4 + 0.2));
+  
+  let action = 'CASH';
+  if (sfc > 0.4 && conf < 0.3) action = 'CASH';
+  else if (sfc > 0.35) action = 'CASH';
+  else if (sfc < 0.15 && conf > 0.3) action = 'BUY';
+  else action = 'CASH';
+  
+  const signal = { action, confidence: Math.round(conf * 100), winProb: Math.round(winProb * 100) / 100 };
+  const decision = paperTrader.decide(signal);
+  
+  // Check if need to close positions
+  if (decision.action === 'CASH' && paperTrader.positions.length > 0) {
+    paperTrader.closeAll(price);
+    addPaperLog(`🔴 [CLOSE] All positions at $${fmtNum(price,0)} — signal says cash`);
+    document.getElementById('paperStatus').textContent = '● CASH';
+  }
+  // Open new position if idle
+  else if (decision.action !== 'CASH' && paperTrader.positions.length === 0) {
+    const trade = paperTrader.execute(decision, price);
+    if (trade) {
+      addPaperLog(`🟢 [OPEN] ${decision.action} $${fmtNum(decision.size,0)} at $${fmtNum(price,0)} — ${decision.reason}`);
+      document.getElementById('paperStatus').textContent = '● IN MARKET';
+    }
+  }
+  
+  // Update PnL
+  const equity = paperTrader.updatePnL(price);
+  updatePaperDisplay({ equity, price });
+  
+  // Save state
+  try { localStorage.setItem('sfc_paper_trades', JSON.stringify({ capital: paperTrader.capital, positions: paperTrader.positions, trades: paperTrader.trades.slice(-200), pnlHistory: paperTrader.pnlHistory.slice(-500), status: paperTrader.status })); } catch(e) {}
+}
+
+function updatePaperDisplay(state) {
+  if (!paperTrader) return;
+  const perf = paperTrader.getPerf();
+  const el = id => document.getElementById(id);
+  el('paperEquity').textContent = '$' + fmtNum(Math.round(perf.equity), 0);
+  el('paperEquity').style.color = perf.totalReturn >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
+  el('paperReturn').textContent = (perf.totalReturn * 100).toFixed(1) + '%';
+  el('paperReturn').style.color = perf.totalReturn >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
+  if (perf.trades > 0) {
+    el('paperSharpe').textContent = perf.sharpe.toFixed(2);
+    el('paperSharpe').style.color = perf.sharpe > 1.5 ? 'var(--accent-green)' : perf.sharpe > 0.5 ? 'var(--accent-yellow)' : 'var(--accent-red)';
+    el('paperWinRate').textContent = (perf.winRate * 100).toFixed(0) + '%';
+    el('paperWinRate').style.color = perf.winRate > 0.6 ? 'var(--accent-green)' : 'var(--accent-yellow)';
+    el('paperDD').textContent = (perf.maxDD * 100).toFixed(1) + '%';
+    el('paperDD').style.color = perf.maxDD < 0.1 ? 'var(--accent-green)' : perf.maxDD < 0.2 ? 'var(--accent-yellow)' : 'var(--accent-red)';
+  }
+}
+
+function addPaperLog(msg) {
+  const log = document.getElementById('paperLog');
+  if (!log) return;
+  const div = document.createElement('div');
+  div.textContent = msg;
+  log.appendChild(div);
+  log.scrollTop = log.scrollHeight;
+  // Keep last 100
+  while (log.children.length > 100) log.removeChild(log.firstChild);
+}
+
+function resetPaperTrading() {
+  paperTrader = new PaperTrader(10000);
+  try { localStorage.removeItem('sfc_paper_trades'); } catch(e) {}
+  document.getElementById('paperLog').innerHTML = '<div>🟢 Paper trading reset to $10,000 capital</div>';
+  document.getElementById('paperStatus').textContent = '● IDLE';
+  updatePaperDisplay({ equity: 10000 });
+}
+
+function exportPaperTrades() {
+  if (!paperTrader || paperTrader.trades.length === 0) { addPaperLog('⚠ No trades to export'); return; }
+  const dataStr = JSON.stringify(paperTrader.trades, null, 2);
+  const blob = new Blob([dataStr], {type: 'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'sfc_paper_trades_' + new Date().toISOString().slice(0,10) + '.json';
+  a.click();
+  URL.revokeObjectURL(url);
+  addPaperLog('📥 Trades exported (' + paperTrader.trades.length + ' entries)');
+}
+
 /* ── INIT ── */
 loadHistory();
+initPaperTrading();
 if (window.__EMBEDDED_DATA) {
   render(window.__EMBEDDED_DATA);
   setTimeout(startNewsSlide, 100);
