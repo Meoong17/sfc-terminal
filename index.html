@@ -1940,6 +1940,17 @@ function exportPaperTrades() {
   addPaperLog('📥 Trades exported (' + paperTrader.trades.length + ' entries)');
 }
 
+/* ── HISTORY FUNCTIONS ── */
+let historyPoints = [];
+function loadHistory() {
+  try { const s = sessionStorage.getItem('sfc_history'); if (s) historyPoints = JSON.parse(s); } catch(e) {}
+}
+function pushHistory(btc, floor) {
+  historyPoints.push({ t: Date.now(), btc, floor });
+  if (historyPoints.length > 200) historyPoints = historyPoints.slice(-200);
+  try { sessionStorage.setItem('sfc_history', JSON.stringify(historyPoints)); } catch(e) {}
+}
+
 /* ── INIT ── */
 loadHistory();
 initPaperTrading();
