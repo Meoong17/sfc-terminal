@@ -929,24 +929,66 @@ if dvol is not None:
 else:
     dvol_conf = 0.0
 
-# Dynamic liquidation indicators
-if dvol is not None:
-    liq_density = round(min(dvol / 150.0, 1.0), 3)
-    cascade_risk = round(min((sopr_score or 0.5) * 0.3 + (dvol / 200.0), 0.95), 3)
-else:
-    liq_density = 0.15
-    cascade_risk = 0.1
+# Dynamic liquidation indicators — real data from OKX (free) or CoinGlass (paid)
+liq_pressure = "BALANCED"
+liq_density = 0.15
+cascade_risk = 0.1
+liq_total_24h = None
+liq_long_vol = None
+liq_short_vol = None
 
-# Liquidation pressure based on RSI + trend
-if rsi_14 is not None:
-    if rsi_14 < 25 and sopr_proxy and sopr_proxy < 0.97:
-        liq_pressure = "LONG_SQUEEZE"
-    elif rsi_14 > 70 and sopr_proxy and sopr_proxy > 1.03:
-        liq_pressure = "SHORT_SQUEEZE"
-    else:
-        liq_pressure = "BALANCED"
-else:
-    liq_pressure = "BALANCED"
+try:
+    from liquidation_client import get_liquidation_data
+    liq_data = get_liquidation_data()
+    if liq_data and liq_data.get("source") == "okx":
+        # Real OKX liquidation data
+        long_v = liq_data.get("long_vol_usd", 0)
+        short_v = liq_data.get("short_vol_usd", 0)
+        total_v = long_v + short_v
+        liq_total_24h = total_v
+        liq_long_vol = long_v
+        liq_short_vol = short_v
+
+        # Pressure: based on which side is dominating
+        dominant = liq_data.get("dominant", "balanced")
+        liq_ratio = liq_data.get("long_ratio", 0.5)
+        if dominant == "long" and liq_ratio > 0.8:
+            liq_pressure = "SHORT_SQUEEZE"   # heavy short liquidations = buying pressure
+        elif dominant == "short" and liq_ratio < 0.2:
+            liq_pressure = "LONG_SQUEEZE"    # heavy long liquidations = selling pressure
+        else:
+            liq_pressure = "BALANCED"
+
+        # Density: normalise total liquidation volume (BTC-only)
+        # $2B+ in 24h = extreme density
+        liq_density = round(min(total_v / 2_000_000_000, 1.0), 3)
+
+        # Cascade risk: extreme one-sided = higher risk
+        imbalance = abs(liq_ratio - 0.5) * 2  # 0 = balanced, 1 = entirely one-sided
+        cascade_risk = round(min(imbalance * 0.5 + (total_v / 5_000_000_000), 0.95), 3)
+
+    elif liq_data and liq_data.get("source") == "coinglass":
+        # CoinGlass data — higher quality
+        pass  # TODO: parse coinglass response format
+
+except ImportError:
+    pass  # liquidation_client.py not available — use proxy
+except Exception as e:
+    print(f"[liq] Error fetching real data: {e}", file=__import__('sys').stderr)
+
+# If real data didn't produce valid values, use proxy estimates
+if liq_total_24h is None:
+    if dvol is not None:
+        liq_density = round(min(dvol / 150.0, 1.0), 3)
+        cascade_risk = round(min((sopr_score or 0.5) * 0.3 + (dvol / 200.0), 0.95), 3)
+    # Liquidation pressure based on RSI + trend
+    if rsi_14 is not None:
+        if rsi_14 < 25 and sopr_proxy and sopr_proxy < 0.97:
+            liq_pressure = "LONG_SQUEEZE"
+        elif rsi_14 > 70 and sopr_proxy and sopr_proxy > 1.03:
+            liq_pressure = "SHORT_SQUEEZE"
+        else:
+            liq_pressure = "BALANCED"
 
 # Composite confidence — multi-factor penalized model
 # Base: method agreement + market calmness
@@ -1023,6 +1065,9 @@ out = {
     "news_stats": news_stats,
     "m2_yoy": m2_yoy,
     "liq_mod": liq_mod,
+    "liq_total_24h": liq_total_24h,
+    "liq_long_vol": liq_long_vol,
+    "liq_short_vol": liq_short_vol,
     "zone": zone,
     "floor_buffer": fb,
     "floor_total": ft,

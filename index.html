@@ -1271,6 +1271,10 @@ function render(d) {
           <div class="info-row"><span class="info-label">Liq. Density</span><span class="info-val">${fmtNum((d.liq_density || 0) * 100, 1)}%</span></div>
           <div class="progress-track"><div class="progress-fill fill-red" style="width: ${(d.liq_density || 0) * 100}%"></div></div>
           <div class="info-row"><span class="info-label">Cascade Risk</span><span class="info-val" style="color:${(d.cascade_risk || 0) > 0.5 ? '#ff3355' : (d.cascade_risk || 0) > 0.25 ? '#ffb347' : '#00e68a'}">${fmtNum((d.cascade_risk || 0) * 100, 0)}%</span></div>
+          ${d.liq_total_24h ? `
+          <div class="info-row"><span class="info-label">24h Liq (OKX)</span><span class="info-val" style="color:${(d.liq_short_vol || 0) > (d.liq_long_vol || 0) ? '#ff3355' : '#ffb347'}">$${fmtNum(d.liq_total_24h)}</span></div>
+          <div class="info-row"><span class="info-label" style="font-size:9px">Long × Short</span><span class="info-val" style="font-size:11px"><span style="color:#22ab94">$${fmtNum(d.liq_long_vol)}</span> <span style="color:#5a6478">/</span> <span style="color:#ff3355">$${fmtNum(d.liq_short_vol)}</span></span></div>
+          ` : ''}
           <div class="info-row"><span class="info-label">Put/Call OI</span><span class="info-val">${fmtNum(d.pc_oi, 2)}</span></div>
           <div class="info-row"><span class="info-label">Put/Call Vol</span><span class="info-val">${fmtNum(d.pc_vol, 2)}</span></div>
         </div>
