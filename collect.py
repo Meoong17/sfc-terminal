@@ -23,6 +23,16 @@ def _load_ath():
 
 # Import institutional methods (M20-M31) and ML ensemble
 sys.path.insert(0, os.path.dirname(__file__))
+
+# Import causal inference
+try:
+    from causal_inference import CausalFilter
+    CAUSAL_AVAILABLE = True
+except ImportError:
+    CAUSAL_AVAILABLE = False
+    print("[SFC] Causal inference not available", file=sys.stderr)
+
+sys.path.insert(0, os.path.dirname(__file__))
 try:
     from methods_institutional import compute_all_institutional
     INSTITUTIONAL_AVAILABLE = True
