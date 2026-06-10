@@ -1,14 +1,14 @@
 {
-  "ts": "2026-06-10T10:40:20.267031+00:00",
-  "btc": 61280.261226942006,
-  "btc_24h": -2.18730758,
-  "btc_mcap": 1228000486109.4175,
+  "ts": "2026-06-10T10:45:21.671862+00:00",
+  "btc": 61279.44680799155,
+  "btc_24h": -2.22815059,
+  "btc_mcap": 1227984165897.2148,
   "fng": 9,
   "fng_cls": "Extreme Fear",
   "dom": 58.1,
-  "dvol": 59.77,
-  "sfc_base": 11.221903398054419,
-  "sfc_effective": 17.22190339805442,
+  "dvol": 59.78,
+  "sfc_base": 11.225456850590808,
+  "sfc_effective": 17.22545685059081,
   "news_stress": 4.2,
   "news_headlines": [
     "\ud83d\udd34[Rt][CoinTelegrap] EU proposes ban on 11 crypto platforms in Russia sanctions push",
@@ -33,8 +33,8 @@
   "liq_long_vol": 438724945.83,
   "liq_short_vol": 620685918.38,
   "zone": "NORMAL",
-  "floor_buffer": 6332,
-  "floor_total": 54948,
+  "floor_buffer": 6333,
+  "floor_total": 54946,
   "regime": "NORMAL",
   "regime_prob": 0.4,
   "transition_risk": 0.6,
@@ -46,15 +46,15 @@
   "state": "NORMAL OSCILLATION",
   "signal": "Standard allocation",
   "factors": {
-    "Lt": -0.8223784797626625,
-    "St": -0.39686324122554506,
+    "Lt": -0.8313207351391956,
+    "St": -0.3957556864493226,
     "Rt": 2.78241770175211,
-    "Ft": 0.46687515598794693,
+    "Ft": 0.4659969122524039,
     "Sc": -2.893765347489998
   },
   "ath": 126080,
   "ath_date": "2025-10-06T18:57:42.558Z",
-  "rsi_14": 20.14,
+  "rsi_14": 20.13,
   "rsi_regime": "OVERSOLD",
   "sopr_proxy": 0.8974,
   "sopr_signal": "EXTREME_CAPITULATION",
@@ -111,8 +111,8 @@
   "m14_skew": 0.1,
   "m14_detail": {
     "skew": 0.0,
-    "put_iv": 58.62,
-    "call_iv": 58.62
+    "put_iv": 58.63,
+    "call_iv": 58.63
   },
   "m15_concentration": 0.1,
   "m15_detail": {
@@ -122,7 +122,7 @@
   "m16_regime_ml": 0.2,
   "m16_detail": {
     "p_crisis": 0.2,
-    "recent_mean": -0.0093,
+    "recent_mean": -0.0094,
     "recent_std": 0.0201
   },
   "m17_granger": 0.1,
@@ -147,10 +147,10 @@
   "total_methods_active": 29,
   "m20_obi": 0.35,
   "m20_detail": {
-    "obi": 0.5359,
-    "obi_norm": 0.7679,
-    "bid_vol": 3.76,
-    "ask_vol": 1.14
+    "obi": 0.9095,
+    "obi_norm": 0.9547,
+    "bid_vol": 5.75,
+    "ask_vol": 0.27
   },
   "m21_trade_flow": 0.3,
   "m21_detail": {
@@ -161,29 +161,29 @@
   "m22_spread": 0.18,
   "m22_detail": {
     "spread_bps": 0.0016,
-    "range_bps": 349.13,
-    "bid": 61300.64,
-    "ask": 61300.65
+    "range_bps": 349.01,
+    "bid": 61322.01,
+    "ask": 61322.02
   },
   "m23_liquidity": 0.8,
   "m23_detail": {
-    "slippage_pct": 2.505,
+    "slippage_pct": 2.504,
     "levels_used_buy": 999,
-    "levels_used_sell": 78,
-    "mid_price": 61300.65
+    "levels_used_sell": 69,
+    "mid_price": 61322.01
   },
   "m24_cape": 0.1,
   "m24_detail": {
-    "cape": 0.658,
-    "current_price": 61281.66,
-    "sma_1y_realized": 93134.6
+    "cape": 0.6578,
+    "current_price": 61263.52,
+    "sma_1y_realized": 93134.55
   },
   "m25_minsky": 0.15,
   "m25_detail": {
     "funding_rate": 0,
     "funding_8h": -1.6e-07,
     "accel": 4e-06,
-    "oi_futures": 2306271420,
+    "oi_futures": 2306217870,
     "minsky_stage": "NORMAL"
   },
   "m26_kahneman": 0.325,
@@ -191,17 +191,17 @@
     "loss_aversion": 0.55,
     "anchoring": 0.15,
     "fear": 0.2,
-    "realized_price": 72398.47,
+    "realized_price": 72397.87,
     "ath": 126080.0,
     "pl_pct": -15.36
   },
   "m27_taleb": 0.432,
   "m27_detail": {
-    "dvol": 59.77,
-    "skewness": -0.0781,
+    "dvol": 59.78,
+    "skewness": -0.0776,
     "max_drawdown": 0.2591,
     "vol_7d_ann": 0.5326,
-    "vol_90d_ann": 0.5977,
+    "vol_90d_ann": 0.5978,
     "term": "3M>1W",
     "tail_danger": "NORMAL"
   },
@@ -222,7 +222,7 @@
     "fsi_score": 0.15,
     "components": {
       "credit_growth": 4.72,
-      "asset_vol": 58.62,
+      "asset_vol": 58.63,
       "yield_curve": 0.41,
       "hy_spread": 2.8,
       "top3_concentration": 0.045,
@@ -232,20 +232,20 @@
   },
   "m31_altman": 0.15,
   "m31_detail": {
-    "z_score": 7.598,
+    "z_score": 7.599,
     "x1_liquidity": 0.0,
     "x2_network": 4.0,
     "x3_efficiency": 1,
     "x4_oi_ratio": 0.635,
-    "x5_turnover": 5.915,
+    "x5_turnover": 5.917,
     "zone": "SAFE"
   },
   "ml_ensemble_score": 0.19,
   "ml_ensemble_confidence": 0.8,
   "ml_ensemble_msg": "WeightedAvg=0.190",
   "ml_accuracy": 1.0,
-  "ml_total_labeled": 87,
-  "ml_correct": 87,
+  "ml_total_labeled": 88,
+  "ml_correct": 88,
   "m1_m6_weight_pct": 85.0,
   "m7_m19_weight_pct": 10.0,
   "m20_m31_weight_pct": 5.0,
@@ -255,7 +255,7 @@
   "kelly_half": 0,
   "kelly_quarter": 0,
   "signal_type": "CALM",
-  "signal_strength": 0.344,
+  "signal_strength": 0.345,
   "timing_precision": "LOW",
   "alert_window_hours": 60.2,
   "readiness_score": 0.203,
