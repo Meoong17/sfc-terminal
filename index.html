@@ -849,6 +849,15 @@ function sfcKpiAccent(v) {
 function getChgCls(v) {
   return v > 0 ? 'chg-pos' : v < 0 ? 'chg-neg' : 'chg-zero';
 }
+function sfcColor(v) {
+  return v >= 50 ? 'var(--accent-red)' : v >= 25 ? 'var(--accent-yellow)' : 'var(--accent-green)';
+}
+function sfcZone(v) {
+  return v >= 50 ? 'zone-critical' : v >= 25 ? 'zone-elevated' : 'zone-normal';
+}
+function sfcFill(v) {
+  return v >= 50 ? 'fill-red' : v >= 25 ? 'fill-yellow' : 'fill-green';
+}
 
 function buildFactorChart(d) {
   const canvas = document.getElementById('factorChart');
