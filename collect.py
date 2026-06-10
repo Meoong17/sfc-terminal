@@ -1131,6 +1131,17 @@ out = {
     "m1_m6_weight_pct": 85.0 if new_active > 0 or inst_active_count > 0 else 100.0,
     "m7_m19_weight_pct": 10.0 if new_active > 0 else 0.0,
     "m20_m31_weight_pct": 5.0 if inst_active_count > 0 else 0.0,
+    # — Kelly Criterion Position Sizing (Gap 2 dari Reality Check) —
+    "kelly_p_win": round(composite_confidence, 3),
+    "kelly_b_payoff": 2.0,  # default risk/reward ratio
+    "kelly_fraction": round(max(0, (composite_confidence * 2.0 - (1 - composite_confidence)) / 2.0), 4),
+    "kelly_half": round(max(0, (composite_confidence * 2.0 - (1 - composite_confidence)) / 4.0), 4),
+    "kelly_quarter": round(max(0, (composite_confidence * 2.0 - (1 - composite_confidence)) / 8.0), 4),
+    # — Signal Timing (alert window estimation) —
+    "signal_type": "STRESS" if effective_sfc and effective_sfc > 25 else "CALM",
+    "signal_strength": round(min(effective_sfc / 50.0 if effective_sfc else 0, 1.0), 3),
+    "timing_precision": "LOW" if composite_confidence < 0.3 else "MEDIUM" if composite_confidence < 0.6 else "HIGH",
+    "alert_window_hours": round(24 + 48 * (1 - composite_confidence), 1),  # wider window = lower confidence
     "readiness_score": round(composite_confidence * (1.0 - min(effective_sfc/100 if effective_sfc else 0, 0.5)), 3),
     "shock_factor": shock_factor,
     "shock_event": shock_event,

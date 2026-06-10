@@ -1310,6 +1310,16 @@ function render(d) {
           <div class="info-row"><span class="info-label">Transition Risk</span><span class="info-val" style="color:${(d.transition_risk || 0) > 0.5 ? '#ff3355' : (d.transition_risk || 0) > 0.25 ? '#ffb347' : '#00e68a'}">${fmtNum((d.transition_risk || 0) * 100, 0)}%</span></div>
           <div class="info-row"><span class="info-label">Readiness</span><span class="info-val" style="color:${(d.readiness_score || 0) >= 0.8 ? '#00e68a' : (d.readiness_score || 0) >= 0.5 ? '#ffb347' : '#8892a8'}">${((d.readiness_score || 0) * 100).toFixed(0)}%</span></div>
           <div class="progress-track"><div class="progress-fill fill-green" style="width: ${((d.readiness_score || 0) * 100).toFixed(0)}%"></div></div>
+          <!-- Reality Check: Kelly + Timing -->
+          <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border-subtle);font-size:10px;color:var(--text-muted)">
+            <div style="font-weight:600;margin-bottom:4px;color:var(--text-secondary)">Kelly Position Size</div>
+            <div class="info-row"><span class="info-label">Win Prob</span><span class="info-val">${((d.kelly_p_win || 0.5) * 100).toFixed(0)}%</span></div>
+            <div class="info-row"><span class="info-label">Full Kelly</span><span class="info-val" style="color:${(d.kelly_fraction || 0) > 0.3 ? '#ffb347' : '#00e68a'}">${((d.kelly_fraction || 0) * 100).toFixed(1)}%</span></div>
+            <div class="info-row"><span class="info-label">Half Kelly</span><span class="info-val" style="color:#00e68a">${((d.kelly_half || 0) * 100).toFixed(1)}%</span></div>
+            <div style="font-weight:600;margin:6px 0 4px;color:var(--text-secondary)">Alert Window</div>
+            <div class="info-row"><span class="info-label">Duration</span><span class="info-val">~${d.alert_window_hours || 48}h</span></div>
+            <div class="info-row"><span class="info-label">Precision</span><span class="info-val" style="color:${d.timing_precision === 'HIGH' ? '#00e68a' : '#ffb347'}">${d.timing_precision || 'LOW'}</span></div>
+          </div>
         </div>
       </div>
     </div>
