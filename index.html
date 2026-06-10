@@ -934,7 +934,7 @@ function updatePriceChart() {
           tension: 0.3
         },
         {
-          label: 'SFC Floor',
+          label: 'Dynamic Floor',
           data: flrP,
           borderColor: '#ff3355',
           backgroundColor: 'rgba(255,51,85,0.04)',
@@ -1028,9 +1028,11 @@ document.addEventListener('transitionend', function(e) {
 function render(d) {
   if (!d) return;
   currentData = d;
-  if (d.btc && d.floor_total) pushHistory(d.btc, d.floor_total);
-
   const sfcEff = d.sfc_effective || 0;
+  if (d.btc && sfcEff != null) {
+    const dynamicFloor = d.btc * (1 - sfcEff/100 * 0.6);
+    pushHistory(d.btc, dynamicFloor);
+  }
   const btcChg = d.btc_24h || 0;
   const state = d.state || 'NORMAL OSCILLATION';
   const signal = d.signal || 'Standard allocation';
@@ -1150,16 +1152,6 @@ function render(d) {
         <div class="kpi-value">${d.fng ?? '—'}</div>
         <div class="kpi-sub">${d.fng_cls || '—'}</div>
       </div>
-      <div class="kpi-card accent-blue">
-        <div class="kpi-label">BTC Dominance</div>
-        <div class="kpi-value">${fmtNum(d.dom, 1)}%</div>
-        <div class="kpi-sub">Mcap: ${fmtCompact(d.btc_mcap)}</div>
-      </div>
-      <div class="kpi-card accent-cyan">
-        <div class="kpi-label">Floor Price</div>
-        <div class="kpi-value" style="color:var(--accent-blue)">$${fmtNum(d.floor_total)}</div>
-        <div class="kpi-sub">Buffer: $${fmtNum(d.floor_buffer)}</div>
-      </div>
     </div>
 
     <div class="col2-grid">
@@ -1227,7 +1219,7 @@ function render(d) {
 
     <div class="card full-row" style="margin-bottom:20px">
       <div class="card-hd">
-        <span class="card-title"><span class="card-title-icon">📉</span>BTC Price vs SFC Floor</span>
+        <span class="card-title"><span class="card-title-icon">📉</span>BTC Price vs Dynamic Floor</span>
         <span class="card-title" style="cursor:pointer;font-size:10px;font-weight:500" onclick="toggleChartVisibility()">${chartVisible ? 'Hide' : 'Show'} Chart</span>
       </div>
       <div class="card-bd" id="chartContainer">
@@ -1384,15 +1376,15 @@ function render(d) {
           </div>
 
           <div class="help-card">
-            <div class="help-title" style="color:#4a9eff">📉 BTC Price vs SFC Floor</div>
+            <div class="help-title" style="color:#4a9eff">📉 BTC Price vs Dynamic Floor</div>
             <div class="help-body">
-              <strong>Floor Price</strong> = ATH × φ × (1 − dv_sfc), where φ represents market structure decay and dv_sfc is current volatility stress.
+              <strong>Dynamic Floor</strong> = Current Price × (1 − SFC% × 0.6).
               <ul>
-                <li>Price <strong>above</strong> floor → normal zone, buffer increases with distance</li>
-                <li>Price <strong>approaching</strong> floor → heightened risk, nearing support</li>
-                <li>Price <strong>below</strong> floor → extreme conditions, historical rarity</li>
+                <li>Floor moves <strong>with</strong> price, but discounts it proportionally to stress level</li>
+                <li>At 0% stress: floor = price (no discount)</li>
+                <li>At 50% stress: floor = price × 0.70 (30% discount)</li>
+                <li>Price approaching floor = risk-off signal</li>
               </ul>
-              Floor adapts daily from dynamic ATH via CoinGecko.
             </div>
           </div>
 

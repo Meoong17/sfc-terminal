@@ -26,11 +26,12 @@ BINANCE_BASE = "https://api.binance.com"
 _CG_CACHE = {}
 
 def _cg_fetch_all():
-    """Fetch all CoinGecko data in 2 calls max, cache for all methods."""
+    """Fetch all CoinGecko data in 4 calls max, cache for all methods. Falls back to Binance klines on rate limit."""
     if _CG_CACHE:
         return _CG_CACHE
+
+    # Call 1: Coin info (ATH, market data)
     try:
-        # Call 1: Coin info (ATH, market data)
         r1 = requests.get(
             "https://api.coingecko.com/api/v3/coins/bitcoin?localization=false&tickers=false&community_data=false&developer_data=false",
             timeout=15
@@ -41,33 +42,46 @@ def _cg_fetch_all():
         _CG_CACHE["ath_date"] = md.get("ath_date", {}).get("usd", "")
         _CG_CACHE["mcap"] = float(md.get("market_cap", {}).get("usd", 0))
         _CG_CACHE["vol_24h"] = float(md.get("total_volume", {}).get("usd", 0))
+    except Exception as e:
+        print(f"[CG Cache] Call 1 (coin info) failed: {e}", file=sys.stderr)
 
-        # Call 2: 365-day price history
+    # Call 2: 365-day price history
+    try:
         r2 = requests.get(
             "https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=365&interval=daily",
             timeout=15
         )
         prices = [p[1] for p in r2.json().get("prices", [])]
         _CG_CACHE["prices_365"] = prices
+    except Exception as e:
+        print(f"[CG Cache] Call 2 (365-day history) failed: {e}", file=sys.stderr)
 
-        # Call 3: 90-day for skewness
+    # Call 3: 90-day for skewness
+    try:
         r3 = requests.get(
             "https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=90&interval=daily",
             timeout=15
         )
         prices_90 = [p[1] for p in r3.json().get("prices", [])]
         _CG_CACHE["prices_90"] = prices_90
+    except Exception as e:
+        print(f"[CG Cache] Call 3 (90-day history) failed: {e}", file=sys.stderr)
 
-        # Call 4: 200-day for Altman Z
+    # Call 4: 200-day for Altman Z
+    try:
         r4 = requests.get(
             "https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=200&interval=daily",
             timeout=15
         )
         _CG_CACHE["prices_200"] = [p[1] for p in r4.json().get("prices", [])]
-
-        print(f"[CG Cache] Fetched: ATH=${_CG_CACHE['ath']:,.0f}, {len(prices)} daily prices", file=sys.stderr)
     except Exception as e:
-        print(f"[CG Cache] Error: {e}", file=sys.stderr)
+        print(f"[CG Cache] Call 4 (200-day history) failed: {e}", file=sys.stderr)
+
+    # If all CoinGecko calls failed, fall back to Binance klines
+    if not _CG_CACHE:
+        print("[CG Cache] All CoinGecko calls failed, trying Binance fallback...", file=sys.stderr)
+        _binance_klines_fallback()
+
     return _CG_CACHE
 
 def _cg_get(key, default=None):
@@ -75,6 +89,27 @@ def _cg_get(key, default=None):
     if not _CG_CACHE:
         _cg_fetch_all()
     return _CG_CACHE.get(key, default)
+
+
+def _binance_klines_fallback():
+    """Fallback when CoinGecko rate-limited: use Binance klines."""
+    try:
+        # Binance daily klines: [open, high, low, close, volume, ...]
+        r = requests.get("https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1d&limit=365", timeout=10)
+        if r.status_code != 200:
+            return
+        klines = r.json()
+        prices = [float(k[4]) for k in klines]  # close prices
+        if prices:
+            _CG_CACHE["prices_365"] = prices
+            _CG_CACHE["prices_90"] = prices[-90:] if len(prices) >= 90 else prices
+            _CG_CACHE["prices_200"] = prices[-200:] if len(prices) >= 200 else prices
+            _CG_CACHE["ath"] = max(prices)  # Use highest close as ATH approximation
+            _CG_CACHE["mcap"] = prices[-1] * 19_500_000  # Approximate: price * circulating supply
+            _CG_CACHE["vol_24h"] = float(klines[-1][5]) * float(klines[-1][4])  # volume * close
+            print(f"[Binance Fallback] Used Binance klines ({len(prices)} days)", file=sys.stderr)
+    except Exception as e:
+        print(f"[Binance Fallback] Error: {e}", file=sys.stderr)
 
 def _binance_depth(symbol="BTCUSDT", limit=20):
     """Fetch order book depth from Binance (free)."""

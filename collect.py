@@ -11,6 +11,16 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+ATH_CACHE_FILE = os.path.join(os.path.dirname(__file__), '.ath_cache.json')
+
+def _save_ath(ath, date):
+    with open(ATH_CACHE_FILE, 'w') as f: json.dump({'ath': ath, 'date': date, 'ts': time.time()}, f)
+
+def _load_ath():
+    if os.path.exists(ATH_CACHE_FILE):
+        with open(ATH_CACHE_FILE) as f: return json.load(f)
+    return None
+
 # Import institutional methods (M20-M31) and ML ensemble
 sys.path.insert(0, os.path.dirname(__file__))
 try:
@@ -96,7 +106,7 @@ def get_btc():
         return None, None, None
 
 def get_ath():
-    """Fetch dynamic ATH from CoinGecko — fallback to hardcoded 126272"""
+    """Fetch dynamic ATH from CoinGecko — fallback to hardcoded 126272 and cache"""
     try:
         r = requests.get("https://api.coingecko.com/api/v3/coins/bitcoin?localization=false&tickers=false&community_data=false&developer_data=false", timeout=10)
         d = r.json()
@@ -104,9 +114,15 @@ def get_ath():
         ath_date = d.get("market_data", {}).get("ath_date", {}).get("usd", "")
         if ath and ath > 0:
             print(f"[SFC] ATH fetched: ${ath:,.0f} on {ath_date}", file=sys.stderr)
+            _save_ath(ath, ath_date)
             return int(ath), ath_date
     except Exception as e:
-        print(f"[SFC] ATH fetch failed, using fallback: {e}", file=sys.stderr)
+        print(f"[SFC] ATH fetch failed: {e}", file=sys.stderr)
+    # Failover: load from cache
+    cached = _load_ath()
+    if cached and cached.get('ath', 0) > 0:
+        print(f"[SFC] ATH from cache: ${cached['ath']:,.0f} ({cached.get('date', '?')})", file=sys.stderr)
+        return int(cached['ath']), cached.get('date', '')
     FALLBACK_ATH = 126272
     return FALLBACK_ATH, ""
 
@@ -198,6 +214,16 @@ def get_btc_ohlcv_daily(days=30):
     except:
         return []
 
+def _binance_klines(days=30):
+    """Fetch BTC klines from Binance as fallback (free, no key)."""
+    try:
+        limit = days  # 1 per day
+        r = requests.get(f"https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1d&limit={limit}", timeout=10)
+        if r.status_code != 200: return []
+        klines = r.json()
+        return [{"time": k[0], "close": float(k[4]), "volume": float(k[5])} for k in klines]
+    except: return []
+
 def compute_rsi(closes, period=14):
     if len(closes) < period + 1:
         return None
@@ -245,55 +271,47 @@ def compute_sopr_proxy(closes_7d, closes_30d, btc_spot):
 # 2. SFC v2.1 CALCULATION (NO LLM - Rule Based)
 # ============================================================
 
+def _sigmoid_factor(val, center, k=0.15):
+    '''Smooth logistic: maps val to [-3, +3] range.
+    center = neutral point, k = steepness.
+    sigmoid(x) = 6 / (1 + exp(-k*(x-center))) - 3
+    '''
+    return 6 / (1 + math.exp(-k * (val - center))) - 3
+
 def score_factors_from_market(btc, btc_24h, dom, dvol, fng, pc_oi, m2_yoy, dxy):
-    """Score 5 factors from market data. Range -3 to +3"""
+    """Score 5 factors from market data using smooth sigmoid/logistic functions. Range -3 to +3"""
     factors = {"Lt": 0.0, "St": 0.0, "Rt": 0.0, "Ft": 0.0, "Sc": 0.0}
     
-    # Lt (Liquidity) - based on M2 and BTC momentum
-    if m2_yoy:
-        if m2_yoy < 2: factors["Lt"] -= 1.5
-        elif m2_yoy < 4: factors["Lt"] -= 0.5
-        elif m2_yoy > 7: factors["Lt"] += 1.0
-        elif m2_yoy > 5: factors["Lt"] += 0.5
-    if btc_24h:
-        if btc_24h < -10: factors["Lt"] -= 1.0
-        elif btc_24h < -5: factors["Lt"] -= 0.5
-        elif btc_24h > 10: factors["Lt"] += 1.0
-        elif btc_24h > 5: factors["Lt"] += 0.5
+    # Lt (Liquidity) — based on M2 and BTC momentum
+    if m2_yoy is not None:
+        factors["Lt"] += _sigmoid_factor(m2_yoy, center=5.0, k=0.8)
+    if btc_24h is not None:
+        factors["Lt"] += _sigmoid_factor(btc_24h, center=0.0, k=0.15)
     
-    # St (Structural) - based on dominance and put/call
-    if dom:
-        if dom > 65: factors["St"] -= 1.0
-        elif dom < 45: factors["St"] += 0.5
-    if pc_oi:
-        if pc_oi > 1.2: factors["St"] -= 1.5
-        elif pc_oi > 1.0: factors["St"] -= 0.5
-        elif pc_oi < 0.6: factors["St"] += 0.5
+    # St (Structural) — based on dominance and put/call
+    if dom is not None:
+        # High dominance = concentration risk (negative), low = diffuse (positive)
+        factors["St"] += -_sigmoid_factor(dom, center=55.0, k=0.2)
+    if pc_oi is not None:
+        # High put/call = fear (negative), low = greed (positive)
+        factors["St"] += -_sigmoid_factor(pc_oi, center=0.8, k=2.0)
     
-    # Rt (Sentiment) - based on Fear & Greed
-    if fng:
-        if fng <= 15: factors["Rt"] = -2.0
-        elif fng <= 30: factors["Rt"] = -1.0
-        elif fng <= 45: factors["Rt"] = -0.5
-        elif fng <= 55: factors["Rt"] = 0.0
-        elif fng <= 75: factors["Rt"] = 1.0
-        else: factors["Rt"] = 2.0
+    # Rt (Sentiment) — based on Fear & Greed Index
+    if fng is not None:
+        # Invert FnG: low fear = high stress (negative), high greed = low stress (positive)
+        factors["Rt"] = -_sigmoid_factor(fng, center=50.0, k=0.08)
     
-    # Ft (Systemic) - based on DVOL
-    if dvol:
-        if dvol >= 120: factors["Ft"] = -2.5
-        elif dvol >= 100: factors["Ft"] = -1.5
-        elif dvol >= 80: factors["Ft"] = -0.5
-        elif dvol >= 60: factors["Ft"] = 0.0
-        elif dvol < 40: factors["Ft"] = 1.0
-        else: factors["Ft"] = 0.5
+    # Ft (Systemic) — based on DVOL (implied volatility)
+    if dvol is not None:
+        # High vol = systemic stress (negative)
+        factors["Ft"] = -_sigmoid_factor(dvol, center=65.0, k=0.06)
     
-    # Sc (External) - based on DXY
-    if dxy:
-        if dxy > 110: factors["Sc"] = -1.5
-        elif dxy > 105: factors["Sc"] = -0.5
-        elif dxy < 95: factors["Sc"] = 1.0
-    if dom and dom > 70:
+    # Sc (External) — based on DXY (US dollar index)
+    if dxy is not None:
+        # Strong dollar = crypto headwind (negative), weak = tailwind (positive)
+        factors["Sc"] = -_sigmoid_factor(dxy, center=100.0, k=0.2)
+    # High dominance amplifies external risk
+    if dom is not None and dom > 65:
         factors["Sc"] -= 0.5
     
     # Clamp all factors to [-3, 3]
@@ -390,15 +408,12 @@ def calculate_sfc_ensemble(factors):
 
 DVOL_BASELINE = 50
 
-def compute_floor(dvol, sfc_pct, ath):
-    if sfc_pct is not None:
-        dv = 0.10 + (sfc_pct / 100.0) * 0.75
-    else:
-        dv = 0.80
-    phi = DVOL_BASELINE / max(dvol or DVOL_BASELINE, DVOL_BASELINE)
-    buf = int(ath * (1 - dv))
-    total = int(ath * (1 - dv) * phi)
-    return buf, total, round(dv, 3), round(phi, 3)
+def compute_floor_v2(btc, sfc_pct):
+    if not btc or sfc_pct is None: return None, None, None, None
+    drawdown = min(sfc_pct / 100.0, 0.8) * 0.6  # Max 48% drawdown at 80% stress
+    floor = int(btc * (1 - drawdown))
+    buffer = int(btc - floor)
+    return buffer, floor, round(drawdown, 3), 1.0
 
 def determine_state(dvol, sfc_pct, btc=None, floor_total=None):
     if dvol is None or sfc_pct is None:
@@ -498,6 +513,7 @@ def calculate_m8_yield_curve():
     elif slope < 1.0: slope_s = 0.40
     elif slope > 2.0: slope_s = 0.15
     else: slope_s = 0.25
+
     if spread > 400: cred_s = 0.85
     elif spread > 300: cred_s = 0.65
     elif spread > 200: cred_s = 0.40
@@ -739,7 +755,7 @@ dxy = get_dxy()
 pc_oi, pc_vol = get_put_call_ratio()
 ath, ath_date = get_ath()
 
-ohlcv = get_btc_ohlcv_daily(days=30)
+ohlcv = get_btc_ohlcv_daily(days=30) or _binance_klines(30)
 closes_all = [c["close"] for c in ohlcv] if ohlcv else []
 closes_7d = closes_all[-7:] if len(closes_all) >= 7 else closes_all
 closes_30d = closes_all[-30:] if len(closes_all) >= 30 else closes_all
@@ -872,7 +888,7 @@ effective_sfc = min(sfc_pct + news_stress + liq_mod, 100.0) if sfc_pct is not No
 effective_sfc = max(effective_sfc, 0.0) if effective_sfc else None
 
 # Floor and state (dynamic ATH)
-fb, ft, dv_sfc, phi = compute_floor(dvol, effective_sfc, ath)
+fb, ft, dv_sfc, phi = compute_floor_v2(btc, effective_sfc)
 state, signal = determine_state(dvol, effective_sfc, btc, ft)
 
 regime, regime_prob, transition_risk = detect_regime(dvol, effective_sfc, news_stress, news_sentiment)
