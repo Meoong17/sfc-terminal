@@ -1052,7 +1052,8 @@ function render(d) {
 
   /* ── SIGNAL CLASS ── */
   let sigClass = 'signal-watch';
-  if ((state + ' ' + signal).includes('BUY') || (state + ' ' + signal).includes('FLOOR')) sigClass = 'signal-buy';
+  if ((d.kelly_fraction || 0) <= 0) sigClass = 'signal-cash';
+  else if ((state + ' ' + signal).includes('BUY') || (state + ' ' + signal).includes('FLOOR')) sigClass = 'signal-buy';
   else if ((state + ' ' + signal).includes('CASH') || (state + ' ' + signal).includes('REDUCE')) sigClass = 'signal-cash';
 
   /* ── TOPBAR BADGE ── */
@@ -1301,11 +1302,11 @@ function render(d) {
 
       <div class="card">
         <div class="card-hd">
-          <span class="card-title"><span class="card-title-icon">🎯</span>Signal & Recommendation</span>
+          <span class="card-title"><span class="card-title-icon">🎯</span>Signal & Action</span>
         </div>
         <div class="card-bd" style="text-align:center">
           <div class="signal-hero ${sigClass}">${state}</div>
-          <div class="info-row"><span class="info-label">Recommendation</span><span class="info-val" style="color:${sigClass === 'signal-buy' ? '#00e68a' : sigClass === 'signal-cash' ? '#ff3355' : '#ffb347'}">${signal}</span></div>
+          <div class="info-row"><span class="info-label">Action</span><span class="info-val" style="color:${(d.kelly_fraction || 0) <= 0 ? '#ff3355' : sigClass === 'signal-buy' ? '#00e68a' : sigClass === 'signal-cash' ? '#ff3355' : '#ffb347'}">${(d.kelly_fraction || 0) <= 0 ? '⚠ CASH' : signal}</span></div>
           <div class="info-row"><span class="info-label">BTC vs Floor</span><span class="info-val" style="color:${d.btc && d.floor_total && d.btc <= d.floor_total * 1.05 ? '#00e68a' : '#ffb347'}">${d.btc && d.floor_total ? ((d.btc / d.floor_total - 1) * 100).toFixed(1) + '% above' : '—'}</span></div>
           <div class="info-row"><span class="info-label">Transition Risk</span><span class="info-val" style="color:${(d.transition_risk || 0) > 0.5 ? '#ff3355' : (d.transition_risk || 0) > 0.25 ? '#ffb347' : '#00e68a'}">${fmtNum((d.transition_risk || 0) * 100, 0)}%</span></div>
           <div class="info-row"><span class="info-label">Readiness</span><span class="info-val" style="color:${(d.readiness_score || 0) >= 0.8 ? '#00e68a' : (d.readiness_score || 0) >= 0.5 ? '#ffb347' : '#8892a8'}">${((d.readiness_score || 0) * 100).toFixed(0)}%</span></div>
@@ -1339,7 +1340,7 @@ function render(d) {
           <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:10px">
             <div class="info-row"><span class="info-label">Alert Window</span><span class="info-val">~${d.alert_window_hours || 48}h (${(d.alert_window_hours || 48) < 36 ? 'tight' : 'wide'})</span></div>
             <div class="info-row"><span class="info-label">Timing Precision</span><span class="info-val" style="color:${d.timing_precision === 'HIGH' ? '#00e68a' : '#ffb347'}">${d.timing_precision || 'LOW'}</span></div>
-            <div class="info-row"><span class="info-label">Signal Type</span><span class="info-val" style="color:${d.signal_type === 'STRESS' ? '#ffb347' : '#00e68a'}">${d.signal_type || 'CALM'}</span></div>
+            <div class="info-row"><span class="info-label">Signal Type</span><span class="info-val" style="color:${d.fng < 15 || (d.cascade_risk || 0) > 0.5 || (d.dvol || 0) > 80 ? '#ff3355' : '#00e68a'}">${d.fng < 15 ? (d.fng_cls || 'EXTREME FEAR') : (d.cascade_risk || 0) > 0.5 ? 'CASCADE RISK' : (d.dvol || 0) > 80 ? 'HIGH VOL' : 'NORMAL'}</span></div>
           </div>
         </div>
       </div>
