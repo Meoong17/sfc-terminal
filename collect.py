@@ -11,6 +11,27 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+# Import institutional methods (M20-M31) and ML ensemble
+sys.path.insert(0, os.path.dirname(__file__))
+try:
+    from methods_institutional import compute_all_institutional
+    INSTITUTIONAL_AVAILABLE = True
+except ImportError as e:
+    print(f"[SFC] Institutional methods not available: {e}", file=sys.stderr)
+    def compute_all_institutional(*a, **k): return {}, {}, 0, None
+    INSTITUTIONAL_AVAILABLE = False
+
+try:
+    from ml_ensemble import predict_with_ml, add_observation, evaluate_accuracy, retrain_on_errors
+    ML_AVAILABLE = True
+except ImportError as e:
+    print(f"[SFC] ML ensemble not available: {e}", file=sys.stderr)
+    def predict_with_ml(*a, **k): return 0.5, 0.0, "ML unavailable"
+    def add_observation(*a, **k): return None
+    def evaluate_accuracy(): return {"accuracy": None}
+    def retrain_on_errors(): return None
+    ML_AVAILABLE = False
+
 # Import news aggregator
 sys.path.insert(0, os.path.dirname(__file__))
 try:
@@ -760,18 +781,46 @@ if dxy_hist and len(dxy_hist) > 1:
     dxy_rets = [(dxy_hist[i] - dxy_hist[i-1]) / dxy_hist[i-1] for i in range(1, len(dxy_hist))]
 m19_s, m19_d = calculate_m19_mutual_info(rets_pct, dxy_rets)
 
-# Blend ensemble: 85% original (M1-M6) + 15% new methods (M7-M19)
+# ── INSTITUTIONAL METHODS (M20-M31) ──
+# From sfc2/INSTITUTIONAL_METHODS_WALLSTREET.md + PATH_TO_90_PERCENT.md
+print("[SFC] Computing M20-M31 institutional methods...", file=sys.stderr)
+inst_results, inst_details, inst_active, inst_avg = compute_all_institutional(btc_current=btc)
+
+# Blend ensemble: 85% original (M1-M6) + 10% new methods (M7-M19) + 5% institutional (M20-M31)
 new_scores = [s for s in [m7_s, m8_s, m9_s, m10_s, m11_s, m12_s, m13_s, m14_s, m15_s, m16_s, m17_s, m18_s, m19_s] if s is not None]
 new_active = len(new_scores)
-if new_active > 0:
+
+# All institutional scores
+inst_scores_list = [s for s in inst_results.values() if s is not None]
+inst_active_count = len(inst_scores_list)
+
+if new_active > 0 and inst_active_count > 0:
+    new_avg = sum(new_scores) / new_active
+    inst_avg_value = sum(inst_scores_list) / inst_active_count
+    p_ens_original = 0.20*m1_klr + 0.25*m2_logit + 0.20*m3_bayes + 0.10*m4_ewc + 0.15*m5_qreg/100 + 0.10*m6_regime/100
+    # Hybrid blend: 85% original + 10% M7-M19 + 5% M20-M31
+    sfc_pct = (0.85 * p_ens_original + 0.10 * new_avg + 0.05 * inst_avg_value) * 100
+    zone = "CRITICAL" if sfc_pct/100 > 0.75 else "HIGH" if sfc_pct/100 > 0.5 else "ELEVATED" if sfc_pct/100 > 0.25 else "NORMAL"
+    print(f"[SFC] Methods active: M7-M19={new_active}/13 + M20-M31={inst_active_count}/12 | "
+          f"Ensemble blend: {sfc_pct:.1f}%", file=sys.stderr)
+elif new_active > 0:
     new_avg = sum(new_scores) / new_active
     p_ens_original = 0.20*m1_klr + 0.25*m2_logit + 0.20*m3_bayes + 0.10*m4_ewc + 0.15*m5_qreg/100 + 0.10*m6_regime/100
     sfc_pct = (0.85 * p_ens_original + 0.15 * new_avg) * 100
-    # Recalculate zone with blended score
     zone = "CRITICAL" if sfc_pct/100 > 0.75 else "HIGH" if sfc_pct/100 > 0.5 else "ELEVATED" if sfc_pct/100 > 0.25 else "NORMAL"
-    print(f"[SFC] New methods active: {new_active}/13 | Ensemble blend: {sfc_pct:.1f}%", file=sys.stderr)
+    print(f"[SFC] M7-M19 active: {new_active}/13 | Ensemble blend: {sfc_pct:.1f}%", file=sys.stderr)
+    inst_avg_value = None
+    inst_active_count = 0
+elif inst_active_count > 0:
+    new_avg = 0.0
+    inst_avg_value = sum(inst_scores_list) / inst_active_count
+    p_ens_original = 0.20*m1_klr + 0.25*m2_logit + 0.20*m3_bayes + 0.10*m4_ewc + 0.15*m5_qreg/100 + 0.10*m6_regime/100
+    sfc_pct = (0.85 * p_ens_original + 0.15 * inst_avg_value) * 100
+    zone = "CRITICAL" if sfc_pct/100 > 0.75 else "HIGH" if sfc_pct/100 > 0.5 else "ELEVATED" if sfc_pct/100 > 0.25 else "NORMAL"
+    print(f"[SFC] M20-M31 active: {inst_active_count}/12 | Ensemble blend: {sfc_pct:.1f}%", file=sys.stderr)
 else:
     new_avg = 0.0
+    inst_avg_value = None
     print(f"[SFC] No new methods available, using original ensemble", file=sys.stderr)
 
 # News aggregation
