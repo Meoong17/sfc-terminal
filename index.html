@@ -1316,22 +1316,22 @@ function render(d) {
       <!-- Reality Check: Kelly Criterion + Timing (Standalone Card) -->
       <div class="card full-row">
         <div class="card-hd">
-          <span class="card-title"><span class="card-title-icon">📐</span>Kelly Position Sizing &mdash; <span style="font-weight:400;color:var(--text-secondary);font-size:10px">Reality Check Gap 2 &amp; 3</span></span>
+          <span class="card-title"><span class="card-title-icon">📐</span>Kelly Position Sizing &mdash; <span style="font-weight:400;color:var(--text-secondary);font-size:10px">Allocation guide based on signal confidence</span></span>
         </div>
         <div class="card-bd">
           <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
             <div style="text-align:center;padding:8px;background:rgba(255,255,255,0.03);border-radius:10px">
-              <div style="font-size:10px;color:var(--text-muted);margin-bottom:4px">Win Prob</div>
+              <div style="font-size:10px;color:var(--text-muted);margin-bottom:4px">Signal Confidence</div>
               <div style="font-size:24px;font-weight:700;font-family:JetBrains Mono,monospace;color:${(d.kelly_p_win || 0) > 0.6 ? '#00e68a' : '#ffb347'}">${((d.kelly_p_win || 0.5) * 100).toFixed(0)}%</div>
-              <div style="font-size:9px;color:var(--text-muted)">Model Confidence</div>
+              <div style="font-size:9px;color:var(--text-muted)">How much to trust this signal</div>
             </div>
             <div style="text-align:center;padding:8px;background:rgba(255,255,255,0.03);border-radius:10px">
-              <div style="font-size:10px;color:var(--text-muted);margin-bottom:4px">Full Kelly</div>
+              <div style="font-size:10px;color:var(--text-muted);margin-bottom:4px">Max Allocation</div>
               <div style="font-size:24px;font-weight:700;font-family:JetBrains Mono,monospace;color:${(d.kelly_fraction || 0) > 0.3 ? '#ffb347' : (d.kelly_fraction || 0) > 0 ? '#00e68a' : '#5a6478'}">${((d.kelly_fraction || 0) * 100).toFixed(1)}%</div>
               <div style="font-size:9px;color:var(--text-muted)">${(d.kelly_fraction || 0) > 0 ? 'Optimal position size' : 'No edge — stay in cash'}</div>
             </div>
             <div style="text-align:center;padding:8px;background:rgba(255,255,255,0.03);border-radius:10px">
-              <div style="font-size:10px;color:var(--text-muted);margin-bottom:4px">Half Kelly (safe)</div>
+              <div style="font-size:10px;color:var(--text-muted);margin-bottom:4px">Safe Allocation</div>
               <div style="font-size:24px;font-weight:700;font-family:JetBrains Mono,monospace;color:#00e68a">${((d.kelly_half || 0) * 100).toFixed(1)}%</div>
               <div style="font-size:9px;color:var(--text-muted)">Conservative bet</div>
             </div>
