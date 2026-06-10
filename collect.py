@@ -320,8 +320,8 @@ def score_factors_from_market(btc, btc_24h, dom, dvol, fng, pc_oi, m2_yoy, dxy):
     
     # Rt (Sentiment) — based on Fear & Greed Index
     if fng is not None:
-        # Invert FnG: low fear = high stress (negative), high greed = low stress (positive)
-        factors["Rt"] = -_sigmoid_factor(fng, center=50.0, k=0.08)
+        # Low FnG = fear = stress (negative), high FnG = greed = calm (positive)
+        factors["Rt"] = _sigmoid_factor(fng, center=50.0, k=0.08)
     
     # Ft (Systemic) — based on DVOL (implied volatility)
     if dvol is not None:
