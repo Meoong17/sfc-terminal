@@ -32,6 +32,17 @@ except ImportError:
     CAUSAL_AVAILABLE = False
     print("[SFC] Causal inference not available", file=sys.stderr)
 
+# Import advanced modules (Priority 2-6)
+try:
+    from sfc_advanced import (
+        RegimeDetector, UncertaintyQuantifier, AutoFeatureEngineer,
+        fetch_all_alternative_data, compute_all_advanced
+    )
+    ADVANCED_AVAILABLE = True
+except ImportError as e:
+    ADVANCED_AVAILABLE = False
+    print(f"[SFC] Advanced modules not available: {e}", file=sys.stderr)
+
 sys.path.insert(0, os.path.dirname(__file__))
 try:
     from methods_institutional import compute_all_institutional
@@ -940,6 +951,89 @@ shock_factor, shock_event, shock_severity = detect_black_swan_v2(articles_scored
 SEC_KEYWORDS = ['hack','exploit','rug','scam','breach','attack','phish','malware','ransom','fraud','theft','ransomware','exploit']
 sec_events = sum(1 for a in articles_scored if any(kw in a['title'].lower() for kw in SEC_KEYWORDS))
 
+# ── ADVANCED MODULES: Regime Detection (Priority 2), Uncertainty (Priority 4), Alt Data (Priority 6) ──
+print("[SFC] Running advanced modules (regime, uncertainty, alt data)...", file=sys.stderr)
+adv_regime = {}
+adv_uncertainty = {}
+adv_alt = {}
+adv_regime_boost = 0
+regime_detector = None
+
+if ADVANCED_AVAILABLE:
+    try:
+        # Build feature matrix from all current method scores for regime detection
+        feat_dict = {
+            'sfc_stress': sfc_pct / 100.0 if sfc_pct else 0.5,
+            'dvol': dvol / 100.0 if dvol else 0.5,
+            'fng': fng / 100.0 if fng else 0.5,
+            'btc_momentum': (chg / 10.0 + 1) / 2 if chg is not None else 0.5,
+            'news_stress': 0.5,
+        }
+        
+        # Use historical data for regime fitting
+        all_feats = []
+        try:
+            with open(os.path.join(os.path.dirname(__file__), "data_collection.json")) as f:
+                hist = json.load(f)
+            feat_list = hist.get("features", [])
+            if len(feat_list) > 20:
+                for obs in feat_list:
+                    row = [
+                        float(obs[i]) if i < len(obs) and obs[i] is not None else 0.5
+                        for i in range(min(5, len(obs)))
+                    ]
+                    all_feats.append(row)
+        except:
+            all_feats = [list(feat_dict.values())] * 30
+        
+        if len(all_feats) >= 20:
+            # Fit regime detector
+            regime_detector = RegimeDetector(n_regimes=4)
+            regime_detector.fit(np.array(all_feats))
+            
+            # Current regime prediction
+            current_feat = np.array([list(feat_dict.values())])
+            adv_regime = regime_detector.get_regime_status(current_feat)
+            regime_boost, _ = regime_detector.score_stress_boost(current_feat)
+            adv_regime_boost = regime_boost
+            
+            print(f"  [Advanced] Regime: {adv_regime.get('regime','?')} | "
+                  f"Crisis prob: {adv_regime.get('crisis_probability',0):.0%} | "
+                  f"Boost: +{regime_boost}", file=sys.stderr)
+    except Exception as e:
+        print(f"[Advanced] Regime detection error: {e}", file=sys.stderr)
+        adv_regime = {'regime': 'NORMAL', 'crisis_probability': 0.0, 'stability': 0.9}
+        adv_regime_boost = 0
+    
+    # Uncertainty Quantification (Priority 4)
+    try:
+        uq = UncertaintyQuantifier(n_bootstrap=50)
+        # Fit on sfc history if available
+        # (in practice, we use raw sfc score with default calibration)
+        uq_result = uq.predict_with_uncertainty(np.array([sfc_pct / 100.0 if sfc_pct else 0.5]))
+        adv_uncertainty = uq_result
+        print(f"  [Advanced] Uncertainty: {uq_result.get('uncertainty',0):.3f} | "
+              f"Reliable: {uq_result.get('is_reliable',False)}", file=sys.stderr)
+    except Exception as e:
+        print(f"[Advanced] Uncertainty error: {e}", file=sys.stderr)
+    
+    # Alternative Data (Priority 6)
+    try:
+        adv_alt = fetch_all_alternative_data()
+        alt_trends = adv_alt.get('trends_recession', 0.5)
+        alt_reddit = adv_alt.get('reddit_sentiment', 0.0)
+        print(f"  [Advanced] Alt data: recession_search={alt_trends:.2f} | "
+              f"reddit_sentiment={alt_reddit:.3f}", file=sys.stderr)
+    except Exception as e:
+        print(f"[Advanced] Alt data error: {e}", file=sys.stderr)
+
+# Apply regime boost to effective SFC
+if adv_regime_boost > 0 and effective_sfc is not None:
+    old_sfc = effective_sfc
+    effective_sfc = min(effective_sfc + adv_regime_boost, 100.0)
+    zone = "CRITICAL" if effective_sfc/100 > 0.75 else "HIGH" if effective_sfc/100 > 0.5 else "ELEVATED" if effective_sfc/100 > 0.25 else "NORMAL"
+    print(f"  [Advanced] SFC boosted: {old_sfc:.1f}% → {effective_sfc:.1f}% (+{adv_regime_boost}) | Zone: {zone}", file=sys.stderr)
+
 # ── ML ENSEMBLE PREDICTION (Strategi 3 & 4) ──
 print("[SFC] Computing ML ensemble prediction...", file=sys.stderr)
 # Build feature vector from all available methods
@@ -1270,6 +1364,18 @@ out = {
     "causal_methods_active": len(causal_active_scores) if causal_filter else None,
     "causal_excluded": ", ".join(causal_excluded) if causal_excluded else None,
     "causal_excluded_count": len(causal_excluded) if causal_excluded else 0,
+    # Advanced modules: Regime Detection (P2), Uncertainty (P4), Alt Data (P6)
+    "adv_regime": adv_regime.get('regime', 'NORMAL') if adv_regime else 'NORMAL',
+    "adv_crisis_prob": round(adv_regime.get('crisis_probability', 0), 3) if adv_regime else 0,
+    "adv_regime_stability": round(adv_regime.get('stability', 0.9), 3) if adv_regime else 0.9,
+    "adv_regime_boost": adv_regime_boost,
+    "adv_uncertainty": round(adv_uncertainty.get('uncertainty', 0), 3) if adv_uncertainty else None,
+    "adv_confidence": adv_uncertainty.get('recommended_action', 'UNKNOWN') if adv_uncertainty else 'UNKNOWN',
+    "adv_trends_recession": round(adv_alt.get('trends_recession', 0.5), 3) if adv_alt else None,
+    "adv_trends_crash": round(adv_alt.get('trends_crash', 0.5), 3) if adv_alt else None,
+    "adv_reddit_sentiment": round(adv_alt.get('reddit_sentiment', 0), 3) if adv_alt else None,
+    "adv_reddit_label": adv_alt.get('reddit_label', 'NONE') if adv_alt else 'NONE',
+    "adv_cg_dd_ath": round(adv_alt.get('cg_ath_dd', 0), 3) if adv_alt else None,
     # — Kelly Criterion Position Sizing (Gap 2 dari Reality Check) —
     "kelly_p_win": round(composite_confidence, 3),
     "kelly_b_payoff": 2.0,  # default risk/reward ratio
