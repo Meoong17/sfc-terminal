@@ -808,46 +808,126 @@ if dxy_hist and len(dxy_hist) > 1:
 m19_s, m19_d = calculate_m19_mutual_info(rets_pct, dxy_rets)
 
 # ── INSTITUTIONAL METHODS (M20-M31) ──
-# From sfc2/INSTITUTIONAL_METHODS_WALLSTREET.md + PATH_TO_90_PERCENT.md
 print("[SFC] Computing M20-M31 institutional methods...", file=sys.stderr)
 inst_results, inst_details, inst_active, inst_avg = compute_all_institutional(btc_current=btc)
 
-# Blend ensemble: 85% original (M1-M6) + 10% new methods (M7-M19) + 5% institutional (M20-M31)
-new_scores = [s for s in [m7_s, m8_s, m9_s, m10_s, m11_s, m12_s, m13_s, m14_s, m15_s, m16_s, m17_s, m18_s, m19_s] if s is not None]
-new_active = len(new_scores)
+# ── CAUSAL INFERENCE FILTER ──
+print("[SFC] Running causal inference filter...", file=sys.stderr)
+causal_filter = None
+causal_weights = {}
+causal_adjustment = {}
+causal_active_scores = []
+causal_excluded = []
 
-# All institutional scores
-inst_scores_list = [s for s in inst_results.values() if s is not None]
-inst_active_count = len(inst_scores_list)
+if CAUSAL_AVAILABLE:
+    try:
+        causal_filter = CausalFilter(max_lag=3)
+        if causal_filter.load_history():
+            causal_filter.analyze_all()
+            causal_weights = causal_filter.get_weights()
+            causal_adjustment = causal_filter.get_blend_adjustment()
+            
+            # Log causal report
+            excluded, low = causal_filter.get_excluded_methods()
+            causal_excluded = excluded
+            print(f"[Causal] Excluded {len(excluded)} constant/noise methods: {', '.join(excluded)}", file=sys.stderr)
+            print(f"[Causal] Blend: M1-M6={causal_adjustment['m1_m6_pct']:.0f}% / "
+                  f"M7-M19={causal_adjustment['m7_m19_pct']:.0f}% / "
+                  f"M20-M31={causal_adjustment['m20_m31_pct']:.0f}%", file=sys.stderr)
+    except Exception as e:
+        print(f"[Causal] Error: {e}", file=sys.stderr)
+        causal_filter = None
 
-if new_active > 0 and inst_active_count > 0:
-    new_avg = sum(new_scores) / new_active
-    inst_avg_value = sum(inst_scores_list) / inst_active_count
-    p_ens_original = 0.20*m1_klr + 0.25*m2_logit + 0.20*m3_bayes + 0.10*m4_ewc + 0.15*m5_qreg/100 + 0.10*m6_regime/100
-    # Hybrid blend: 85% original + 10% M7-M19 + 5% M20-M31
-    sfc_pct = (0.85 * p_ens_original + 0.10 * new_avg + 0.05 * inst_avg_value) * 100
-    zone = "CRITICAL" if sfc_pct/100 > 0.75 else "HIGH" if sfc_pct/100 > 0.5 else "ELEVATED" if sfc_pct/100 > 0.25 else "NORMAL"
-    print(f"[SFC] Methods active: M7-M19={new_active}/13 + M20-M31={inst_active_count}/12 | "
-          f"Ensemble blend: {sfc_pct:.1f}%", file=sys.stderr)
-elif new_active > 0:
-    new_avg = sum(new_scores) / new_active
-    p_ens_original = 0.20*m1_klr + 0.25*m2_logit + 0.20*m3_bayes + 0.10*m4_ewc + 0.15*m5_qreg/100 + 0.10*m6_regime/100
-    sfc_pct = (0.85 * p_ens_original + 0.15 * new_avg) * 100
-    zone = "CRITICAL" if sfc_pct/100 > 0.75 else "HIGH" if sfc_pct/100 > 0.5 else "ELEVATED" if sfc_pct/100 > 0.25 else "NORMAL"
-    print(f"[SFC] M7-M19 active: {new_active}/13 | Ensemble blend: {sfc_pct:.1f}%", file=sys.stderr)
-    inst_avg_value = None
-    inst_active_count = 0
-elif inst_active_count > 0:
-    new_avg = 0.0
-    inst_avg_value = sum(inst_scores_list) / inst_active_count
-    p_ens_original = 0.20*m1_klr + 0.25*m2_logit + 0.20*m3_bayes + 0.10*m4_ewc + 0.15*m5_qreg/100 + 0.10*m6_regime/100
-    sfc_pct = (0.85 * p_ens_original + 0.15 * inst_avg_value) * 100
-    zone = "CRITICAL" if sfc_pct/100 > 0.75 else "HIGH" if sfc_pct/100 > 0.5 else "ELEVATED" if sfc_pct/100 > 0.25 else "NORMAL"
-    print(f"[SFC] M20-M31 active: {inst_active_count}/12 | Ensemble blend: {sfc_pct:.1f}%", file=sys.stderr)
+# Build method scores dict for causal filtering
+method_scores_dict = {}
+# M1-M6
+for name, val in [("m1_klr", m1_klr), ("m2_logit", m2_logit), ("m3_bayes", m3_bayes),
+                   ("m4_ewc", m4_ewc), ("m5_qreg", m5_qreg/100), ("m6_regime", m6_regime/100)]:
+    method_scores_dict[name] = val if val is not None else 0.5
+# M7-M19
+for name, val in [("m7_fisher", m7_s), ("m8_yield", m8_s), ("m9_liquidity", m9_s),
+                   ("m10_garch", m10_s), ("m11_var", m11_s), ("m12_jump", m12_s),
+                   ("m13_funding", m13_s), ("m14_skew", m14_s), ("m15_concentration", m15_s),
+                   ("m16_regime_ml", m16_s), ("m17_granger", m17_s), ("m18_entropy", m18_s),
+                   ("m19_mutual_info", m19_s)]:
+    method_scores_dict[name] = val if val is not None else 0.5
+# M20-M31
+for i, name in enumerate(["m20_obi", "m21_trade_flow", "m22_spread", "m23_liquidity",
+                           "m24_cape", "m25_minsky", "m26_kahneman", "m27_taleb",
+                           "m28_summers", "m29_debt", "m30_rajan", "m31_altman"]):
+    key = name
+    val = inst_results.get(key.replace("_", "_"), None)
+    if key in inst_results:
+        method_scores_dict[name] = inst_results[key] if inst_results[key] is not None else 0.5
+    else:
+        method_scores_dict[name] = 0.5
+
+# Apply causal filter to get weighted scores
+if causal_filter and causal_weights:
+    filtered_scores, causal_active = causal_filter.apply_filter(method_scores_dict)
+    causal_active_scores = [v for v in filtered_scores.values() if v is not None]
+    
+    # Classification: which methods are still active
+    causal_active_names = list(filtered_scores.keys())
+    causal_active_m1m6 = [n for n in causal_active_names if n in ("m1_klr","m2_logit","m3_bayes","m4_ewc","m5_qreg","m6_regime")]
+    causal_active_m7m19 = [n for n in causal_active_names if n in ("m7_fisher","m8_yield","m9_liquidity","m10_garch","m11_var","m12_jump","m13_funding","m14_skew","m15_concentration","m16_regime_ml","m17_granger","m18_entropy","m19_mutual_info")]
+    causal_active_m20m31 = [n for n in causal_active_names if n in ("m20_obi","m21_trade_flow","m22_spread","m23_liquidity","m24_cape","m25_minsky","m26_kahneman","m27_taleb","m28_summers","m29_debt","m30_rajan","m31_altman")]
 else:
-    new_avg = 0.0
-    inst_avg_value = None
-    print(f"[SFC] No new methods available, using original ensemble", file=sys.stderr)
+    # Fallback: use all methods with equal weights
+    filtered_scores = method_scores_dict
+    causal_active = list(method_scores_dict.keys())
+    causal_active_scores = [v for v in method_scores_dict.values() if v is not None]
+    causal_active_m1m6 = ["m1_klr","m2_logit","m3_bayes","m4_ewc","m5_qreg","m6_regime"]
+    causal_active_m7m19 = ["m7_fisher","m8_yield","m9_liquidity","m10_garch","m11_var","m12_jump","m13_funding","m14_skew","m15_concentration","m16_regime_ml","m17_granger","m18_entropy","m19_mutual_info"]
+    causal_active_m20m31 = ["m20_obi","m21_trade_flow","m22_spread","m23_liquidity","m24_cape","m25_minsky","m26_kahneman","m27_taleb","m28_summers","m29_debt","m30_rajan","m31_altman"]
+    causal_adjustment = {"m1_m6_pct": 85.0, "m7_m19_pct": 10.0, "m20_m31_pct": 5.0}
+
+# ── DYNAMIC ENSEMBLE BLEND ──
+# Use causal-adjusted blend: filter removes noise, boosts signal
+p_ens_original = 0.20*m1_klr + 0.25*m2_logit + 0.20*m3_bayes + 0.10*m4_ewc + 0.15*m5_qreg/100 + 0.10*m6_regime/100
+
+# Compute group averages from causally-filtered scores
+m1m6_scores = [filtered_scores.get(n, 0.5) for n in ["m1_klr","m2_logit","m3_bayes","m4_ewc","m5_qreg","m6_regime"]]
+m7m19_scores = [filtered_scores.get(n, 0.5) for n in ["m7_fisher","m8_yield","m9_liquidity","m10_garch","m11_var","m12_jump","m13_funding","m14_skew","m15_concentration","m16_regime_ml","m17_granger","m18_entropy","m19_mutual_info"]]
+m20m31_scores = [filtered_scores.get(n, 0.5) for n in ["m20_obi","m21_trade_flow","m22_spread","m23_liquidity","m24_cape","m25_minsky","m26_kahneman","m27_taleb","m28_summers","m29_debt","m30_rajan","m31_altman"]]
+
+# Only count scores from methods that passed the causal filter (weight >= 0.2)
+m1m6_active = [s for n, s in zip(["m1_klr","m2_logit","m3_bayes","m4_ewc","m5_qreg","m6_regime"], m1m6_scores) if causal_weights.get(n, 0.5) >= 0.2]
+m7m19_active = [s for n, s in zip(["m7_fisher","m8_yield","m9_liquidity","m10_garch","m11_var","m12_jump","m13_funding","m14_skew","m15_concentration","m16_regime_ml","m17_granger","m18_entropy","m19_mutual_info"], m7m19_scores) if causal_weights.get(n, 0.5) >= 0.2]
+m20m31_active = [s for n, s in zip(["m20_obi","m21_trade_flow","m22_spread","m23_liquidity","m24_cape","m25_minsky","m26_kahneman","m27_taleb","m28_summers","m29_debt","m30_rajan","m31_altman"], m20m31_scores) if causal_weights.get(n, 0.5) >= 0.2]
+
+new_active = len(m7m19_active)
+inst_active_count = len(m20m31_active)
+
+m1m6_avg = sum(m1m6_active) / len(m1m6_active) if m1m6_active else sum(m1m6_scores) / 6
+new_avg = sum(m7m19_active) / len(m7m19_active) if m7m19_active else 0.5
+inst_avg_value = sum(m20m31_active) / len(m20m31_active) if m20m31_active else 0.5
+
+# Dynamic blend weights from causal analysis
+causal_p1 = causal_adjustment.get("m1_m6_pct", 85.0) / 100.0
+causal_p2 = causal_adjustment.get("m7_m19_pct", 10.0) / 100.0
+causal_p3 = causal_adjustment.get("m20_m31_pct", 5.0) / 100.0
+
+# Adjust blend based on active method counts (weight shifts when groups have few active methods)
+active_total = causal_p1 + causal_p2 + causal_p3
+if active_total > 0:
+    p1 = causal_p1 / active_total
+    p2 = causal_p2 / active_total if new_active > 0 else 0.0
+    p3 = causal_p3 / active_total if inst_active_count > 0 else 0.0
+    # Redistribute unused weight to M1-M6 core
+    unused = (1.0 - p1 - p2 - p3)
+    p1 += unused
+else:
+    p1, p2, p3 = 1.0, 0.0, 0.0
+
+# Final ensemble
+sfc_pct = (p1 * m1m6_avg + p2 * new_avg + p3 * inst_avg_value) * 100
+zone = "CRITICAL" if sfc_pct/100 > 0.75 else "HIGH" if sfc_pct/100 > 0.5 else "ELEVATED" if sfc_pct/100 > 0.25 else "NORMAL"
+
+print(f"[SFC] Causal-filtered blend: M1-M6={p1*100:.0f}% ({len(m1m6_active)}/6) + "
+      f"M7-M19={p2*100:.0f}% ({new_active}/13) + "
+      f"M20-M31={p3*100:.0f}% ({inst_active_count}/12)", file=sys.stderr)
+print(f"[SFC] Ensemble: {sfc_pct:.1f}% | Zone: {zone}", file=sys.stderr)
 
 print("[SFC] Aggregating news...", file=sys.stderr)
 cp_key = os.getenv("CRYPTOPANIC_KEY", "")
@@ -1183,9 +1263,13 @@ out = {
     "ml_total_labeled": ml_metrics.get("total", 0),
     "ml_correct": ml_metrics.get("correct", 0),
     # Blend info
-    "m1_m6_weight_pct": 85.0 if new_active > 0 or inst_active_count > 0 else 100.0,
-    "m7_m19_weight_pct": 10.0 if new_active > 0 else 0.0,
-    "m20_m31_weight_pct": 5.0 if inst_active_count > 0 else 0.0,
+    "m1_m6_weight_pct": round(p1 * 100, 1) if causal_filter else 85.0,
+    "m7_m19_weight_pct": round(p2 * 100, 1) if causal_filter else (10.0 if new_active > 0 else 0.0),
+    "m20_m31_weight_pct": round(p3 * 100, 1) if causal_filter else (5.0 if inst_active_count > 0 else 0.0),
+    # Causal inference info
+    "causal_methods_active": len(causal_active_scores) if causal_filter else None,
+    "causal_excluded": ", ".join(causal_excluded) if causal_excluded else None,
+    "causal_excluded_count": len(causal_excluded) if causal_excluded else 0,
     # — Kelly Criterion Position Sizing (Gap 2 dari Reality Check) —
     "kelly_p_win": round(composite_confidence, 3),
     "kelly_b_payoff": 2.0,  # default risk/reward ratio
