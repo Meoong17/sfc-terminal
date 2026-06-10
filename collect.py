@@ -22,7 +22,7 @@ except ImportError as e:
     INSTITUTIONAL_AVAILABLE = False
 
 try:
-    from ml_ensemble import predict_with_ml, add_observation, evaluate_accuracy, retrain_on_errors
+    from ml_ensemble import predict_with_ml, add_observation, evaluate_accuracy, retrain_on_errors, compute_actual_stress
     ML_AVAILABLE = True
 except ImportError as e:
     print(f"[SFC] ML ensemble not available: {e}", file=sys.stderr)
@@ -823,7 +823,6 @@ else:
     inst_avg_value = None
     print(f"[SFC] No new methods available, using original ensemble", file=sys.stderr)
 
-# News aggregation
 print("[SFC] Aggregating news...", file=sys.stderr)
 cp_key = os.getenv("CRYPTOPANIC_KEY", "")
 news_stress, news_headlines, news_sentiment, articles_scored, news_stats = get_news_stress_v2(cp_key, max_workers=6)
@@ -834,6 +833,35 @@ shock_factor, shock_event, shock_severity = detect_black_swan_v2(articles_scored
 # Count security-related headlines (hacks, exploits, breaches, etc.)
 SEC_KEYWORDS = ['hack','exploit','rug','scam','breach','attack','phish','malware','ransom','fraud','theft','ransomware','exploit']
 sec_events = sum(1 for a in articles_scored if any(kw in a['title'].lower() for kw in SEC_KEYWORDS))
+
+# ── ML ENSEMBLE PREDICTION (Strategi 3 & 4) ──
+print("[SFC] Computing ML ensemble prediction...", file=sys.stderr)
+# Build feature vector from all available methods
+all_method_scores = []
+for s in [m1_klr, m2_logit, m3_bayes, m4_ewc/100, m5_qreg/100, m6_regime/100,
+          m7_s, m8_s, m9_s, m10_s, m11_s, m12_s, m13_s, m14_s, m15_s, m16_s, m17_s, m18_s, m19_s]:
+    all_method_scores.append(s if s is not None else 0.5)
+# Add institutional method scores
+for name in sorted(inst_results.keys()):
+    v = inst_results[name]
+    all_method_scores.append(v if v is not None else 0.5)
+
+total_methods = len(all_method_scores)
+ml_score, ml_confidence, ml_msg = predict_with_ml(all_method_scores, total_methods)
+
+# Label: compute actual stress for today
+actual_stress = compute_actual_stress(dvol, sfc_pct, news_stress, chg)
+
+# Store observation for online learning
+add_observation(all_method_scores, prediction=ml_score, actual_label=actual_stress)
+
+# Accuracy tracking
+ml_metrics = evaluate_accuracy()
+print(f"[SFC] ML Ensemble: {ml_msg} | Accuracy: {ml_metrics.get('message', 'N/A')}", file=sys.stderr)
+
+# Count total active methods
+total_active_methods = 6 + new_active + inst_active_count
+print(f"[SFC] Total active methods: {total_active_methods}/31", file=sys.stderr)
 
 # Compute effective SFC
 liq_mod = 0.0
@@ -1047,6 +1075,46 @@ out = {
     "m19_detail": m19_d,
     "new_methods_active": new_active,
     "new_methods_avg": round(new_avg, 3) if new_active > 0 else None,
+    # Institutional methods (M20-M31)
+    "inst_methods_active": inst_active_count,
+    "inst_methods_avg": round(inst_avg_value, 3) if inst_active_count > 0 and inst_avg_value is not None else None,
+    "total_methods_active": total_active_methods,
+    # M20-M31 individual scores
+    "m20_obi": round(inst_results.get("m20_obi", 0), 3) if "m20_obi" in inst_results else None,
+    "m20_detail": inst_details.get("m20_detail"),
+    "m21_trade_flow": round(inst_results.get("m21_trade_flow", 0), 3) if "m21_trade_flow" in inst_results else None,
+    "m21_detail": inst_details.get("m21_detail"),
+    "m22_spread": round(inst_results.get("m22_spread", 0), 3) if "m22_spread" in inst_results else None,
+    "m22_detail": inst_details.get("m22_detail"),
+    "m23_liquidity": round(inst_results.get("m23_liquidity", 0), 3) if "m23_liquidity" in inst_results else None,
+    "m23_detail": inst_details.get("m23_detail"),
+    "m24_cape": round(inst_results.get("m24_cape", 0), 3) if "m24_cape" in inst_results else None,
+    "m24_detail": inst_details.get("m24_detail"),
+    "m25_minsky": round(inst_results.get("m25_minsky", 0), 3) if "m25_minsky" in inst_results else None,
+    "m25_detail": inst_details.get("m25_detail"),
+    "m26_kahneman": round(inst_results.get("m26_kahneman", 0), 3) if "m26_kahneman" in inst_results else None,
+    "m26_detail": inst_details.get("m26_detail"),
+    "m27_taleb": round(inst_results.get("m27_taleb", 0), 3) if "m27_taleb" in inst_results else None,
+    "m27_detail": inst_details.get("m27_detail"),
+    "m28_summers": round(inst_results.get("m28_summers", 0), 3) if "m28_summers" in inst_results else None,
+    "m28_detail": inst_details.get("m28_detail"),
+    "m29_debt": round(inst_results.get("m29_debt", 0), 3) if "m29_debt" in inst_results else None,
+    "m29_detail": inst_details.get("m29_detail"),
+    "m30_rajan": round(inst_results.get("m30_rajan", 0), 3) if "m30_rajan" in inst_results else None,
+    "m30_detail": inst_details.get("m30_detail"),
+    "m31_altman": round(inst_results.get("m31_altman", 0), 3) if "m31_altman" in inst_results else None,
+    "m31_detail": inst_details.get("m31_detail"),
+    # ML ensemble
+    "ml_ensemble_score": round(ml_score, 3),
+    "ml_ensemble_confidence": round(ml_confidence, 3),
+    "ml_ensemble_msg": ml_msg,
+    "ml_accuracy": ml_metrics.get("accuracy"),
+    "ml_total_labeled": ml_metrics.get("total", 0),
+    "ml_correct": ml_metrics.get("correct", 0),
+    # Blend info
+    "m1_m6_weight_pct": 85.0 if new_active > 0 or inst_active_count > 0 else 100.0,
+    "m7_m19_weight_pct": 10.0 if new_active > 0 else 0.0,
+    "m20_m31_weight_pct": 5.0 if inst_active_count > 0 else 0.0,
     "readiness_score": round(composite_confidence * (1.0 - min(effective_sfc/100 if effective_sfc else 0, 0.5)), 3),
     "shock_factor": shock_factor,
     "shock_event": shock_event,
