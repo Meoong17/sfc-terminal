@@ -6,6 +6,7 @@ Multi-source news aggregator (20+ free sources)
 """
 
 import json, os, sys, subprocess, math, requests, time
+import numpy as np
 from datetime import datetime, timezone
 from dotenv import load_dotenv
 
@@ -1027,13 +1028,6 @@ if ADVANCED_AVAILABLE:
     except Exception as e:
         print(f"[Advanced] Alt data error: {e}", file=sys.stderr)
 
-# Apply regime boost to effective SFC
-if adv_regime_boost > 0 and effective_sfc is not None:
-    old_sfc = effective_sfc
-    effective_sfc = min(effective_sfc + adv_regime_boost, 100.0)
-    zone = "CRITICAL" if effective_sfc/100 > 0.75 else "HIGH" if effective_sfc/100 > 0.5 else "ELEVATED" if effective_sfc/100 > 0.25 else "NORMAL"
-    print(f"  [Advanced] SFC boosted: {old_sfc:.1f}% → {effective_sfc:.1f}% (+{adv_regime_boost}) | Zone: {zone}", file=sys.stderr)
-
 # ── ML ENSEMBLE PREDICTION (Strategi 3 & 4) ──
 print("[SFC] Computing ML ensemble prediction...", file=sys.stderr)
 # Build feature vector from all available methods
@@ -1076,6 +1070,13 @@ fb, ft, dv_sfc, phi = compute_floor_v2(btc, effective_sfc)
 state, signal = determine_state(dvol, effective_sfc, btc, ft)
 
 regime, regime_prob, transition_risk = detect_regime(dvol, effective_sfc, news_stress, news_sentiment)
+
+# Apply regime boost from advanced HMM detection to effective SFC
+if ADVANCED_AVAILABLE and adv_regime_boost > 0 and effective_sfc is not None:
+    old_sfc = effective_sfc
+    effective_sfc = min(effective_sfc + adv_regime_boost, 100.0)
+    zone = "CRITICAL" if effective_sfc/100 > 0.75 else "HIGH" if effective_sfc/100 > 0.5 else "ELEVATED" if effective_sfc/100 > 0.25 else "NORMAL"
+    print(f"  [Advanced] SFC boosted by regime: {old_sfc:.1f}% → {effective_sfc:.1f}% (+{adv_regime_boost}) | Zone: {zone}", file=sys.stderr)
 
 # Technical indicators
 sopr_proxy, sopr_signal, sopr_score = compute_sopr_proxy(closes_7d, closes_30d, btc)
