@@ -497,15 +497,26 @@ body {
 .signal-watch { background: var(--accent-yellow-dim); color: var(--accent-yellow); }
 .signal-cash { background: var(--accent-red-dim); color: var(--accent-red); }
 
-/* ── CHART CONTAINER ── */
+/* ── CHART CONTAINER (Dribbble-inspired) ── */
 .chart-wrap {
   position: relative;
   width: 100%;
+  background: linear-gradient(180deg, rgba(33,24,53,0.3) 0%, transparent 100%);
+  border-radius: 12px;
+  padding: 8px 4px 4px 4px;
 }
 .chart-wrap canvas {
   width: 100% !important;
   height: auto !important;
   max-height: 260px;
+}
+.chart-wrap::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 12px;
+  pointer-events: none;
+  border: 1px solid rgba(121,112,158,0.06);
 }
 
 /* ── NEWS SLIDE BAR ── */
@@ -907,6 +918,7 @@ function buildMethodChart(d) {
   });
 }
 
+/* ── PRICE CHART (Dribbble-inspired by Zoltán Garami) ── */
 function updatePriceChart() {
   const canvas = document.getElementById('priceChart');
   if (!canvas) return;
@@ -917,6 +929,22 @@ function updatePriceChart() {
   const btcP = historyPoints.map(p => p.btc);
   const flrP = historyPoints.map(p => p.floor);
 
+  const ctx = canvas.getContext('2d');
+
+  const btcGrad = ctx.createLinearGradient(0, 0, 0, 260);
+  btcGrad.addColorStop(0, 'rgba(222,124,94,0.25)');
+  btcGrad.addColorStop(0.5, 'rgba(222,124,94,0.08)');
+  btcGrad.addColorStop(1, 'rgba(222,124,94,0.01)');
+
+  const floorGrad = ctx.createLinearGradient(0, 0, 0, 260);
+  floorGrad.addColorStop(0, 'rgba(55,206,147,0.12)');
+  floorGrad.addColorStop(1, 'rgba(55,206,147,0.01)');
+
+  const minVal = Math.min(...btcP, ...flrP);
+  const maxVal = Math.max(...btcP, ...flrP);
+  const range = maxVal - minVal || 1;
+  const yPadding = range * 0.12;
+
   priceChart = new Chart(canvas.getContext('2d'), {
     type: 'line',
     data: {
@@ -925,38 +953,126 @@ function updatePriceChart() {
         {
           label: 'BTC Price',
           data: btcP,
-          borderColor: '#00e68a',
-          backgroundColor: 'rgba(0,230,138,0.06)',
-          borderWidth: 2,
-          pointRadius: 0,
-          pointHoverRadius: 4,
+          borderColor: '#DE7C5E',
+          backgroundColor: btcGrad,
+          borderWidth: 2.5,
+          pointBackgroundColor: '#DE7C5E',
+          pointBorderColor: '#211835',
+          pointBorderWidth: 1.5,
+          pointRadius: 3,
+          pointHoverRadius: 6,
+          pointHoverBackgroundColor: '#DE7C5E',
+          pointHoverBorderColor: '#fff',
+          pointHoverBorderWidth: 2,
           fill: true,
-          tension: 0.3
+          tension: 0.35
         },
         {
           label: 'Dynamic Floor',
           data: flrP,
-          borderColor: '#ff3355',
-          backgroundColor: 'rgba(255,51,85,0.04)',
-          borderWidth: 1.5,
-          borderDash: [5, 5],
-          pointRadius: 0,
-          fill: false,
-          tension: 0.3
+          borderColor: '#37CE93',
+          backgroundColor: floorGrad,
+          borderWidth: 2,
+          borderDash: [4, 4],
+          pointBackgroundColor: '#37CE93',
+          pointBorderColor: '#211835',
+          pointBorderWidth: 1.5,
+          pointRadius: 2.5,
+          pointHoverRadius: 5,
+          pointHoverBackgroundColor: '#37CE93',
+          pointHoverBorderColor: '#fff',
+          pointHoverBorderWidth: 2,
+          fill: true,
+          tension: 0.35
         }
       ]
     },
     options: {
-      ..._chartDefaults,
+      responsive: true,
+      maintainAspectRatio: true,
+      animation: {
+        duration: 1200,
+        easing: 'easeOutQuart'
+      },
+      interaction: {
+        mode: 'index',
+        intersect: false
+      },
       plugins: {
-        ..._chartDefaults.plugins,
-        legend: { ..._chartDefaults.plugins.legend, position: 'top' }
+        legend: {
+          position: 'top',
+          labels: {
+            color: '#A5BBE9',
+            font: { family: 'Inter', size: 10, weight: '500' },
+            boxWidth: 14,
+            boxHeight: 3,
+            usePointStyle: true,
+            pointStyle: 'line',
+            padding: 16
+          }
+        },
+        tooltip: {
+          enabled: true,
+          mode: 'index',
+          intersect: false,
+          backgroundColor: 'rgba(33,24,53,0.92)',
+          titleColor: '#f0f4f8',
+          titleFont: { family: 'Inter', size: 11, weight: '600' },
+          bodyColor: '#A5BBE9',
+          bodyFont: { family: 'JetBrains Mono', size: 10 },
+          borderColor: 'rgba(165,187,233,0.12)',
+          borderWidth: 1,
+          padding: 12,
+          cornerRadius: 8,
+          callbacks: {
+            label: function(ctx) {
+              let label = ctx.dataset.label || '';
+              if (label) label += ': ';
+              if (ctx.parsed.y !== null) {
+                label += '$' + ctx.parsed.y.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0});
+              }
+              return label;
+            }
+          }
+        }
       },
       scales: {
-        x: { ..._chartDefaults.scales.x, grid: { display: false } },
-        y: { ..._chartDefaults.scales.y, ticks: { ..._chartDefaults.scales.y.ticks, callback: v => '$' + fmtNum(v) } }
+        x: {
+          grid: { display: false },
+          ticks: {
+            color: '#79709E',
+            font: { family: 'Inter', size: 9 },
+            maxTicksLimit: 8,
+            autoSkip: true
+          }
+        },
+        y: {
+          min: minVal - yPadding,
+          max: maxVal + yPadding,
+          grid: {
+            color: 'rgba(121,112,158,0.08)',
+            drawBorder: false
+          },
+          ticks: {
+            color: '#79709E',
+            font: { family: 'Inter', size: 10 },
+            padding: 8,
+            callback: v => '$' + fmtNum(v),
+            maxTicksLimit: 6
+          }
+        }
       }
-    }
+    },
+    plugins: [{
+      id: 'dribbbleGlow',
+      beforeDraw: function(chart) {
+        const ctx2 = chart.ctx;
+        ctx2.save();
+        ctx2.shadowColor = 'rgba(222,124,94,0.04)';
+        ctx2.shadowBlur = 20;
+        ctx2.restore();
+      }
+    }]
   });
 }
 
