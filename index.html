@@ -1467,43 +1467,6 @@ function render(d) {
       </div>
     </div>
 
-    ${d.bt_sharpe != null ? `
-    <!-- Backtest Validation Card (Priority 3) -->
-    <div class="card full-row">
-      <div class="card-hd">
-        <span class="card-title"><span class="card-title-icon">📊</span>Walk-Forward Backtest &mdash; <span style="font-weight:400;color:var(--text-secondary);font-size:10px">Out-of-sample validation on ${d.bt_periods || 0} periods</span></span>
-        <span class="card-title" style="font-size:10px;font-weight:400;color:${(d.bt_sharpe || 0) > 1.5 ? '#00e68a' : (d.bt_sharpe || 0) > 0.5 ? '#ffb347' : '#ff3355'}">${d.bt_label || 'NEEDS CALIBRATION'}</span>
-      </div>
-      <div class="card-bd">
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px">
-          <div style="text-align:center;padding:8px;background:rgba(255,255,255,0.03);border-radius:10px">
-            <div style="font-size:10px;color:var(--text-muted);margin-bottom:4px">Sharpe Ratio</div>
-            <div style="font-size:22px;font-weight:700;font-family:JetBrains Mono,monospace;color:${(d.bt_sharpe || 0) > 1.5 ? '#00e68a' : (d.bt_sharpe || 0) > 0.5 ? '#ffb347' : '#ff3355'}">${fmtNum(d.bt_sharpe, 2)}</div>
-            <div style="font-size:9px;color:var(--text-muted)">Risk-adjusted return</div>
-          </div>
-          <div style="text-align:center;padding:8px;background:rgba(255,255,255,0.03);border-radius:10px">
-            <div style="font-size:10px;color:var(--text-muted);margin-bottom:4px">Win Rate</div>
-            <div style="font-size:22px;font-weight:700;font-family:JetBrains Mono,monospace;color:#00e68a">${((d.bt_win_rate || 0) * 100).toFixed(0)}%</div>
-            <div style="font-size:9px;color:var(--text-muted)">Signal accuracy</div>
-          </div>
-          <div style="text-align:center;padding:8px;background:rgba(255,255,255,0.03);border-radius:10px">
-            <div style="font-size:10px;color:var(--text-muted);margin-bottom:4px">Max Drawdown</div>
-            <div style="font-size:22px;font-weight:700;font-family:JetBrains Mono,monospace;color:${(d.bt_max_dd || 0) < 0.1 ? '#00e68a' : (d.bt_max_dd || 0) < 0.2 ? '#ffb347' : '#ff3355'}">${((d.bt_max_dd || 0) * 100).toFixed(1)}%</div>
-            <div style="font-size:9px;color:var(--text-muted)">Worst peak-to-trough</div>
-          </div>
-          <div style="text-align:center;padding:8px;background:rgba(255,255,255,0.03);border-radius:10px">
-            <div style="font-size:10px;color:var(--text-muted);margin-bottom:4px">Signal Stability</div>
-            <div style="font-size:22px;font-weight:700;font-family:JetBrains Mono,monospace;color:${(d.bt_stability || 0) > 0.7 ? '#00e68a' : '#ffb347'}">${((d.bt_stability || 0) * 100).toFixed(0)}%</div>
-            <div style="font-size:9px;color:var(--text-muted)">Consistency score</div>
-          </div>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:10px">
-          <div class="info-row"><span class="info-label">Validation Method</span><span class="info-val">Walk-Forward (expanding window)</span></div>
-          <div class="info-row"><span class="info-label">Overfitting Risk</span><span class="info-val" style="color:${(d.bt_sharpe || 0) > 1.5 ? '#00e68a' : (d.bt_sharpe || 0) > 0.5 ? '#ffb347' : '#ff3355'}">${(d.bt_sharpe || 0) > 1.5 ? 'LOW' : (d.bt_sharpe || 0) > 0.5 ? 'MEDIUM' : 'HIGH'}</span></div>
-        </div>
-      </div>
-    </div>` : ''}
-
     ${headlines.length ? `
     <div class="card full-row news-ticker">
       <div class="card-hd">
