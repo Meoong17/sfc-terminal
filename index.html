@@ -1187,6 +1187,11 @@ function render(d) {
   const signal = d.signal || 'Standard allocation';
 
   const kpiAccent = sfcKpiAccent(sfcEff);
+  function sfcKpiAccent(val) {
+    if (val >= 50) return 'accent-red';
+    if (val >= 25) return 'accent-yellow';
+    return 'accent-green';
+  }
 
   /* ── REGIME LABEL ── */
   let regimeColor = '#00e68a';
