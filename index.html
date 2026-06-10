@@ -1309,9 +1309,10 @@ function render(d) {
           <span class="card-title"><span class="card-title-icon">🎯</span>Signal & Action</span>
         </div>
         <div class="card-bd" style="text-align:center">
-          <div class="signal-hero ${sigClass}">${state}</div>
+          <div class="signal-hero ${sigClass}">${(d.kelly_fraction || 0) <= 0 ? (d.fng < 15 ? (d.fng_cls || 'EXTREME FEAR') : 'RISK OFF') : state}</div>
           <div class="info-row"><span class="info-label">Action</span><span class="info-val" style="color:${(d.kelly_fraction || 0) <= 0 ? '#ff3355' : sigClass === 'signal-buy' ? '#00e68a' : sigClass === 'signal-cash' ? '#ff3355' : '#ffb347'}">${(d.kelly_fraction || 0) <= 0 ? '⚠ CASH' : signal}</span></div>
           <div class="info-row"><span class="info-label">BTC vs Floor</span><span class="info-val" style="color:${d.btc && d.floor_total && d.btc <= d.floor_total * 1.05 ? '#00e68a' : '#ffb347'}">${d.btc && d.floor_total ? ((d.btc / d.floor_total - 1) * 100).toFixed(1) + '% above' : '—'}</span></div>
+          <div style="font-size:8px;color:var(--text-muted);margin:-4px 0 6px 0;text-align:center">Floor = Price × (1 − SFC% × 0.6). Dynamic support based on stress level.</div>
           <div class="info-row"><span class="info-label">Transition Risk</span><span class="info-val" style="color:${(d.transition_risk || 0) > 0.5 ? '#ff3355' : (d.transition_risk || 0) > 0.25 ? '#ffb347' : '#00e68a'}">${fmtNum((d.transition_risk || 0) * 100, 0)}%</span></div>
           <div class="info-row"><span class="info-label">Readiness</span><span class="info-val" style="color:${(d.readiness_score || 0) >= 0.8 ? '#00e68a' : (d.readiness_score || 0) >= 0.5 ? '#ffb347' : '#8892a8'}">${((d.readiness_score || 0) * 100).toFixed(0)}%</span></div>
           <div class="progress-track"><div class="progress-fill fill-green" style="width: ${((d.readiness_score || 0) * 100).toFixed(0)}%"></div></div>
