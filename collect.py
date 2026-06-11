@@ -178,12 +178,26 @@ def get_cmc_dominance():
         return None
 
 def get_btc():
-    """BTC price — try CoinMarketCap first, fallback to CoinGecko"""
+    """BTC price — try Binance WebSocket first, then CMC, fallback CoinGecko"""
+    # Fast local read from Binance WebSocket daemon (no API call)
+    ws_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "btc_ws.json")
+    if os.path.exists(ws_path):
+        try:
+            with open(ws_path) as f:
+                ws_data = json.load(f)
+            if ws_data.get("btc") is not None:
+                btc_ws = ws_data["btc"]
+                chg_ws = ws_data.get("btc_24h", 0)
+                _, _, mcap = get_cmc_price()
+                print(f"[SFC] BTC from Binance WS: ${btc_ws:,.0f} ({chg_ws:+.2f}%)", file=sys.stderr)
+                return btc_ws, chg_ws, mcap
+        except (json.JSONDecodeError, OSError, KeyError):
+            pass
+
     cmc_btc, cmc_chg, cmc_mcap = get_cmc_price()
     if cmc_btc is not None:
         print(f"[SFC] BTC from CMC: ${cmc_btc:,.0f}", file=sys.stderr)
         return cmc_btc, cmc_chg, cmc_mcap
-    # Fallback: CoinGecko
     try:
         r = requests.get("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd&include_24hr_change=true&include_market_cap=true", timeout=10)
         d = r.json()["bitcoin"]
