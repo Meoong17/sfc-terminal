@@ -411,7 +411,7 @@ def calculate_sfc_ensemble(factors):
     p_regime = max(p_regime, 0.01)
     
     # Ensemble
-    p_ens = 0.20*p_klr + 0.25*p_logit + 0.20*p_bayes + 0.10*p_ewc + 0.15*p_quantile + 0.10*p_regime
+    p_ens = 0.19*p_klr + 0.16*p_logit + 0.12*p_bayes + 0.16*p_ewc + 0.24*p_quantile + 0.14*p_regime
     
     # Method agreement
     method_probs = [p_klr, p_logit, p_bayes, p_ewc, p_quantile, p_regime]
