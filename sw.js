@@ -1,10 +1,10 @@
 /**
- * Service Worker v8 — Stale-while-revalidate + version check
+ * Service Worker v9 — Stale-while-revalidate + version check
  * Never serve data.json older than 30 minutes without attempting refresh
  */
 
-const CACHE_NAME = "sfc-terminal-v8";
-const DATA_CACHE = "sfc-data-v2";
+const CACHE_NAME = "sfc-terminal-v9";
+const DATA_CACHE = "sfc-data-v3";
 const MAX_DATA_AGE_MS = 30 * 60 * 1000; // 30 minutes
 
 const STATIC_ASSETS = [
@@ -107,4 +107,4 @@ self.addEventListener("message", e => {
   }
 });
 
-console.log("[SW] Service Worker v8 loaded");
+console.log("[SW] Service Worker v9 loaded");
