@@ -72,6 +72,7 @@ def _run_qlstm_inference():
     """Run trained QLSTM model to predict SFC stress.
     Returns (prediction_0_1, is_available)"""
     global QLSTM_AVAILABLE, QLSTM_INFERENCE_CACHE
+    script_dir = os.path.dirname(os.path.abspath(__file__))
     try:
         import torch
         import pennylane as qml
@@ -79,7 +80,7 @@ def _run_qlstm_inference():
     except ImportError:
         # Try venv path (sfc2/venv has torch+pennylane installed)
         try:
-            venv_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "sfc2", "venv", "lib", "python3.12", "site-packages")
+            venv_path = os.path.join(os.path.dirname(script_dir), "sfc2", "venv", "lib", "python3.12", "site-packages")
             if os.path.exists(venv_path):
                 if venv_path not in sys.path:
                     sys.path.insert(0, venv_path)
@@ -87,10 +88,11 @@ def _run_qlstm_inference():
                 import pennylane as qml
                 from pennylane.qnn import TorchLayer
             else:
+                print(f"[SFC] QLSTM venv not found at {venv_path}", file=sys.stderr)
                 raise ImportError("venv not found")
-        except ImportError:
+        except ImportError as e:
             if QLSTM_AVAILABLE:
-                print("[SFC] QLSTM deps missing", file=sys.stderr)
+                print(f"[SFC] QLSTM deps missing: {e}", file=sys.stderr)
                 QLSTM_AVAILABLE = False
             return None, False
     
@@ -111,8 +113,17 @@ def _run_qlstm_inference():
         seq_len = checkpoint["seq_len"]
         hidden_dim = checkpoint.get("hidden_dim", 16)
         
-        # Build model
-        from sfc2.qlstm_model import QLSTMVolatilityPredictor
+        # Build model via importlib (avoid sys.path issues with 'sfc2' package)
+        import importlib.util
+        qlstm_py = os.path.join(os.path.dirname(script_dir), "sfc2", "qlstm_model.py")
+        if not os.path.exists(qlstm_py):
+            print(f"[SFC] QLSTM model file not found: {qlstm_py}", file=sys.stderr)
+            return None, False
+        spec = importlib.util.spec_from_file_location("qlstm_model", qlstm_py)
+        qlstm_mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(qlstm_mod)
+        QLSTMVolatilityPredictor = qlstm_mod.QLSTMVolatilityPredictor
+        
         model = QLSTMVolatilityPredictor(input_dim, hidden_dim=hidden_dim, seq_len=seq_len)
         model.load_state_dict(checkpoint["model_state_dict"])
         model.eval()
@@ -155,8 +166,8 @@ def _run_qlstm_inference():
         return qlstm_pred_0_1, True
         
     except Exception as e:
-        if QLSTM_AVAILABLE:
-            print(f"[SFC] QLSTM error: {e}", file=sys.stderr)
+        if QLSTM_AVAILABLE or True:
+            print(f"[SFC] QLSTM inference error: {e}", file=sys.stderr)
             QLSTM_AVAILABLE = False
         return None, False
 
