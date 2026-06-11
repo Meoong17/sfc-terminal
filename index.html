@@ -1396,6 +1396,23 @@ function startNewsSlide() {
   dots.forEach((d, i) => d.addEventListener('click', () => { clearInterval(newsSlideTimer); showSlide(i); newsSlideTimer = setInterval(() => showSlide((newsSlideIndex + 1) % items.length), 5000); }));
 }
 
+/* ── TAB NAVIGATION ── */
+let activeTab = 'overview';
+
+function switchTab(tab) {
+  activeTab = tab;
+  const el = document.getElementById(tab + 'Section');
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  document.querySelectorAll('.nav-tab').forEach(t => {
+    t.classList.toggle('active', t.textContent.trim().toLowerCase() === tab);
+  });
+}
+
+function restoreScrollPos() {
+  const el = document.getElementById(activeTab + 'Section');
+  if (el) el.scrollIntoView({ block: 'start' });
+}
+
 /* ── RENDER ── */
 function render(d) {
   currentData = d;
@@ -1456,10 +1473,10 @@ function render(d) {
       </div>
     </div>
     <div class="nav-center">
-      <div class="nav-tab active">Overview</div>
-      <div class="nav-tab">Ensemble</div>
-      <div class="nav-tab">Risk</div>
-      <div class="nav-tab">Backtest</div>
+      <div class="nav-tab active" onclick="switchTab('overview')">Overview</div>
+      <div class="nav-tab" onclick="switchTab('ensemble')">Ensemble</div>
+      <div class="nav-tab" onclick="switchTab('risk')">Risk</div>
+      <div class="nav-tab" onclick="switchTab('backtest')">Backtest</div>
     </div>
     <div class="nav-right">
       <div class="nav-meta">
@@ -1555,7 +1572,7 @@ function render(d) {
     <!-- ROW 1: SFC Index + Ensemble -->
     <div class="grid-2 mb-16">
       <!-- SFC STRESS INDEX -->
-      <div class="card">
+      <div id="overviewSection" class="card">
         <div class="card-head">
           <div class="card-title">
             <div class="card-icon">
@@ -1637,7 +1654,7 @@ function render(d) {
       </div>
 
       <!-- ENSEMBLE -->
-      <div class="card">
+      <div id="ensembleSection" class="card">
         <div class="card-head">
           <div class="card-title">
             <div class="card-icon">
@@ -1728,7 +1745,7 @@ function render(d) {
     </div>
 
     <!-- ROW 2: Momentum, Liquidation, Confidence, Signal -->
-    <div class="grid-4 mb-16">
+    <div id="riskSection" class="grid-4 mb-16">
 
       <!-- MOMENTUM -->
       <div class="card">
@@ -1903,7 +1920,7 @@ function render(d) {
 
     <!-- BACKTEST -->
     ${d.bt_sharpe != null ? `
-    <div class="card span-full mb-16">
+    <div id="backtestSection" class="card span-full mb-16">
       <div class="card-head">
         <div class="card-title">
           <div class="card-icon">
@@ -2191,6 +2208,7 @@ async function fetchLiveData() {
     window.__EMBEDDED_DATA = data;
     render(data);
     startNewsSlide();
+    restoreScrollPos();
     return true;
   } catch (e) {
     console.log('Fetch failed:', e);
@@ -2374,9 +2392,11 @@ initPaperTrading();
 if (typeof __EMBEDDED_DATA !== 'undefined' && __EMBEDDED_DATA) {
   render(__EMBEDDED_DATA);
   setTimeout(startNewsSlide, 100);
+  setTimeout(restoreScrollPos, 200);
 } else if (window.__EMBEDDED_DATA) {
   render(window.__EMBEDDED_DATA);
   setTimeout(startNewsSlide, 100);
+  setTimeout(restoreScrollPos, 200);
 } else {
   fetchLiveData().then(() => setTimeout(startNewsSlide, 100));
 }
