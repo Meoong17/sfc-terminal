@@ -1217,9 +1217,8 @@ function buildMethodChart(d) {
       }]
     },
     options: {
+      ...chartDefaults,
       indexAxis: 'y',
-      responsive: true,
-      maintainAspectRatio: false,
       plugins: { ...chartDefaults.plugins, legend: { display: false } },
       scales: {
         x: { ...chartDefaults.scales.x },
