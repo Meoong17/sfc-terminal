@@ -1838,9 +1838,64 @@ function render(d) {
             </div>
           </div>
 
+          <div class="help-card">
+            <div class="help-title" style="color:#ffb347">📐 Kelly Position Sizing</div>
+            <div class="help-body">
+              <strong>Risk management via the Kelly Criterion.</strong> Translates signal confidence into position size.
+              <ul>
+                <li><strong>Signal Confidence</strong> — probability the signal is correct (Bayesian prior)</li>
+                <li><strong>Max Allocation</strong> — Kelly-optimal position size. 0% = no edge, stay in cash</li>
+                <li><strong>Safe Allocation</strong> — half-Kelly, a conservative bet that reduces variance</li>
+              </ul>
+              <strong>CASH (0%)</strong> when no edge exists — do not force a trade.
+            </div>
+          </div>
+
+          <div class="help-card">
+            <div class="help-title" style="color:#00e6ff">📊 Walk-Forward Backtest</div>
+            <div class="help-body">
+              <strong>Out-of-sample validation of SFC signal performance.</strong> Walk-forward analysis with expanding windows.
+              <ul>
+                <li><strong>Sharpe Ratio</strong> — risk-adjusted return. &gt;1.5 = good, &gt;1.0 = acceptable</li>
+                <li><strong>Win Rate</strong> — percentage of profitable signals. 95% confidence interval shown</li>
+                <li><strong>Max Drawdown</strong> — worst peak-to-trough loss in backtest</li>
+                <li><strong>Signal Stability</strong> — consistency of signal quality across windows</li>
+              </ul>
+              <em>Results are upper-bound estimates due to limited stress events in the training window.</em>
+            </div>
+          </div>
+
+          <div class="help-card">
+            <div class="help-title" style="color:#a855f7">🧠 QLSTM Feature Importance</div>
+            <div class="help-body">
+              <strong>What drives the quantum LSTM prediction.</strong> Permutation importance analysis on the QLSTM model.
+              <ul>
+                <li><strong>Importance %</strong> — how much each feature influences the QLSTM forecast</li>
+                <li><strong>Direction</strong> — <span style="color:#00e68a">↓ negative</span> = higher feature value <em>lowers</em> SFC; <span style="color:#ff3355">↑ positive</span> = <em>raises</em> SFC</li>
+                <li><strong>Hybrid SFC</strong> — QLSTM prediction + GARCH(1,1) residual correction</li>
+                <li><strong>ProAdapt Weight</strong> — adaptive blend between QLSTM and GARCH, updated online</li>
+              </ul>
+              Features with high importance are the dominant risk drivers in the quantum model.
+            </div>
+          </div>
+
+          <div class="help-card">
+            <div class="help-title" style="color:#ffb347">📈 Paper Trading</div>
+            <div class="help-body">
+              <strong>Signal-driven simulator with $10,000 starting capital.</strong>
+              <ul>
+                <li>Executes trades based on SFC signal, Kelly allocation, and dynamic floor</li>
+                <li>Tracks equity, return, Sharpe ratio, win rate, and max drawdown</li>
+                <li>All trades logged with timestamps and rationale</li>
+                <li>Use <strong>Reset</strong> to restart or <strong>Export</strong> to download CSV</li>
+              </ul>
+              Paper trading is client-side only — no data is saved to the server.
+            </div>
+          </div>
+
         </div>
       </div>
-    </div>
+    </div>`
   `;
 
   document.getElementById('app').innerHTML = html;
