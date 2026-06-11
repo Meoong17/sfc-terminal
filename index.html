@@ -1582,6 +1582,49 @@ function render(d) {
       </div>
     </div>` : ''}
 
+    ${d.xai_top_features && d.xai_top_features.length ? `
+    <!-- XAI Feature Importance -->
+    <div class="card full-row">
+      <div class="card-hd">
+        <span class="card-title"><span class="card-title-icon">🧠</span>QLSTM Feature Importance &mdash; <span style="font-weight:400;color:var(--text-secondary);font-size:10px">What drives the quantum LSTM prediction</span></span>
+        <span class="card-title" style="font-size:9px;font-weight:400;color:var(--text-muted)">Permutation importance · higher = more influence</span>
+      </div>
+      <div class="card-bd">
+        <div style="display:grid;grid-template-columns:repeat(${Math.min(d.xai_top_features.length, 5)}, 1fr);gap:12px">
+          ${d.xai_top_features.slice(0, 5).map((f, i) => {
+            const barColor = f.direction === 'positive' ? '#ff3355' : '#00e68a';
+            const dirIcon = f.direction === 'positive' ? '↑' : f.direction === 'negative' ? '↓' : '→';
+            return `
+            <div style="text-align:center;padding:8px;background:rgba(255,255,255,0.03);border-radius:10px">
+              <div style="font-size:10px;color:var(--text-muted);margin-bottom:4px">${f.name}</div>
+              <div style="font-size:22px;font-weight:700;font-family:JetBrains Mono,monospace;color:${barColor}">${f.importance_pct}%</div>
+              <div style="font-size:11px;color:${barColor}">${dirIcon} ${f.direction}</div>
+              <div class="progress-track" style="margin-top:6px">
+                <div class="progress-fill ${f.direction === 'positive' ? 'fill-red' : 'fill-green'}" style="width: ${f.importance_pct}%"></div>
+              </div>
+            </div>`;
+          }).join('')}
+        </div>
+        ${d.xai_top_features.length > 5 ? `
+        <div style="display:grid;grid-template-columns:repeat(${Math.min(d.xai_top_features.length - 5, 4)}, 1fr);gap:12px;margin-top:8px">
+          ${d.xai_top_features.slice(5).map(f => {
+            const barColor = f.direction === 'positive' ? '#ff3355' : '#00e68a';
+            const dirIcon = f.direction === 'positive' ? '↑' : f.direction === 'negative' ? '↓' : '→';
+            return `
+            <div style="text-align:center;padding:6px;background:rgba(255,255,255,0.02);border-radius:8px">
+              <div style="font-size:9px;color:var(--text-muted);margin-bottom:2px">${f.name}</div>
+              <div style="font-size:16px;font-weight:600;font-family:JetBrains Mono,monospace;color:${barColor}">${f.importance_pct}% ${dirIcon}</div>
+            </div>`;
+          }).join('')}
+        </div>` : ''}
+        <div style="font-size:9px;color:var(--text-muted);margin-top:10px;padding:6px 10px;background:rgba(0,230,255,0.04);border-radius:6px">
+          🔬 Features with high importance strongly influence QLSTM's SFC prediction. 
+          ${d.m32_hybrid_pred != null ? `Hybrid (QLSTM+GARCH) SFC: <strong>${d.m32_hybrid_pred.toFixed(2)}%</strong>. ` : ''}
+          ${d.m32_proadapt_weight != null ? `ProAdapt weight: <strong>${(d.m32_proadapt_weight * 100).toFixed(0)}%</strong> QLSTM vs ${((1 - d.m32_proadapt_weight) * 100).toFixed(0)}% GARCH.` : ''}
+        </div>
+      </div>
+    </div>` : ''}
+
     <!-- Paper Trading Simulator -->
     <div class="paper-section">
       <div class="paper-hd">

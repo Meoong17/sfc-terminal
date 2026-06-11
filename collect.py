@@ -64,112 +64,66 @@ except ImportError as e:
     def retrain_on_errors(): return None
     ML_AVAILABLE = False
 
-# ── QLSTM INFERENCE (M32 — Hybrid Quantum LSTM) ──
+# ── QLSTM INFERENCE (M32 — Hybrid Quantum LSTM + GARCH + ProAdapt) ──
 QLSTM_AVAILABLE = False
 QLSTM_INFERENCE_CACHE = {"pred": None, "ts": 0}
 
 def _run_qlstm_inference():
-    """Run trained QLSTM model to predict SFC stress.
-    Returns (prediction_0_1, is_available)"""
+    """Run enhanced QLSTM inference (M32+Hybrid+ProAdapt+XAI).
+    Returns (prediction_0_1, is_available)
+    Also stores enhanced results in module-level vars for output dict."""
     global QLSTM_AVAILABLE, QLSTM_INFERENCE_CACHE
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    try:
-        import torch
-        import pennylane as qml
-        from pennylane.qnn import TorchLayer
-    except ImportError:
-        # Try venv path (sfc2/venv has torch+pennylane installed)
-        try:
-            venv_path = os.path.join(os.path.dirname(script_dir), "sfc2", "venv", "lib", "python3.12", "site-packages")
-            if os.path.exists(venv_path):
-                if venv_path not in sys.path:
-                    sys.path.insert(0, venv_path)
-                import torch
-                import pennylane as qml
-                from pennylane.qnn import TorchLayer
-            else:
-                print(f"[SFC] QLSTM venv not found at {venv_path}", file=sys.stderr)
-                raise ImportError("venv not found")
-        except ImportError as e:
-            if QLSTM_AVAILABLE:
-                print(f"[SFC] QLSTM deps missing: {e}", file=sys.stderr)
-                QLSTM_AVAILABLE = False
-            return None, False
+    global _XAI_FEATURES, _GARCH_RESIDUAL, _GARCH_VOL, _PROADAPT_W, _PROADAPT_FINAL
     
-    # Cache: re-run every 30 min
     now = time.time()
     if QLSTM_INFERENCE_CACHE["pred"] is not None and now - QLSTM_INFERENCE_CACHE["ts"] < 1800:
         return QLSTM_INFERENCE_CACHE["pred"], True
     
     try:
-        model_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "sfc2", "qlstm_model.pt")
-        data_path = os.path.join(os.path.dirname(__file__), "data_collection.json")
+        sfc2_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "sfc2")
+        sys.path.insert(0, sfc2_dir)
+        from qlstm_enhanced import run_enhanced_inference
         
-        if not os.path.exists(model_path) or not os.path.exists(data_path):
+        result = run_enhanced_inference(force=True)
+        
+        if not result.get("qlstm_ok"):
+            if QLSTM_AVAILABLE:
+                print(f"[SFC] QLSTM enhanced failed: {result.get('error', 'unknown')}", file=sys.stderr)
+                QLSTM_AVAILABLE = False
             return None, False
         
-        checkpoint = torch.load(model_path, map_location="cpu", weights_only=False)
-        input_dim = checkpoint["input_dim"]
-        seq_len = checkpoint["seq_len"]
-        hidden_dim = checkpoint.get("hidden_dim", 16)
-        
-        # Build model via importlib (avoid sys.path issues with 'sfc2' package)
-        import importlib.util
-        qlstm_py = os.path.join(os.path.dirname(script_dir), "sfc2", "qlstm_model.py")
-        if not os.path.exists(qlstm_py):
-            print(f"[SFC] QLSTM model file not found: {qlstm_py}", file=sys.stderr)
-            return None, False
-        spec = importlib.util.spec_from_file_location("qlstm_model", qlstm_py)
-        qlstm_mod = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(qlstm_mod)
-        QLSTMVolatilityPredictor = qlstm_mod.QLSTMVolatilityPredictor
-        
-        model = QLSTMVolatilityPredictor(input_dim, hidden_dim=hidden_dim, seq_len=seq_len)
-        model.load_state_dict(checkpoint["model_state_dict"])
-        model.eval()
-        
-        # Load & normalize data same as training
-        with open(data_path) as f:
-            data = json.load(f)
-        feats = data.get("features", [])
-        if len(feats) < seq_len + 2:
-            return None, False
-        
-        max_len = max(len(f) for f in feats)
-        feats_padded = []
-        for f in feats:
-            f_arr = np.array(f, dtype=np.float32)
-            if len(f_arr) < max_len:
-                f_arr = np.concatenate([f_arr, np.full(max_len - len(f_arr), 0.5, dtype=np.float32)])
-            feats_padded.append(f_arr)
-        features = np.array(feats_padded)
-        
-        mean = features.mean(axis=0)
-        std = features.std(axis=0)
-        std = np.where(std < 1e-8, 1.0, std)
-        features_norm = (features - mean) / std
-        
-        # Use latest seq_len observations
-        latest_seq = features_norm[-seq_len:]
-        inp = torch.tensor(latest_seq, dtype=torch.float32).unsqueeze(0)  # (1, seq_len, input_dim)
-        
-        with torch.no_grad():
-            pred = model(inp).item()  # SFC value 0-100
-        
-        qlstm_pred_0_1 = pred / 100.0  # normalize to 0-1
+        qlstm_pred_0_1 = result["qlstm_pred"] / 100.0
+        _GARCH_RESIDUAL = result.get("garch_residual", 0)
+        _GARCH_VOL = result.get("garch_volatility", 0)
+        _PROADAPT_W = result.get("proadapt_weight", 0.5)
+        _PROADAPT_FINAL = result.get("proadapt_final", result["qlstm_pred"])
+        _XAI_FEATURES = result.get("xai_top_features", None)
         
         if not QLSTM_AVAILABLE:
-            print(f"[SFC] QLSTM ready: pred={pred:.1f}", file=sys.stderr)
+            print(f"[SFC] QLSTM enhanced ready: pred={result['qlstm_pred']:.1f} "
+                  f"garch={_GARCH_RESIDUAL:+.3f} adapt_w={_PROADAPT_W:.2f}", file=sys.stderr)
             QLSTM_AVAILABLE = True
         
         QLSTM_INFERENCE_CACHE = {"pred": qlstm_pred_0_1, "ts": now}
         return qlstm_pred_0_1, True
         
     except Exception as e:
-        if QLSTM_AVAILABLE or True:
-            print(f"[SFC] QLSTM inference error: {e}", file=sys.stderr)
+        if QLSTM_AVAILABLE:
+            print(f"[SFC] QLSTM enhanced error: {e}", file=sys.stderr)
             QLSTM_AVAILABLE = False
+        _GARCH_RESIDUAL = 0
+        _GARCH_VOL = 0
+        _PROADAPT_W = 0.5
+        _PROADAPT_FINAL = None
+        _XAI_FEATURES = None
         return None, False
+
+# Module-level vars for enhanced output
+_XAI_FEATURES = None
+_GARCH_RESIDUAL = 0
+_GARCH_VOL = 0
+_PROADAPT_W = 0.5
+_PROADAPT_FINAL = None
 
 # Import news aggregator
 sys.path.insert(0, os.path.dirname(__file__))
@@ -1056,9 +1010,9 @@ print(f"[SFC] Causal-filtered blend: M1-M6={p1*100:.0f}% ({len(m1m6_active)}/6) 
       f"M20-M31={p3*100:.0f}% ({inst_active_count}/12)", file=sys.stderr)
 print(f"[SFC] Ensemble: {sfc_pct:.1f}% | Zone: {zone}", file=sys.stderr)
 
-# ── QLSTM ENSEMBLE ADJUSTMENT (M32) ──
+# ── QLSTM ENSEMBLE ADJUSTMENT (M32 + Hybrid + ProAdapt) ──
 # QLSTM has temporal memory (8-day sequence) — use it to nudge the ensemble
-# Small adjustment: ±5% of the difference between QLSTM and ensemble
+# Now enhanced with GARCH residual correction and ProAdapt online learning
 qlstm_adjustment = 0
 if qlstm_ok and qlstm_pred is not None:
     qlstm_sfc = qlstm_pred * 100
@@ -1066,7 +1020,9 @@ if qlstm_ok and qlstm_pred is not None:
     qlstm_adjustment = qlstm_diff * 0.05  # 5% nudge
     sfc_pct += qlstm_adjustment
     zone = "CRITICAL" if sfc_pct/100 > 0.75 else "HIGH" if sfc_pct/100 > 0.5 else "ELEVATED" if sfc_pct/100 > 0.25 else "NORMAL"
-    print(f"[SFC] QLSTM adj: {qlstm_adjustment:+.2f}pp ({qlstm_sfc:.1f}% vs {sfc_pct-qlstm_adjustment:.1f}%) → {sfc_pct:.1f}%", file=sys.stderr)
+    print(f"[SFC] QLSTM enhanced: raw={qlstm_sfc:.1f} garch+{_GARCH_RESIDUAL:.3f} "
+          f"adapt={_PROADAPT_FINAL:.1f} adj={qlstm_adjustment:+.2f}pp "
+          f"→ {sfc_pct:.1f}%", file=sys.stderr)
 
 print("[SFC] Aggregating news...", file=sys.stderr)
 cp_key = os.getenv("CRYPTOPANIC_KEY", "")
@@ -1573,10 +1529,19 @@ out = {
     "m30_detail": inst_details.get("m30_detail"),
     "m31_altman": round(inst_results.get("m31_altman", 0), 3) if "m31_altman" in inst_results else None,
     "m31_detail": inst_details.get("m31_detail"),
-    # QLSTM — Quantum Hybrid LSTM (M32)
+    # QLSTM — Quantum Hybrid LSTM (M32) with GARCH + ProAdapt
     "m32_qlstm": round(qlstm_pred, 4) if qlstm_pred is not None else None,
     "m32_active": qlstm_ok,
     "m32_adjustment_pp": round(qlstm_adjustment, 4),
+    # GARCH residual correction
+    "m32_garch_residual": round(_GARCH_RESIDUAL, 4),
+    "m32_garch_volatility": round(_GARCH_VOL, 4),
+    "m32_hybrid_pred": round(qlstm_pred * 100 + _GARCH_RESIDUAL, 4) if qlstm_pred is not None else None,
+    # ProAdapt online learning
+    "m32_proadapt_weight": round(_PROADAPT_W, 4),
+    "m32_proadapt_final": round(_PROADAPT_FINAL, 4) if _PROADAPT_FINAL is not None else None,
+    # XAI feature importance
+    "xai_top_features": _XAI_FEATURES,
     # ML ensemble
     "ml_ensemble_score": round(ml_score, 3),
     "ml_ensemble_confidence": round(ml_confidence, 3),
