@@ -2166,6 +2166,8 @@ async function fetchBtcLive() {
       const floorEl = document.querySelector('[style*="var(--green)"]');
       if (floorEl) floorEl.textContent = '$' + fmtNum(floor);
     }
+    // Update paper trading PnL in real-time (mark-to-market on every BTC tick)
+    if (currentData) processSignalFromSFC(currentData);
     return price;
   } catch (e) {
     console.log('BtcLive fetch failed:', e);
@@ -2207,8 +2209,9 @@ class PaperTrader {
   }
   decide(signal) {
     const { action, confidence, winProb } = signal;
-    if (confidence < 20 || (winProb || 0) < 0.3) return { action: 'CASH', size: 0, reason: 'Low confidence' };
+    if (confidence < 15 || (winProb || 0) < 0.25) return { action: 'CASH', size: 0, reason: 'Low confidence' };
     if (action === 'CASH') return { action: 'CASH', size: 0, reason: 'Signal says cash' };
+    if (action === 'HOLD') return { action: 'HOLD', size: 0, reason: 'Neutral zone — no edge' };
     const kelly = Math.max(0, Math.min(0.25, ((winProb||0.5) * 2 - (1-(winProb||0.5))) / 2));
     const size = this.capital * kelly;
     if (size < 10) return { action: 'CASH', size: 0, reason: 'Size too small' };
@@ -2283,17 +2286,17 @@ function processSignalFromSFC(d) {
   if (paperTrader.pnlHistory.length === 0 && paperTrader.trades.length === 0) {
     updatePaperDisplay({ equity: paperTrader.capital });
     addPaperLog('🟢 Paper trading initialized with $10,000 capital');
-    addPaperLog('⏳ Waiting for signal from SFC model...');
+    addPaperLog('⏳ Waiting for first trade signal from SFC...');
+    return; // Don't process signal on first init call
   }
   const price   = d.btc || 60000;
   const sfc     = (d.sfc_effective || 0) / 100;
   const conf    = (d.composite_confidence || 0.3);
   const winProb = Math.min(0.9, Math.max(0.1, (1-sfc)*0.4 + conf*0.4 + 0.2));
   let action = 'CASH';
-  if (sfc > 0.4 && conf < 0.3) action = 'CASH';
-  else if (sfc > 0.35) action = 'CASH';
-  else if (sfc < 0.15 && conf > 0.3) action = 'BUY';
-  else action = 'CASH';
+  if (sfc > 0.45) action = 'CASH';
+  else if (sfc < 0.25 && conf > 0.20) action = 'BUY';
+  else action = 'HOLD'; // Between 25-45% SFC — maintain existing positions
   const signal   = { action, confidence: Math.round(conf*100), winProb: Math.round(winProb*100)/100 };
   const decision = paperTrader.decide(signal);
   if (decision.action === 'CASH' && paperTrader.positions.length > 0) {
@@ -2301,13 +2304,16 @@ function processSignalFromSFC(d) {
     addPaperLog(`🔴 [CLOSE] All at $${fmtNum(price,0)} — signal cash`);
     const ps = document.getElementById('paperStatus');
     if (ps) ps.textContent = '● CASH';
-  } else if (decision.action !== 'CASH' && paperTrader.positions.length === 0) {
+  } else if ((decision.action === 'LONG' || decision.action === 'SHORT') && paperTrader.positions.length === 0) {
     const trade = paperTrader.execute(decision, price);
     if (trade) {
       addPaperLog(`🟢 [OPEN] ${decision.action} $${fmtNum(decision.size,0)} at $${fmtNum(price,0)} — ${decision.reason}`);
       const ps = document.getElementById('paperStatus');
       if (ps) ps.textContent = '● IN MARKET';
     }
+  } else if (decision.action === 'HOLD' && paperTrader.positions.length === 0 && Math.random() < 0.05) {
+    // Occasionally log that paper trader is watching but not trading
+    addPaperLog(`👀 Watching — SFC ${(sfc*100).toFixed(0)}%, conf ${(conf*100).toFixed(0)}%, awaiting clear signal`);
   }
   const equity = paperTrader.updatePnL(price);
   updatePaperDisplay({ equity, price });
