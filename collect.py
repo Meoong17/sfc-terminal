@@ -64,6 +64,102 @@ except ImportError as e:
     def retrain_on_errors(): return None
     ML_AVAILABLE = False
 
+# ── QLSTM INFERENCE (M32 — Hybrid Quantum LSTM) ──
+QLSTM_AVAILABLE = False
+QLSTM_INFERENCE_CACHE = {"pred": None, "ts": 0}
+
+def _run_qlstm_inference():
+    """Run trained QLSTM model to predict SFC stress.
+    Returns (prediction_0_1, is_available)"""
+    global QLSTM_AVAILABLE, QLSTM_INFERENCE_CACHE
+    try:
+        import torch
+        import pennylane as qml
+        from pennylane.qnn import TorchLayer
+    except ImportError:
+        # Try venv path (sfc2/venv has torch+pennylane installed)
+        try:
+            venv_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "sfc2", "venv", "lib", "python3.12", "site-packages")
+            if os.path.exists(venv_path):
+                if venv_path not in sys.path:
+                    sys.path.insert(0, venv_path)
+                import torch
+                import pennylane as qml
+                from pennylane.qnn import TorchLayer
+            else:
+                raise ImportError("venv not found")
+        except ImportError:
+            if QLSTM_AVAILABLE:
+                print("[SFC] QLSTM deps missing", file=sys.stderr)
+                QLSTM_AVAILABLE = False
+            return None, False
+    
+    # Cache: re-run every 30 min
+    now = time.time()
+    if QLSTM_INFERENCE_CACHE["pred"] is not None and now - QLSTM_INFERENCE_CACHE["ts"] < 1800:
+        return QLSTM_INFERENCE_CACHE["pred"], True
+    
+    try:
+        model_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "sfc2", "qlstm_model.pt")
+        data_path = os.path.join(os.path.dirname(__file__), "data_collection.json")
+        
+        if not os.path.exists(model_path) or not os.path.exists(data_path):
+            return None, False
+        
+        checkpoint = torch.load(model_path, map_location="cpu", weights_only=False)
+        input_dim = checkpoint["input_dim"]
+        seq_len = checkpoint["seq_len"]
+        hidden_dim = checkpoint.get("hidden_dim", 16)
+        
+        # Build model
+        from sfc2.qlstm_model import QLSTMVolatilityPredictor
+        model = QLSTMVolatilityPredictor(input_dim, hidden_dim=hidden_dim, seq_len=seq_len)
+        model.load_state_dict(checkpoint["model_state_dict"])
+        model.eval()
+        
+        # Load & normalize data same as training
+        with open(data_path) as f:
+            data = json.load(f)
+        feats = data.get("features", [])
+        if len(feats) < seq_len + 2:
+            return None, False
+        
+        max_len = max(len(f) for f in feats)
+        feats_padded = []
+        for f in feats:
+            f_arr = np.array(f, dtype=np.float32)
+            if len(f_arr) < max_len:
+                f_arr = np.concatenate([f_arr, np.full(max_len - len(f_arr), 0.5, dtype=np.float32)])
+            feats_padded.append(f_arr)
+        features = np.array(feats_padded)
+        
+        mean = features.mean(axis=0)
+        std = features.std(axis=0)
+        std = np.where(std < 1e-8, 1.0, std)
+        features_norm = (features - mean) / std
+        
+        # Use latest seq_len observations
+        latest_seq = features_norm[-seq_len:]
+        inp = torch.tensor(latest_seq, dtype=torch.float32).unsqueeze(0)  # (1, seq_len, input_dim)
+        
+        with torch.no_grad():
+            pred = model(inp).item()  # SFC value 0-100
+        
+        qlstm_pred_0_1 = pred / 100.0  # normalize to 0-1
+        
+        if not QLSTM_AVAILABLE:
+            print(f"[SFC] QLSTM ready: pred={pred:.1f}", file=sys.stderr)
+            QLSTM_AVAILABLE = True
+        
+        QLSTM_INFERENCE_CACHE = {"pred": qlstm_pred_0_1, "ts": now}
+        return qlstm_pred_0_1, True
+        
+    except Exception as e:
+        if QLSTM_AVAILABLE:
+            print(f"[SFC] QLSTM error: {e}", file=sys.stderr)
+            QLSTM_AVAILABLE = False
+        return None, False
+
 # Import news aggregator
 sys.path.insert(0, os.path.dirname(__file__))
 try:
@@ -823,6 +919,14 @@ m19_s, m19_d = calculate_m19_mutual_info(rets_pct, dxy_rets)
 print("[SFC] Computing M20-M31 institutional methods...", file=sys.stderr)
 inst_results, inst_details, inst_active, inst_avg = compute_all_institutional(btc_current=btc)
 
+# ── QLSTM INFERENCE (M32 — Hybrid Quantum LSTM) ──
+print("[SFC] Running QLSTM inference (M32)...", file=sys.stderr)
+qlstm_pred, qlstm_ok = _run_qlstm_inference()
+if qlstm_ok:
+    print(f"[SFC] QLSTM predicts SFC={qlstm_pred*100:.1f}%", file=sys.stderr)
+else:
+    print("[SFC] QLSTM unavailable", file=sys.stderr)
+
 # ── CAUSAL INFERENCE FILTER ──
 print("[SFC] Running causal inference filter...", file=sys.stderr)
 causal_filter = None
@@ -941,6 +1045,18 @@ print(f"[SFC] Causal-filtered blend: M1-M6={p1*100:.0f}% ({len(m1m6_active)}/6) 
       f"M20-M31={p3*100:.0f}% ({inst_active_count}/12)", file=sys.stderr)
 print(f"[SFC] Ensemble: {sfc_pct:.1f}% | Zone: {zone}", file=sys.stderr)
 
+# ── QLSTM ENSEMBLE ADJUSTMENT (M32) ──
+# QLSTM has temporal memory (8-day sequence) — use it to nudge the ensemble
+# Small adjustment: ±5% of the difference between QLSTM and ensemble
+qlstm_adjustment = 0
+if qlstm_ok and qlstm_pred is not None:
+    qlstm_sfc = qlstm_pred * 100
+    qlstm_diff = qlstm_sfc - sfc_pct
+    qlstm_adjustment = qlstm_diff * 0.05  # 5% nudge
+    sfc_pct += qlstm_adjustment
+    zone = "CRITICAL" if sfc_pct/100 > 0.75 else "HIGH" if sfc_pct/100 > 0.5 else "ELEVATED" if sfc_pct/100 > 0.25 else "NORMAL"
+    print(f"[SFC] QLSTM adj: {qlstm_adjustment:+.2f}pp ({qlstm_sfc:.1f}% vs {sfc_pct-qlstm_adjustment:.1f}%) → {sfc_pct:.1f}%", file=sys.stderr)
+
 print("[SFC] Aggregating news...", file=sys.stderr)
 cp_key = os.getenv("CRYPTOPANIC_KEY", "")
 news_stress, news_headlines, news_sentiment, articles_scored, news_stats = get_news_stress_v2(cp_key, max_workers=6)
@@ -1054,8 +1170,8 @@ ml_metrics = evaluate_accuracy()
 print(f"[SFC] ML Ensemble: {ml_msg} | Accuracy: {ml_metrics.get('message', 'N/A')}", file=sys.stderr)
 
 # Count total active methods
-total_active_methods = 6 + new_active + inst_active_count
-print(f"[SFC] Total active methods: {total_active_methods}/31", file=sys.stderr)
+total_active_methods = 6 + new_active + inst_active_count + (1 if qlstm_ok else 0)
+print(f"[SFC] Total active methods: {total_active_methods}/32 (M1-M6+M7-M19+M20-M31+M32_Q)", file=sys.stderr)
 
 # Compute effective SFC
 liq_mod = 0.0
@@ -1446,6 +1562,10 @@ out = {
     "m30_detail": inst_details.get("m30_detail"),
     "m31_altman": round(inst_results.get("m31_altman", 0), 3) if "m31_altman" in inst_results else None,
     "m31_detail": inst_details.get("m31_detail"),
+    # QLSTM — Quantum Hybrid LSTM (M32)
+    "m32_qlstm": round(qlstm_pred, 4) if qlstm_pred is not None else None,
+    "m32_active": qlstm_ok,
+    "m32_adjustment_pp": round(qlstm_adjustment, 4),
     # ML ensemble
     "ml_ensemble_score": round(ml_score, 3),
     "ml_ensemble_confidence": round(ml_confidence, 3),
@@ -1508,4 +1628,4 @@ print(json.dumps(out, indent=2))
 btc_str = f"${btc:,.0f}" if btc is not None else "N/A"
 rsi_str = f"{rsi_14}" if rsi_14 is not None else "N/A"
 sopr_str = f"{sopr_proxy}" if sopr_proxy is not None else "N/A"
-print(f"\n✅ BTC={btc_str} | SFC={effective_sfc:.1f}% | Zone={zone} | RSI={rsi_str} | SOPR={sopr_str} | News={news_stress:.1f} | {regime} | Methods={total_active_methods}/31", file=sys.stderr)
+print(f"\n✅ BTC={btc_str} | SFC={effective_sfc:.1f}% | Zone={zone} | RSI={rsi_str} | SOPR={sopr_str} | News={news_stress:.1f} | {regime} | Methods={total_active_methods}/32", file=sys.stderr)
