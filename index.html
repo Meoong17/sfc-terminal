@@ -2176,14 +2176,17 @@ async function fetchBtcLive() {
 /* ── FETCH ── */
 async function fetchLiveData() {
   try {
+    // Save actual scroll position before DOM rebuild
+    const savedScrollY = window.scrollY;
     const r = await fetch('data.json?t=' + Date.now(), { cache: 'no-cache' });
     if (!r.ok) throw new Error('HTTP ' + r.status);
     const data = await r.json();
     currentData = data;
     window.__EMBEDDED_DATA = data;
     render(data);
+    // Restore exact scroll position (not activeTab section)
+    window.scrollTo({ top: savedScrollY, behavior: 'instant' });
     startNewsSlide();
-    restoreScrollPos();
     fetchBtcLive(); // Sync live price after pipeline data refresh
     return true;
   } catch (e) {
