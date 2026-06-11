@@ -1220,10 +1220,7 @@ function buildMethodChart(d) {
       ...chartDefaults,
       indexAxis: 'y',
       plugins: { ...chartDefaults.plugins, legend: { display: false } },
-      scales: {
-        x: { ...chartDefaults.scales.x },
-        y: { ...chartDefaults.scales.y, beginAtZero: true, ticks: { ...chartDefaults.scales.y.ticks, callback: v => v + '%' } }
-      }
+      scales: { y: { ...chartDefaults.scales.y, beginAtZero: true, ticks: { ...chartDefaults.scales.y.ticks, callback: v => v + '%' } } }
     }
   });
 }
