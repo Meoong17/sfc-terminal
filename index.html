@@ -2465,9 +2465,9 @@ let sseReconnectTimer = null;
 function connectSSE() {
   if (sseSource) { sseSource.close(); }
 
-  // Try snapshot first for instant initial load
+  // Snapshot = initial full render (single source of truth)
   fetch(SSE_URL + '/snapshot').then(r => r.json()).then(snap => {
-    if (snap.sfc && !currentData) {
+    if (snap.sfc) {
       currentData = snap.sfc;
       window.__EMBEDDED_DATA = snap.sfc;
       render(snap.sfc);
@@ -2475,6 +2475,8 @@ function connectSSE() {
       setTimeout(restoreScrollPos, 200);
       if (snap.btc && snap.btc.btc) {
         prevBtcPrice = snap.btc.btc;
+        // Also show initial ticker immediately
+        updateBtcTicker(snap.btc);
       }
     }
   }).catch(() => {});
@@ -2880,18 +2882,7 @@ loadHistory();
 initPaperTrading();
 fetchPaperTrackRecord();
 setInterval(fetchPaperTrackRecord, 60000);
-if (typeof __EMBEDDED_DATA !== 'undefined' && __EMBEDDED_DATA) {
-  currentData = __EMBEDDED_DATA;
-  render(__EMBEDDED_DATA);
-  setTimeout(startNewsSlide, 100);
-  setTimeout(restoreScrollPos, 200);
-} else if (window.__EMBEDDED_DATA) {
-  currentData = window.__EMBEDDED_DATA;
-  render(window.__EMBEDDED_DATA);
-  setTimeout(startNewsSlide, 100);
-  setTimeout(restoreScrollPos, 200);
-}
-// SSE connection — real-time updates replaces interval polling
+// SSE is the single source of truth — connects and fetches snapshot as initial data
 setTimeout(connectSSE, 300);
 
 if ('serviceWorker' in navigator) {
