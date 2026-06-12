@@ -1588,7 +1588,7 @@ function render(d) {
       </div>
       <div class="nav-meta">
         <div class="nav-meta-label">Regime</div>
-        <div class="nav-meta-val" id="regimeNavVal" style="color:${regimeColor}">${typeof d.regime === 'string' && isNaN(d.regime) ? d.regime : (d.adv_regime || 'NORMAL')}</div>
+        <div class="nav-meta-val" id="regimeNavVal" style="color:${regimeColor}" data-regime="${typeof d.regime === 'string' && isNaN(d.regime) ? d.regime : (d.adv_regime || 'NORMAL')}">${typeof d.regime === 'string' && isNaN(d.regime) ? d.regime : (d.adv_regime || 'NORMAL')}</div>
       </div>
       <span class="nav-pill ${topPillClass}">${topPillText}</span>
     </div>
@@ -2806,17 +2806,23 @@ setInterval(fetchBtcLive, 15000);
 // SSE is the single source of truth — connects and fetches snapshot as initial data
 setTimeout(connectSSE, 300);
 
-/* ── REGIME NAV WATCHER — fixes numeric overwrite from floor/btc every 500ms ── */
-setInterval(function() {
-  var el = document.getElementById('regimeNavVal');
-  if (!el) return;
-  var txt = el.textContent.trim();
-  if (/^\$?[\d,]+\.?\d*$/.test(txt)) {
-    var d = currentData || window.__EMBEDDED_DATA;
-    var val = d ? (typeof d.regime === 'string' && isNaN(d.regime) ? d.regime : (d.adv_regime || 'NORMAL')) : 'NORMAL';
-    el.textContent = val;
+/* ── REGIME NAV GUARD — MutationObserver prevents numeric overwrite ── */
+(function() {
+  function fixRegimeNav() {
+    var el = document.getElementById('regimeNavVal');
+    if (!el) return;
+    var correct = el.getAttribute('data-regime') || 'NORMAL';
+    if (el.textContent !== correct) el.textContent = correct;
   }
-}, 500);
+  // Watch for any changes
+  var target = document.getElementById('regimeNavVal');
+  if (target) {
+    var obs = new MutationObserver(function() { fixRegimeNav(); });
+    obs.observe(target, { characterData: true, childList: true, subtree: true });
+  }
+  // Also keep the 500ms poll as backup
+  setInterval(fixRegimeNav, 500);
+})();
 
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js').catch(e => console.log('SW failed:', e));
