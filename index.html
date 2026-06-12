@@ -2067,8 +2067,11 @@ function render(d) {
           Paper Trading
           <span style="font-weight:400;color:var(--text-3);font-size:10px;text-transform:none;letter-spacing:0">— Signal-driven simulator · $10,000 starting capital</span>
         </div>
+        <div style="display:flex;align-items:center;gap:6px">
         <span id="paperStatus" style="font-size:9px;font-weight:600;padding:3px 10px;border-radius:100px;background:var(--green-dim);color:var(--green);border:1px solid var(--border-green)">● IDLE</span>
-        <span id="paperServerBadge" style="font-size:8px;font-weight:500;padding:2px 7px;border-radius:100px;background:var(--cyan-dim);color:var(--cyan);border:1px solid rgba(0,212,255,0.2);margin-left:6px">SERVER</span>
+        <span id="paperServerBadge" style="font-size:8px;font-weight:500;padding:2px 7px;border-radius:100px;background:var(--cyan-dim);color:var(--cyan);border:1px solid rgba(0,212,255,0.2)">SERVER</span>
+        <div style="cursor:pointer;padding:4px 8px;font-size:10px;color:var(--text-2);border-radius:6px;transition:all 0.15s" onclick="togglePaperSection()" id="paperToggle" title="Toggle paper trading details">&#x25b2;</div>
+        </div>
       </div>
       <div id="paperBody" style="display:block">
       <div class="paper-stats">
@@ -2272,7 +2275,8 @@ function togglePaperSection() {
   const p = document.getElementById('paperBody');
   const t = document.getElementById('paperToggle');
   if (p) p.style.display = paperVisible ? 'block' : 'none';
-  if (t) t.textContent = paperVisible ? '\u25b2 Hide' : '\u25bc Show';
+  if (t) t.textContent = paperVisible ? '\\u25b2' : '\\u25bc';
+  if (t) t.title = paperVisible ? 'Hide paper trading details' : 'Show paper trading details';
 }
 
 /* ── SERVER PAPER TRADING TRACK RECORD ── */
@@ -2486,15 +2490,20 @@ function connectSSE() {
 
   sseSource.addEventListener('sfc_update', (e) => {
     const d = JSON.parse(e.data);
-    // Update in-memory data
     currentData = d;
     window.__EMBEDDED_DATA = d;
-    // Refresh news ticker (lightweight)
+    // Refresh news ticker
     if (d.news_headlines) {
       updateNewsHeadlines(d.news_headlines);
     }
-    // Update KPI values in-place without full re-render
+    // Update SFC KPIs in-place
     updateSfcKpis(d);
+    // Process paper trading signal on every SFC update (not just BTC price change)
+    if (typeof processSignalFromSFC === 'function') {
+      processSignalFromSFC(d);
+    }
+    // Update paper track record
+    fetchPaperTrackRecord();
   });
 
   sseSource.addEventListener('heartbeat', () => {
@@ -2780,12 +2789,10 @@ function initPaperTrading() {
 
 function processSignalFromSFC(d) {
   if (!paperTrader) return;
-  if (paperTrader.pnlHistory.length === 0 && paperTrader.trades.length === 0) {
-    updatePaperDisplay({ equity: paperTrader.capital });
-    addPaperLog('🟢 Paper trading initialized with $10,000 capital');
-    addPaperLog('⏳ Waiting for first trade signal from SFC...');
-    return; // Don't process signal on first init call
-  }
+  // Debounce: don't re-process more than once per 5s (prevents double-trigger from BTC + SFC)
+  const now = Date.now();
+  if (paperTrader._lastSignalTs && (now - paperTrader._lastSignalTs) < 5000) return;
+  paperTrader._lastSignalTs = now;
   const price   = d.btc || 60000;
   const sfc     = (d.sfc_effective || 0) / 100;
   const conf    = (d.composite_confidence || 0.3);
