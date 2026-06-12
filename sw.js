@@ -3,7 +3,7 @@
  * Never serve data.json older than 30 minutes without attempting refresh
  */
 
-const CACHE_NAME = "sfc-terminal-v10";
+const CACHE_NAME = "sfc-terminal-v11";
 const DATA_CACHE = "sfc-data-v4";
 const MAX_DATA_AGE_MS = 5 * 60 * 1000; // 5 minutes (was 30 min — dashboard was serving stale data)
 
