@@ -88,6 +88,16 @@ except ImportError:
     def calculate_systemic_risk(*a, **k):
         return {"overall_systemic_risk": 0.5, "btc_systemic_risk": 0.5, "market_regime": "NORMAL", "correlation_breakdown": False}
 
+# XAI Explainability (M70-M71)
+try:
+    from xai_explainer_q5 import run_all_xai
+    XAI_AVAILABLE = True
+except ImportError:
+    XAI_AVAILABLE = False
+    print("[SFC] XAI Explainability (M70-M71) not available", file=sys.stderr)
+    def run_all_xai(*a, **k):
+        return {"m70_shap_ok": False, "m71_lime_ok": False, "m70_shap_features": [], "m71_lime_features": []}
+
 sys.path.insert(0, os.path.dirname(__file__))
 try:
     from methods_institutional import compute_all_institutional
@@ -1537,6 +1547,11 @@ _m69_btc = _m69_result.get("btc_systemic_risk", 0.5)
 _m69_regime = _m69_result.get("market_regime", "NORMAL")
 _m69_breakdown = _m69_result.get("correlation_breakdown", False)
 
+# M70-M71: XAI Explainability (SHAP + LIME) — runs every cycle, cached by function
+_xai_result = run_all_xai() if XAI_AVAILABLE else {"m70_shap_ok": False, "m71_lime_ok": False, "m70_shap_features": [], "m71_lime_features": []}
+_m70_shap_features = _xai_result.get("m70_shap_features", [])
+_m71_lime_features = _xai_result.get("m71_lime_features", [])
+
 # Build output
 out = {
     "ts": datetime.now(timezone.utc).isoformat(),
@@ -1740,6 +1755,15 @@ out = {
     "m69_market_regime": _m69_regime,
     "m69_correlation_breakdown": _m69_breakdown,
     "m69_available": GNN_AVAILABLE,
+    # ── XAI Explainability: M70-M71 ──
+    "m70_shap_ok": _xai_result.get("m70_shap_ok", False),
+    "m70_shap_top_1": _m70_shap_features[0]["name"] if len(_m70_shap_features) > 0 else None,
+    "m70_shap_top_1_pct": _m70_shap_features[0]["importance_pct"] if len(_m70_shap_features) > 0 else None,
+    "m70_shap_top_3": ", ".join(f["name"] for f in _m70_shap_features[:3]) if _m70_shap_features else None,
+    "m71_lime_ok": _xai_result.get("m71_lime_ok", False),
+    "m71_lime_top_1": _m71_lime_features[0]["name"] if len(_m71_lime_features) > 0 else None,
+    "m71_lime_top_1_pct": _m71_lime_features[0]["importance_pct"] if len(_m71_lime_features) > 0 else None,
+    "m71_lime_top_3": ", ".join(f["name"] for f in _m71_lime_features[:3]) if _m71_lime_features else None,
 }
 
 print(json.dumps(out, indent=2))

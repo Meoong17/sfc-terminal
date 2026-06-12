@@ -2066,6 +2066,8 @@ function render(d) {
           <div class="info-row"><span class="info-k">CNN Pattern</span><span class="info-v" style="font-size:9px;color:${(d.m65_cnn_attention||0)>0.6?'var(--red)':(d.m65_cnn_attention||0)>0.4?'var(--amber)':'var(--green)'}">${fmtNum(Number(d.m65_cnn_attention||0)*100,0)}% ${d.m65_pattern_type?.split('—')[0]?.trim()||'—'}</span></div>
           <div class="info-row"><span class="info-k">Systemic Risk</span><span class="info-v" style="color:${(d.m69_systemic_risk||0)>0.6?'var(--red)':(d.m69_systemic_risk||0)>0.4?'var(--amber)':'var(--green)'}">${fmtNum(Number(d.m69_systemic_risk||0)*100,0)}% ${d.m69_market_regime||'—'}</span></div>
           <div class="info-row"><span class="info-k">DRL Signal</span><span class="info-v" style="color:${d.m68_drl_signal==='SELL'?'var(--red)':d.m68_drl_signal==='BUY_50'?'var(--green)':d.m68_drl_signal?.startsWith('BUY')?'var(--amber)':'var(--text-1)'}">${d.m68_drl_signal||'—'}</span></div>
+          <div class="info-row"><span class="info-k">SHAP Driver</span><span class="info-v" style="font-size:9px;color:var(--cyan)">${d.m70_shap_top_1||'—'}${d.m70_shap_top_1_pct != null ? ' '+fmtNum(d.m70_shap_top_1_pct,0)+'%' : ''}</span></div>
+          <div class="info-row"><span class="info-k">LIME Drivers</span><span class="info-v" style="font-size:8px;color:var(--text-3)">${d.m71_lime_top_3||'—'}</span></div>
         </div>
       </div>
     </div>
