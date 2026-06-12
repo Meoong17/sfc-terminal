@@ -1503,7 +1503,7 @@ function render(d) {
       </div>
       <div class="nav-meta">
         <div class="nav-meta-label">Regime</div>
-        <div class="nav-meta-val" style="color:${regimeColor}">${typeof d.regime === 'string' && isNaN(d.regime) ? d.regime : (d.adv_regime || 'NORMAL')}</div>
+        <div class="nav-meta-val" id="regimeDisplay_xyz">—</div>
       </div>
       <span class="nav-pill ${topPillClass}">${topPillText}</span>
     </div>
@@ -2178,7 +2178,33 @@ function render(d) {
   buildMethodChart(d);
   if (chartVisible) updatePriceChart();
   processSignalFromSFC(d);
+  // Update regime display from fresh data
+  updateRegimeDisplay(d);
 }
+
+/* ── REGIME DISPLAY UPDATER (immune to floor overwrite) ── */
+function updateRegimeDisplay(d) {
+  var el = document.getElementById('regimeDisplay_xyz');
+  if (!el) return;
+  var val = typeof d.regime === 'string' && isNaN(d.regime) ? d.regime : (d.adv_regime || 'NORMAL');
+  var color = val === 'CAPITULATION' ? 'var(--red)' : val === 'STRESS' ? 'var(--amber)' : 'var(--green)';
+  el.textContent = val;
+  el.style.color = color;
+}
+// Aggressive poll: fix regime display every 200ms to prevent floor overwrite
+setInterval(function() {
+  var el = document.getElementById('regimeDisplay_xyz');
+  if (!el) return;
+  var d = currentData || window.__EMBEDDED_DATA;
+  if (!d) return;
+  var val = typeof d.regime === 'string' && isNaN(d.regime) ? d.regime : (d.adv_regime || 'NORMAL');
+  var txt = el.textContent;
+  // If it contains a $ sign or a number with decimal, overwrite
+  if (/^\$?[\d,]+\.?\d*$/.test(txt.trim())) {
+    el.textContent = val;
+    el.style.color = val === 'CAPITULATION' ? 'var(--red)' : val === 'STRESS' ? 'var(--amber)' : 'var(--green)';
+  }
+}, 200);
 
 /* ── PAPER SECTION TOGGLE ── */
 let paperVisible = true;
