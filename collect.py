@@ -1474,8 +1474,19 @@ composite_confidence = max(0.05, min(cc_base - cc_penalty, 0.95))
 composite_confidence = round(composite_confidence, 3)
 
 # ── Q5 Advanced Methods: M65-M69 ──
-# M65: CNN+Attention pattern recognition
-_m65_result = calculate_cnn_attention_stress([])  # empty data → fallback if no model
+# M65: CNN+Attention pattern recognition (skip if PyTorch not available)
+if CNN_ATTENTION_AVAILABLE:
+    try:
+        # Check if torch available — CNN needs data window, skip with fallback
+        try:
+            import torch
+            _m65_result = calculate_cnn_attention_stress(np.array([[0.5]*41]))
+        except ImportError:
+            _m65_result = {"m65_cnn_attention": 0.5, "attention_focus": [], "pattern_type": "FALLBACK — PyTorch not in main Python"}
+    except Exception as _m65_e:
+        _m65_result = {"m65_cnn_attention": 0.5, "attention_focus": [], "pattern_type": f"FALLBACK — {_m65_e}"}
+else:
+    _m65_result = {"m65_cnn_attention": 0.5, "attention_focus": [], "pattern_type": "FALLBACK — CNN not available"}
 _m65_stress = _m65_result.get("m65_cnn_attention", 0.5)
 _m65_pattern = _m65_result.get("pattern_type", "FALLBACK")
 
@@ -1506,7 +1517,7 @@ if _m67_due and TIMEGAN_AVAILABLE:
         if _m67_result is not None:
             _m67_augmented = _m67_result.shape
             import collect as _collect_mod
-            _collect_mod._m67_last_aug = _m67_now
+            _collect_mod._m67_last_aug = _m66_now
     except Exception:
         pass
 
