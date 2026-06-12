@@ -2061,7 +2061,7 @@ function render(d) {
           <div class="info-row"><span class="info-k">SEC Events</span><span class="info-v">${d.sec_events||0}</span></div>
           <div class="info-row"><span class="info-k">Adv Uncertainty</span><span class="info-v">${fmtNum((d.adv_uncertainty||0)*100,1)}%</span></div>
           <div class="info-row"><span class="info-k">Adv Confidence</span><span class="info-v" style="font-size:10px;color:var(--cyan)">${(d.adv_confidence||'—').replace(/_/g,' ')}</span></div>
-          <div class="info-row"><span class="info-k">News Stress</span><span class="info-v" style="color:${(d.news_stress||0)<0?'var(--green)':(d.news_stress||0)>5?'var(--red)':(d.news_stress||0)>1?'var(--amber)':'var(--text-1)'}">${fmtNum(d.news_stress,1)}pp</span></div>
+          <div class="info-row"><span class="info-k">News Stress</span><span class="info-v" style="color:${(d.news_stress||0)<0?'var(--green)':(d.news_stress||0)>5?'var(--red)':(d.news_stress||0)>1?'var(--amber)':'var(--text-1)'}">${fmtNum(d.news_stress,1)}%</span></div>
           <div class="info-row"><span class="info-k">News Sources</span><span class="info-v">${d.news_stats?.sources_hit||0} of 12</span></div>
         </div>
       </div>
