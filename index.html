@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net 'unsafe-inline'; style-src 'self' https://fonts.googleapis.com 'unsafe-inline'; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.binance.com;">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net 'unsafe-inline'; style-src 'self' https://fonts.googleapis.com 'unsafe-inline'; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.binance.com http://172.31.19.27:8765 http://localhost:8765 ws://172.31.19.27:8765;">
 <title>SFC Terminal | Quantitative Stress Intelligence</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -2452,7 +2452,122 @@ async function fetchBtcLive() {
   }
 }
 
-/* ── FETCH ── */
+/* ── SSE CLIENT — replaces polling fetchLiveData + fetchBtcLive ── */
+const SSE_URL = 'http://172.31.19.27:8765';
+let sseSource = null;
+let sseReconnectTimer = null;
+
+function connectSSE() {
+  if (sseSource) { sseSource.close(); }
+
+  // Try snapshot first for instant initial load
+  fetch(SSE_URL + '/snapshot').then(r => r.json()).then(snap => {
+    if (snap.sfc && !currentData) {
+      currentData = snap.sfc;
+      window.__EMBEDDED_DATA = snap.sfc;
+      render(snap.sfc);
+      setTimeout(startNewsSlide, 100);
+      setTimeout(restoreScrollPos, 200);
+      if (snap.btc && snap.btc.btc) {
+        prevBtcPrice = snap.btc.btc;
+      }
+    }
+  }).catch(() => {});
+
+  sseSource = new EventSource(SSE_URL + '/events');
+
+  sseSource.addEventListener('btc_ticker', (e) => {
+    const d = JSON.parse(e.data);
+    if (!d.price || d.price <= 0) return;
+    liveBtcData = d;
+    updateBtcTicker(d);
+  });
+
+  sseSource.addEventListener('sfc_update', (e) => {
+    const d = JSON.parse(e.data);
+    currentData = d;
+    window.__EMBEDDED_DATA = d;
+    render(d);
+    startNewsSlide();
+  });
+
+  sseSource.addEventListener('heartbeat', () => {
+    // Connection alive — no action needed
+  });
+
+  sseSource.onerror = () => {
+    console.log('[SSE] Connection lost — will reconnect');
+    sseSource.close();
+    // Fallback to polling if SSE fails
+    sseReconnectTimer = setTimeout(() => {
+      console.log('[SSE] Attempting reconnect...');
+      connectSSE();
+    }, 10000);
+    // Immediate fallback: start polling so page stays alive
+    startPollingFallback();
+  };
+}
+
+let pollingActive = false;
+function startPollingFallback() {
+  if (pollingActive) return;
+  pollingActive = true;
+  console.log('[SSE] Fallback to polling mode');
+  fetchLiveData();
+  fetchBtcLive();
+  setInterval(fetchLiveData, 30000);
+  setInterval(fetchBtcLive, 15000);
+}
+
+function updateBtcTicker(d) {
+  const tickerEl = document.getElementById('liveTicker');
+  if (!tickerEl) return;
+
+  tickerEl.innerHTML =
+    '<span class="ticker-dot"></span>' +
+    '<span class="ticker-price' + (prevBtcPrice !== null ? (d.price > prevBtcPrice ? ' flash-green' : d.price < prevBtcPrice ? ' flash-red' : '') : '') + '">$' + d.price.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2}) + '</span>' +
+    '<span class="ticker-change ' + (d.change_pct >= 0 ? 'pos' : 'neg') + '">' + (d.change_pct >= 0 ? '▲' : '▼') + ' ' + Math.abs(d.change_pct).toFixed(2) + '%</span>' +
+    '<span class="ticker-stat"><span class="stat-label">High</span><span class="stat-val high">$' + Math.round(d.high_24h).toLocaleString() + '</span></span>' +
+    '<span class="ticker-stat"><span class="stat-label">Low</span><span class="stat-val low">$' + Math.round(d.low_24h).toLocaleString() + '</span></span>' +
+    '<span class="ticker-vol"><span class="stat-label">Vol 24h</span>' + (d.volume_24h >= 1e9 ? (d.volume_24h/1e9).toFixed(2) + 'B' : (d.volume_24h/1e6).toFixed(1) + 'M') + '</span>';
+
+  setTimeout(() => {
+    const tp = tickerEl.querySelector('.ticker-price');
+    if (tp) tp.classList.remove('flash-green', 'flash-red');
+  }, 600);
+
+  // Update BTC KPI hero
+  const kpiNum = document.querySelector('.kpi-hero .kpi-num');
+  if (kpiNum) {
+    if (prevBtcPrice !== null && d.price !== prevBtcPrice) {
+      kpiNum.style.color = d.price > prevBtcPrice ? 'var(--green)' : 'var(--red)';
+      setTimeout(() => { kpiNum.style.color = 'var(--cyan)'; }, 400);
+    }
+    kpiNum.textContent = '$' + d.price.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+  }
+
+  // Update BTC change %
+  const auxEl = document.querySelector('.kpi-hero .kpi-aux');
+  if (auxEl) {
+    auxEl.innerHTML = '<span class="' + (d.change_pct >= 0 ? 'chg-pos' : 'chg-neg') + '">' + (d.change_pct >= 0 ? '▲' : '▼') + ' ' + Math.abs(d.change_pct).toFixed(2) + '% 24h</span>';
+  }
+
+  // Push to chart if meaningful change
+  if (currentData && window.updatePriceChart) {
+    const last = historyPoints[historyPoints.length - 1];
+    if (!last || Math.abs(last.btc - d.price) / last.btc > 0.0002) {
+      const floor = currentData ? d.price * (1 - Math.min((currentData.sfc_effective || currentData.sfc || 0), 80) / 100 * 0.6) : 0;
+      pushHistory(d.price, floor);
+      if (chartVisible) updatePriceChart();
+    }
+    // Update paper trading PnL
+    if (window.processSignalFromSFC) processSignalFromSFC(currentData);
+  }
+
+  prevBtcPrice = d.price;
+}
+
+/* ── FETCH (SSE fallback — used when SSE connection fails) ── */
 async function fetchLiveData() {
   try {
     // Save actual scroll position before DOM rebuild
@@ -2652,24 +2767,20 @@ function exportPaperTrades() {
 loadHistory();
 initPaperTrading();
 fetchPaperTrackRecord();
-setInterval(fetchPaperTrackRecord, 60000); // refresh track record every 60s
+setInterval(fetchPaperTrackRecord, 60000);
 if (typeof __EMBEDDED_DATA !== 'undefined' && __EMBEDDED_DATA) {
   currentData = __EMBEDDED_DATA;
   render(__EMBEDDED_DATA);
   setTimeout(startNewsSlide, 100);
   setTimeout(restoreScrollPos, 200);
-  setTimeout(fetchBtcLive, 500);
 } else if (window.__EMBEDDED_DATA) {
   currentData = window.__EMBEDDED_DATA;
   render(window.__EMBEDDED_DATA);
   setTimeout(startNewsSlide, 100);
   setTimeout(restoreScrollPos, 200);
-  setTimeout(fetchBtcLive, 500);
-} else {
-  fetchLiveData().then(() => setTimeout(startNewsSlide, 100));
 }
-setInterval(fetchLiveData, 30000);
-setInterval(fetchBtcLive, 15000);
+// SSE connection — real-time updates replaces interval polling
+setTimeout(connectSSE, 300);
 
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js').catch(e => console.log('SW failed:', e));
