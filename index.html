@@ -2369,6 +2369,27 @@ async function fetchBtcLive() {
 
     liveBtcData = { price, changePct, high, low, bid, ask, vol };
 
+    // ── Ensure live ticker bar exists (SSE might not have created it) ──
+    let tickerEl = document.getElementById('liveTicker');
+    if (!tickerEl) {
+      tickerEl = document.createElement('div');
+      tickerEl.id = 'liveTicker';
+      tickerEl.className = 'live-ticker';
+      tickerEl.innerHTML =
+        '<span class="ticker-dot"></span>' +
+        '<span class="ticker-price"></span>' +
+        '<span class="ticker-change"></span>' +
+        '<span class="ticker-stat"><span class="stat-label">High</span><span class="stat-val high">—</span></span>' +
+        '<span class="ticker-stat"><span class="stat-label">Low</span><span class="stat-val low">—</span></span>' +
+        '<span class="ticker-vol"><span class="stat-label">Vol 24h</span>—</span>';
+      const kpiRow = document.querySelector('.kpi-row');
+      if (kpiRow && kpiRow.nextSibling) {
+        kpiRow.parentNode.insertBefore(tickerEl, kpiRow.nextSibling);
+      } else {
+        document.querySelector('.news-wrap')?.before(tickerEl);
+      }
+    }
+
     // ── Update KPI hero card ──
     const kpiNum = document.querySelector('.kpi-hero .kpi-num');
     if (kpiNum) {
@@ -2533,9 +2554,8 @@ function startPollingFallback() {
   pollingActive = true;
   console.log('[SSE] Fallback to polling mode');
   fetchLiveData();
-  fetchBtcLive();
   setInterval(fetchLiveData, 30000);
-  setInterval(fetchBtcLive, 15000);
+  // fetchBtcLive already running on its own interval — no need to restart
 }
 
 function updateBtcTicker(d) {
@@ -2875,6 +2895,9 @@ loadHistory();
 initPaperTrading();
 fetchPaperTrackRecord();
 setInterval(fetchPaperTrackRecord, 60000);
+// Start BTC live ticker immediately (SSE or fallback — both work)
+fetchBtcLive();
+setInterval(fetchBtcLive, 15000);
 // SSE is the single source of truth — connects and fetches snapshot as initial data
 setTimeout(connectSSE, 300);
 
