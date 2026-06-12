@@ -1655,6 +1655,16 @@ function render(d) {
       </div>
     </div>
 
+    <!-- LIVE TICKER (TradingView Style) -->
+    <div class="live-ticker" id="liveTicker">
+      <span class="ticker-dot"></span>
+      <span class="ticker-price">$${fmtNum(d.btc)}</span>
+      <span class="ticker-change ${(d.btc_24h||0)>=0?'pos':'neg'}">${(d.btc_24h||0)>=0?'▲':'▼'} ${Math.abs(d.btc_24h||0).toFixed(2)}%</span>
+      <span class="ticker-stat"><span class="stat-label">High</span><span class="stat-val high">—</span></span>
+      <span class="ticker-stat"><span class="stat-label">Low</span><span class="stat-val low">—</span></span>
+      <span class="ticker-vol"><span class="stat-label">Vol 24h</span>—</span>
+    </div>
+
     <!-- NEWS -->
     <div class="news-wrap">
       <div class="news-viewport">
@@ -2369,27 +2379,6 @@ async function fetchBtcLive() {
 
     liveBtcData = { price, changePct, high, low, bid, ask, vol };
 
-    // ── Ensure live ticker bar exists (SSE might not have created it) ──
-    let tickerEl = document.getElementById('liveTicker');
-    if (!tickerEl) {
-      tickerEl = document.createElement('div');
-      tickerEl.id = 'liveTicker';
-      tickerEl.className = 'live-ticker';
-      tickerEl.innerHTML =
-        '<span class="ticker-dot"></span>' +
-        '<span class="ticker-price"></span>' +
-        '<span class="ticker-change"></span>' +
-        '<span class="ticker-stat"><span class="stat-label">High</span><span class="stat-val high">—</span></span>' +
-        '<span class="ticker-stat"><span class="stat-label">Low</span><span class="stat-val low">—</span></span>' +
-        '<span class="ticker-vol"><span class="stat-label">Vol 24h</span>—</span>';
-      const kpiRow = document.querySelector('.kpi-row');
-      if (kpiRow && kpiRow.nextSibling) {
-        kpiRow.parentNode.insertBefore(tickerEl, kpiRow.nextSibling);
-      } else {
-        document.querySelector('.news-wrap')?.before(tickerEl);
-      }
-    }
-
     // ── Update KPI hero card ──
     const kpiNum = document.querySelector('.kpi-hero .kpi-num');
     if (kpiNum) {
@@ -2559,8 +2548,8 @@ function startPollingFallback() {
 }
 
 function updateBtcTicker(d) {
-  // Create live ticker bar on first call (render() no longer includes it)
-  let tickerEl = document.getElementById('liveTicker');
+  // Ticker bar already rendered by render() — just update values
+  const tickerEl = document.getElementById('liveTicker');
   if (!tickerEl) {
     tickerEl = document.createElement('div');
     tickerEl.id = 'liveTicker';
