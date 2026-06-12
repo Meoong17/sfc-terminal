@@ -2891,6 +2891,11 @@ function exportPaperTrades() {
 }
 
 /* ── INIT ── */
+// Render immediately from embedded data (always available, no network needed)
+if (typeof __EMBEDDED_DATA !== 'undefined' && __EMBEDDED_DATA) {
+  render(__EMBEDDED_DATA);
+  setTimeout(startNewsSlide, 100);
+}
 loadHistory();
 initPaperTrading();
 fetchPaperTrackRecord();
