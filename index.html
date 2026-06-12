@@ -2070,7 +2070,7 @@ function render(d) {
         <div style="display:flex;align-items:center;gap:6px">
         <span id="paperStatus" style="font-size:9px;font-weight:600;padding:3px 10px;border-radius:100px;background:var(--green-dim);color:var(--green);border:1px solid var(--border-green)">● IDLE</span>
         <span id="paperServerBadge" style="font-size:8px;font-weight:500;padding:2px 7px;border-radius:100px;background:var(--cyan-dim);color:var(--cyan);border:1px solid rgba(0,212,255,0.2)">SERVER</span>
-        <div style="cursor:pointer;padding:4px 8px;font-size:10px;color:var(--text-2);border-radius:6px;transition:all 0.15s" onclick="togglePaperSection()" id="paperToggle" title="Toggle paper trading details">&#x25b2;</div>
+        <div style="cursor:pointer;padding:4px 8px;font-size:10px;color:var(--text-2);border-radius:6px;transition:all 0.15s" onclick="togglePaperSection()" id="paperToggleHead" title="Toggle paper trading details">&#x25b2;</div>
         </div>
       </div>
       <div id="paperBody" style="display:block">
@@ -2272,11 +2272,13 @@ function render(d) {
 let paperVisible = true;
 function togglePaperSection() {
   paperVisible = !paperVisible;
-  const p = document.getElementById('paperBody');
-  const t = document.getElementById('paperToggle');
-  if (p) p.style.display = paperVisible ? 'block' : 'none';
-  if (t) t.textContent = paperVisible ? '\\u25b2' : '\\u25bc';
-  if (t) t.title = paperVisible ? 'Hide paper trading details' : 'Show paper trading details';
+  const body = document.getElementById('paperBody');
+  const toggleHead = document.getElementById('paperToggleHead');
+  const toggleFoot = document.getElementById('paperToggle');
+  if (body) body.style.display = paperVisible ? 'block' : 'none';
+  const arrow = paperVisible ? '\u25b2' : '\u25bc';
+  if (toggleHead) { toggleHead.textContent = arrow; toggleHead.title = paperVisible ? 'Hide paper trading details' : 'Show paper trading details'; }
+  if (toggleFoot) { toggleFoot.textContent = arrow + (paperVisible ? ' Hide' : ' Show'); toggleFoot.title = paperVisible ? 'Hide paper trading details' : 'Show paper trading details'; }
 }
 
 /* ── SERVER PAPER TRADING TRACK RECORD ── */
