@@ -2366,7 +2366,6 @@ async function fetchLiveData() {
     // Restore exact scroll position (not activeTab section)
     window.scrollTo({ top: savedScrollY, behavior: 'instant' });
     startNewsSlide();
-    fetchBtcLive(); // Sync live price after pipeline data refresh
     return true;
   } catch (e) {
     console.log('Fetch failed:', e);
@@ -2558,18 +2557,15 @@ if (typeof __EMBEDDED_DATA !== 'undefined' && __EMBEDDED_DATA) {
   render(__EMBEDDED_DATA);
   setTimeout(startNewsSlide, 100);
   setTimeout(restoreScrollPos, 200);
-  setTimeout(fetchBtcLive, 500);
 } else if (window.__EMBEDDED_DATA) {
   currentData = window.__EMBEDDED_DATA;
   render(window.__EMBEDDED_DATA);
   setTimeout(startNewsSlide, 100);
   setTimeout(restoreScrollPos, 200);
-  setTimeout(fetchBtcLive, 500);
 } else {
   fetchLiveData().then(() => setTimeout(startNewsSlide, 100));
 }
 setInterval(fetchLiveData, 30000);
-setInterval(fetchBtcLive, 15000);
 
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js').catch(e => console.log('SW failed:', e));
