@@ -1,6 +1,9 @@
 """
 SHAP Explainer script — run inside xai_venv
 Called as subprocess from xai_explainer_q5.py
+
+Uses random data as background (real pipeline integration TBD).
+Feature importance is relative, not absolute — useful for ranking.
 """
 import json, os, sys, numpy as np
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
@@ -22,7 +25,11 @@ model = ModelWrapper()
 model.eval()
 
 np.random.seed(42)
-background = torch.randn(5, 20, 41)
+torch.manual_seed(42)
+
+# Use deterministic random data for stable feature importance ranking
+# In production, this should load real data from data.json
+background = torch.randn(10, 20, 41)
 x_explain = torch.randn(1, 20, 41)
 
 try:

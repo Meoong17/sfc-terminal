@@ -103,6 +103,17 @@ def run_shap_explanation() -> Dict[str, Any]:
         return _shap_fallback(str(e))
 
 
+# ── Helper: map LIME range names back to clean feature names ──
+
+def _clean_lime_name(name: str) -> str:
+    """Convert 'M20_OBI <= -0.58' or '-0.68 < M6_Regime' back to clean 'M20_OBI' or 'M6_Regime'."""
+    import re
+    m = re.search(r'([A-Z]\d+_[A-Za-z]+)', name)
+    if m:
+        return m.group(1)
+    return name
+
+
 def _shap_fallback(reason: str) -> Dict[str, Any]:
     return {
         "ok": False,
@@ -186,6 +197,11 @@ print(json.dumps(result))
 
     if result is None:
         return _lime_fallback("Venv not available")
+
+    # Clean LIME feature names (strip bin ranges)
+    if result.get("ok") and "top_features" in result:
+        for f in result["top_features"]:
+            f["name"] = _clean_lime_name(f["name"])
 
     return result
 
