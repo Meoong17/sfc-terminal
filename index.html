@@ -1588,7 +1588,7 @@ function render(d) {
       </div>
       <div class="nav-meta">
         <div class="nav-meta-label">Regime</div>
-        <div class="nav-meta-val" style="color:${regimeColor}">${typeof d.regime === 'string' && isNaN(d.regime) ? d.regime : (d.adv_regime || 'NORMAL')}</div>
+        <div class="nav-meta-val" id="regimeNavVal" style="color:${regimeColor}">${typeof d.regime === 'string' && isNaN(d.regime) ? d.regime : (d.adv_regime || 'NORMAL')}</div>
       </div>
       <span class="nav-pill ${topPillClass}">${topPillText}</span>
     </div>
@@ -2556,6 +2556,12 @@ function updateNewsHeadlines(headlines) {
 }
 
 function updateSfcKpis(d) {
+  // Force-update nav regime display every time data arrives
+  const regimeEl = document.getElementById('regimeNavVal');
+  if (regimeEl) {
+    const val = typeof d.regime === 'string' && isNaN(d.regime) ? d.regime : (d.adv_regime || 'NORMAL');
+    regimeEl.textContent = val;
+  }
   // Update SFC hero gauge numbers without full re-render
   const sfcEff = d.sfc_effective || 0;
   const bigNum = document.querySelector('.sfc-big-num');
