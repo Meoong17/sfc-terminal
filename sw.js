@@ -1,9 +1,9 @@
 /**
- * Service Worker v9 — Stale-while-revalidate + version check
+ * Service Worker v10 — Always-bypass cache for index.html + data.json
  * Never serve data.json older than 30 minutes without attempting refresh
  */
 
-const CACHE_NAME = "sfc-terminal-v11";
+const CACHE_NAME = "sfc-terminal-v12";
 const DATA_CACHE = "sfc-data-v4";
 const MAX_DATA_AGE_MS = 5 * 60 * 1000; // 5 minutes (was 30 min — dashboard was serving stale data)
 
@@ -39,7 +39,16 @@ self.addEventListener("activate", e => {
 self.addEventListener("fetch", e => {
   const url = new URL(e.request.url);
 
-  if (url.pathname.includes("data.json")) {
+    // Index HTML — always bypass SW cache for index.html (prevent stale nav)
+    if (url.pathname.endsWith("index.html") || url.pathname === "/") {
+      fetch(e.request).then(res => {
+        if (res.ok) caches.open(CACHE_NAME).then(c => c.put(e.request, res.clone()));
+      });
+      e.respondWith(fetch(e.request).catch(() => caches.match(e.request)));
+      return;
+    }
+
+    if (url.pathname.includes("data.json")) {
     // Stale-while-revalidate: serve cached instantly, update in background
     e.respondWith(
       caches.open(DATA_CACHE).then(async cache => {
