@@ -44,6 +44,50 @@ except ImportError as e:
     ADVANCED_AVAILABLE = False
     print(f"[SFC] Advanced modules not available: {e}", file=sys.stderr)
 
+# Q5 Advanced Pattern Methods (M65-M69)
+try:
+    from models.cnn_attention_module import calculate_cnn_attention_stress
+    CNN_ATTENTION_AVAILABLE = True
+except ImportError:
+    CNN_ATTENTION_AVAILABLE = False
+    print("[SFC] CNN+Attention (M65) not available", file=sys.stderr)
+    def calculate_cnn_attention_stress(*a, **k):
+        return {"m65_cnn_attention": 0.5, "attention_focus": [], "pattern_type": "FALLBACK"}
+
+try:
+    from optimization.genetic_algorithm import weekly_feature_optimization
+    GA_AVAILABLE = True
+except ImportError:
+    GA_AVAILABLE = False
+    print("[SFC] Genetic Algorithm (M66) not available", file=sys.stderr)
+    def weekly_feature_optimization(*a, **k): return []
+
+try:
+    from data_augmentation.timegan_module import monthly_data_augmentation
+    TIMEGAN_AVAILABLE = True
+except ImportError:
+    TIMEGAN_AVAILABLE = False
+    print("[SFC] TimeGAN (M67) not available", file=sys.stderr)
+    def monthly_data_augmentation(*a, **k): return None
+
+try:
+    from trading.drl_agent import get_trading_signal, train_drl_agent
+    DRL_AVAILABLE = True
+except ImportError:
+    DRL_AVAILABLE = False
+    print("[SFC] DRL Agent (M68) not available", file=sys.stderr)
+    def get_trading_signal(*a, **k): return "HOLD"
+    def train_drl_agent(*a, **k): return None
+
+try:
+    from risk.gnn_module import calculate_systemic_risk
+    GNN_AVAILABLE = True
+except ImportError:
+    GNN_AVAILABLE = False
+    print("[SFC] GNN Systemic Risk (M69) not available", file=sys.stderr)
+    def calculate_systemic_risk(*a, **k):
+        return {"overall_systemic_risk": 0.5, "btc_systemic_risk": 0.5, "market_regime": "NORMAL", "correlation_breakdown": False}
+
 sys.path.insert(0, os.path.dirname(__file__))
 try:
     from methods_institutional import compute_all_institutional
@@ -1429,6 +1473,59 @@ if transition_risk > 0.5:
 composite_confidence = max(0.05, min(cc_base - cc_penalty, 0.95))
 composite_confidence = round(composite_confidence, 3)
 
+# ── Q5 Advanced Methods: M65-M69 ──
+# M65: CNN+Attention pattern recognition
+_m65_result = calculate_cnn_attention_stress([])  # empty data → fallback if no model
+_m65_stress = _m65_result.get("m65_cnn_attention", 0.5)
+_m65_pattern = _m65_result.get("pattern_type", "FALLBACK")
+
+# M66: Genetic Algorithm feature selection (runs weekly, not every cycle)
+# Only check if optimization is due
+_m66_last_opt = getattr(sys.modules.get('collect.py'), '_m66_last_opt', 0)
+_m66_now = time.time()
+_m66_due = (_m66_now - _m66_last_opt > 604800)  # 7 days
+_m66_features = None
+if _m66_due and GA_AVAILABLE:
+    try:
+        _m66_result = weekly_feature_optimization()
+        if _m66_result and len(_m66_result) > 0:
+            _m66_features = _m66_result
+            # Cache timestamp — store on module
+            import collect as _collect_mod
+            _collect_mod._m66_last_opt = _m66_now
+    except Exception:
+        pass
+
+# M67: TimeGAN crisis data augmentation (runs monthly)
+_m67_last_aug = getattr(sys.modules.get('collect.py'), '_m67_last_aug', 0)
+_m67_due = (_m66_now - _m67_last_aug > 2592000)  # 30 days
+_m67_augmented = None
+if _m67_due and TIMEGAN_AVAILABLE:
+    try:
+        _m67_result = monthly_data_augmentation()
+        if _m67_result is not None:
+            _m67_augmented = _m67_result.shape
+            import collect as _collect_mod
+            _collect_mod._m67_last_aug = _m67_now
+    except Exception:
+        pass
+
+# M68: DRL Trading Signal
+_drl_market_state = {
+    "stress": effective_sfc / 100.0 if effective_sfc else 0.5,
+    "rsi": rsi_14 or 50,
+    "price": btc or 60000,
+    "momentum": (chg or 0) / 100.0,
+}
+_m68_signal = get_trading_signal(_drl_market_state)
+
+# M69: GNN Systemic Risk
+_m69_result = calculate_systemic_risk()
+_m69_overall = _m69_result.get("overall_systemic_risk", 0.5)
+_m69_btc = _m69_result.get("btc_systemic_risk", 0.5)
+_m69_regime = _m69_result.get("market_regime", "NORMAL")
+_m69_breakdown = _m69_result.get("correlation_breakdown", False)
+
 # Build output
 out = {
     "ts": datetime.now(timezone.utc).isoformat(),
@@ -1616,10 +1713,30 @@ out = {
     "shock_event": shock_event,
     "shock_severity": shock_severity,
     "sec_events": sec_events,
+    # ── Q5 Advanced Methods: M65-M69 ──
+    "m65_cnn_attention": round(_m65_stress, 4),
+    "m65_pattern_type": _m65_pattern,
+    "m65_available": CNN_ATTENTION_AVAILABLE,
+    "m66_ga_features": _m66_features,
+    "m66_ga_count": len(_m66_features) if _m66_features else 0,
+    "m66_available": GA_AVAILABLE,
+    "m67_augmented_shape": str(_m67_augmented) if _m67_augmented else None,
+    "m67_available": TIMEGAN_AVAILABLE,
+    "m68_drl_signal": _m68_signal,
+    "m68_available": DRL_AVAILABLE,
+    "m69_systemic_risk": round(_m69_overall, 4),
+    "m69_btc_systemic_risk": round(_m69_btc, 4),
+    "m69_market_regime": _m69_regime,
+    "m69_correlation_breakdown": _m69_breakdown,
+    "m69_available": GNN_AVAILABLE,
 }
 
 print(json.dumps(out, indent=2))
 btc_str = f"${btc:,.0f}" if btc is not None else "N/A"
 rsi_str = f"{rsi_14}" if rsi_14 is not None else "N/A"
 sopr_str = f"{sopr_proxy}" if sopr_proxy is not None else "N/A"
-print(f"\n✅ BTC={btc_str} | SFC={effective_sfc:.1f}% | Zone={zone} | RSI={rsi_str} | SOPR={sopr_str} | News={news_stress:.1f} | {regime} | Methods={total_active_methods}/32", file=sys.stderr)
+qlstm_str = f" QLSTM={qlstm_pred*100:.1f}" if qlstm_pred is not None else ""
+m65_str = f" CNN={_m65_stress:.2f}" if CNN_ATTENTION_AVAILABLE else ""
+m68_str = f" DRL={_m68_signal}" if DRL_AVAILABLE else ""
+m69_str = f" SYS={_m69_overall:.2f}" if GNN_AVAILABLE else ""
+print(f"\n✅ BTC={btc_str} | SFC={effective_sfc:.1f}% | Zone={zone} | RSI={rsi_str} | SOPR={sopr_str} | News={news_stress:.1f} | {regime} | Methods={total_active_methods}/32{qlstm_str}{m65_str}{m68_str}{m69_str}", file=sys.stderr)

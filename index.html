@@ -2063,6 +2063,9 @@ function render(d) {
           <div class="info-row"><span class="info-k">Adv Confidence</span><span class="info-v" style="font-size:10px;color:var(--cyan)">${(d.adv_confidence||'—').replace(/_/g,' ')}</span></div>
           <div class="info-row"><span class="info-k">News Stress</span><span class="info-v" style="color:${(d.news_stress||0)<0?'var(--green)':(d.news_stress||0)>5?'var(--red)':(d.news_stress||0)>1?'var(--amber)':'var(--text-1)'}">${fmtNum(d.news_stress,1)}%</span></div>
           <div class="info-row"><span class="info-k">News Sources</span><span class="info-v">${d.news_stats?.sources_hit||0} of 12</span></div>
+          <div class="info-row"><span class="info-k">CNN Pattern</span><span class="info-v" style="font-size:9px;color:${(d.m65_cnn_attention||0)>0.6?'var(--red)':(d.m65_cnn_attention||0)>0.4?'var(--amber)':'var(--green)'}">${fmtNum(Number(d.m65_cnn_attention||0)*100,0)}% ${d.m65_pattern_type?.split('—')[0]?.trim()||'—'}</span></div>
+          <div class="info-row"><span class="info-k">Systemic Risk</span><span class="info-v" style="color:${(d.m69_systemic_risk||0)>0.6?'var(--red)':(d.m69_systemic_risk||0)>0.4?'var(--amber)':'var(--green)'}">${fmtNum(Number(d.m69_systemic_risk||0)*100,0)}% ${d.m69_market_regime||'—'}</span></div>
+          <div class="info-row"><span class="info-k">DRL Signal</span><span class="info-v" style="color:${d.m68_drl_signal==='SELL'?'var(--red)':d.m68_drl_signal==='BUY_50'?'var(--green)':d.m68_drl_signal?.startsWith('BUY')?'var(--amber)':'var(--text-1)'}">${d.m68_drl_signal||'—'}</span></div>
         </div>
       </div>
     </div>
