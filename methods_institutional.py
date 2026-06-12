@@ -26,62 +26,54 @@ BINANCE_BASE = "https://api.binance.com"
 _CG_CACHE = {}
 
 def _cg_fetch_all():
-    """Fetch all CoinGecko data in 4 calls max, cache for all methods. Falls back to Binance klines on rate limit."""
+    """Fetch all CoinGecko data in parallel. Falls back to Binance klines on rate limit."""
     if _CG_CACHE:
         return _CG_CACHE
 
-    # Call 1: Coin info (ATH, market data)
-    try:
-        r1 = requests.get(
-            "https://api.coingecko.com/api/v3/coins/bitcoin?localization=false&tickers=false&community_data=false&developer_data=false",
-            timeout=15
-        )
-        coin = r1.json()
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    
+    urls = [
+        ("coin_info", "https://api.coingecko.com/api/v3/coins/bitcoin?localization=false&tickers=false&community_data=false&developer_data=false"),
+        ("prices_365", "https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=365&interval=daily"),
+        ("prices_90", "https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=90&interval=daily"),
+        ("prices_200", "https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=200&interval=daily"),
+    ]
+    
+    results = {}
+    def _fetch_one(name, url):
+        try:
+            r = requests.get(url, timeout=15)
+            if r.status_code == 200:
+                return name, r.json()
+            return name, None
+        except:
+            return name, None
+    
+    with ThreadPoolExecutor(max_workers=4) as ex:
+        futures = {ex.submit(_fetch_one, n, u): n for n, u in urls}
+        for f in as_completed(futures):
+            name, data = f.result()
+            results[name] = data
+    
+    # Process results
+    coin = results.get("coin_info")
+    if coin:
         md = coin.get("market_data", {})
         _CG_CACHE["ath"] = float(md.get("ath", {}).get("usd", 126272))
         _CG_CACHE["ath_date"] = md.get("ath_date", {}).get("usd", "")
         _CG_CACHE["mcap"] = float(md.get("market_cap", {}).get("usd", 0))
         _CG_CACHE["vol_24h"] = float(md.get("total_volume", {}).get("usd", 0))
-    except Exception as e:
-        print(f"[CG Cache] Call 1 (coin info) failed: {e}", file=sys.stderr)
-
-    # Call 2: 365-day price history
-    try:
-        r2 = requests.get(
-            "https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=365&interval=daily",
-            timeout=15
-        )
-        prices = [p[1] for p in r2.json().get("prices", [])]
-        _CG_CACHE["prices_365"] = prices
-    except Exception as e:
-        print(f"[CG Cache] Call 2 (365-day history) failed: {e}", file=sys.stderr)
-
-    # Call 3: 90-day for skewness
-    try:
-        r3 = requests.get(
-            "https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=90&interval=daily",
-            timeout=15
-        )
-        prices_90 = [p[1] for p in r3.json().get("prices", [])]
-        _CG_CACHE["prices_90"] = prices_90
-    except Exception as e:
-        print(f"[CG Cache] Call 3 (90-day history) failed: {e}", file=sys.stderr)
-
-    # Call 4: 200-day for Altman Z
-    try:
-        r4 = requests.get(
-            "https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=200&interval=daily",
-            timeout=15
-        )
-        _CG_CACHE["prices_200"] = [p[1] for p in r4.json().get("prices", [])]
-    except Exception as e:
-        print(f"[CG Cache] Call 4 (200-day history) failed: {e}", file=sys.stderr)
-
+    
+    for key in ["prices_365", "prices_90", "prices_200"]:
+        data = results.get(key)
+        if data:
+            _CG_CACHE[key] = [p[1] for p in data.get("prices", [])]
+    
     # If all CoinGecko calls failed, fall back to Binance klines
     if not _CG_CACHE:
         print("[CG Cache] All CoinGecko calls failed, trying Binance fallback...", file=sys.stderr)
         _binance_klines_fallback()
-
+    
     return _CG_CACHE
 
 def _cg_get(key, default=None):

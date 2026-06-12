@@ -684,15 +684,86 @@ def detect_regime(dvol, sfc_pct, news_stress, sentiment):
 # ============================================================
 
 FRED_KEY = os.getenv("FRED_API_KEY", "")
+_FRED_CACHE = {}  # series_id -> (vals, ts)
+
 def _fred(series, limit=2):
+    """Fetch FRED data with module-level cache. Cache is warm after _fred_prefetch()."""
+    global _FRED_CACHE
+    cache_key = f"{series}:{limit}"
+    if cache_key in _FRED_CACHE:
+        return _FRED_CACHE[cache_key]
     if not FRED_KEY: return None
     try:
         r = requests.get(f"https://api.stlouisfed.org/fred/series/observations?series_id={series}&api_key={FRED_KEY}&file_type=json&sort_order=desc&limit={limit}", timeout=15)
         if r.status_code != 200: return None
         obs = r.json().get("observations", [])
         vals = [float(o["value"]) for o in obs if o["value"] != "."]
-        return vals if vals else None
+        result = vals if vals else None
+        _FRED_CACHE[cache_key] = result
+        return result
     except: return None
+
+def _fred_cpi_yoy():
+    """Fetch CPI YoY with caching (called by M7)."""
+    cache_key = "CPIAUCSL:13_yoy"
+    if cache_key in _FRED_CACHE:
+        return _FRED_CACHE[cache_key]
+    if not FRED_KEY: return 3.0
+    try:
+        r = requests.get(f"https://api.stlouisfed.org/fred/series/observations?series_id=CPIAUCSL&api_key={FRED_KEY}&file_type=json&sort_order=desc&limit=13", timeout=15)
+        obs = r.json().get("observations", [])
+        if len(obs) >= 13:
+            cpi_now = float(obs[0]["value"])
+            cpi_yr = float(obs[12]["value"])
+            result = (cpi_now - cpi_yr) / cpi_yr * 100
+            _FRED_CACHE[cache_key] = result
+            return result
+    except: pass
+    return 3.0
+
+def _fred_prefetch():
+    """Prefetch ALL FRED data in ONE parallel batch."""
+    global _FRED_CACHE
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    
+    needed = [
+        ("FEDFUNDS:1", "FEDFUNDS", 1),
+        ("CPIAUCSL:1", "CPIAUCSL", 1),
+        ("DGS10:1", "DGS10", 1),
+        ("DGS2:1", "DGS2", 1),
+        ("BAMLH0A0HYM2:1", "BAMLH0A0HYM2", 1),
+        ("M2SL:1", "M2SL", 1),
+        ("MBCURSL:1", "MBCURSL", 1),
+        ("M2SL:30", "M2SL", 30),
+        ("DTWEXBGS:30", "DTWEXBGS", 30),
+    ]
+    
+    def _fetch_one(series, limit):
+        try:
+            if not FRED_KEY: return None, None
+            r = requests.get(f"https://api.stlouisfed.org/fred/series/observations?series_id={series}&api_key={FRED_KEY}&file_type=json&sort_order=desc&limit={limit}", timeout=15)
+            if r.status_code != 200: return None, series
+            obs = r.json().get("observations", [])
+            vals = [float(o["value"]) for o in obs if o["value"] != "."]
+            return (vals if vals else None), series
+        except: return None, series
+    
+    # Also fetch CPI YoY in same batch
+    needed.append(("CPIAUCSL:13", "CPIAUCSL", 13))
+    
+    with ThreadPoolExecutor(max_workers=10) as ex:
+        futures = {ex.submit(_fetch_one, s, l): (k, s) for k, s, l in needed}
+        for f in as_completed(futures):
+            vals, series = f.result()
+            key = futures[f][0]
+            _FRED_CACHE[key] = vals if vals else None
+    
+    # Precompute CPI YoY
+    cpi_13 = _FRED_CACHE.get("CPIAUCSL:13")
+    if cpi_13 and len(cpi_13) >= 13:
+        _FRED_CACHE["CPIAUCSL:13_yoy"] = (cpi_13[0] - cpi_13[12]) / cpi_13[12] * 100
+    else:
+        _FRED_CACHE["CPIAUCSL:13_yoy"] = 3.0
 
 # ── TIER 1: MACRO ECONOMICS ──
 
@@ -702,16 +773,8 @@ def calculate_m7_fisher():
     vals_cpi = _fred("CPIAUCSL", 1)
     if not vals_fed or not vals_cpi: return None, None
     fed_rate = vals_fed[0]
-    inflation = (vals_cpi[0] / vals_cpi[0])  # Not YoY calc here — using raw vs target
-    # Use YoY CPI from separate fetch
-    try:
-        r = requests.get(f"https://api.stlouisfed.org/fred/series/observations?series_id=CPIAUCSL&api_key={FRED_KEY}&file_type=json&sort_order=desc&limit=13", timeout=15)
-        obs = r.json().get("observations", [])
-        if len(obs) >= 13:
-            cpi_now = float(obs[0]["value"])
-            cpi_yr = float(obs[12]["value"])
-            cpi_yoy = (cpi_now - cpi_yr) / cpi_yr * 100
-    except: cpi_yoy = 3.0
+    # Use cached CPI YoY from prefetch
+    cpi_yoy = _fred_cpi_yoy()
     real_rate = fed_rate - cpi_yoy
     if real_rate > 3.0: score = 0.85
     elif real_rate > 2.0: score = 0.60
@@ -987,6 +1050,11 @@ with ThreadPoolExecutor(max_workers=8) as ex:
     ex.submit(_fetch_and_store, "pc", get_put_call_ratio)
     ex.submit(_fetch_and_store, "ath", get_ath)
     ex.submit(_fetch_and_store, "ohlcv", get_btc_ohlcv_daily, 30)
+
+# ── PARALLEL FRED PREFETCH ──
+# Fetch ALL FRED data in one batch before M7-M19 need them
+print("[SFC] Prefetching FRED data (parallel)...", file=sys.stderr)
+_fred_prefetch()
 
 # Unpack results
 btc, chg, mcap = _api_results.get("btc", (None, None, None))
