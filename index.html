@@ -1045,6 +1045,9 @@ body {
   .nav-center { display: none; }
   .main { padding: 14px; }
   .kpi-row { grid-template-columns: repeat(2, 1fr); }
+  .kpi-hero .kpi-num { font-size: 24px; }
+  .kpi-num { font-size: 20px; }
+  .kpi-hero { grid-column: 1 / -1; }
   .grid-4 { grid-template-columns: 1fr; }
   .paper-stats { grid-template-columns: repeat(3, 1fr); }
   .help-grid { grid-template-columns: 1fr; }
@@ -1055,6 +1058,13 @@ body {
   .method-grid-sm { grid-template-columns: repeat(4, 1fr); }
   .stat-4 { grid-template-columns: repeat(2, 1fr); }
   .chart-shell canvas { height: 180px !important; }
+}
+
+@media (max-width: 480px) {
+  .kpi-hero .kpi-num { font-size: 18px; }
+  .kpi-num { font-size: 16px; }
+  .kpi-row { gap: 8px; }
+  .kpi { padding: 12px; }
 }
 
 /* ══════════════════════════════════════════
