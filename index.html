@@ -2561,12 +2561,8 @@ function updateNewsHeadlines(headlines) {
 }
 
 function updateSfcKpis(d) {
-  // Force-update nav regime display every time data arrives
-  const regimeEl = document.getElementById('regimeNavVal');
-  if (regimeEl) {
-    const val = typeof d.regime === 'string' && isNaN(d.regime) ? d.regime : (d.adv_regime || 'NORMAL');
-    regimeEl.textContent = val;
-  }
+  // Force-update nav regime display every time data arrives  
+  setNavRegime(d);
   // Update SFC hero gauge numbers without full re-render
   const sfcEff = d.sfc_effective || 0;
   const bigNum = document.querySelector('.sfc-big-num');
@@ -2809,6 +2805,18 @@ fetchBtcLive();
 setInterval(fetchBtcLive, 15000);
 // SSE is the single source of truth — connects and fetches snapshot as initial data
 setTimeout(connectSSE, 300);
+
+/* ── REGIME NAV WATCHER — fixes numeric overwrite from floor/btc every 500ms ── */
+setInterval(function() {
+  var el = document.getElementById('regimeNavVal');
+  if (!el) return;
+  var txt = el.textContent.trim();
+  if (/^\$?[\d,]+\.?\d*$/.test(txt)) {
+    var d = currentData || window.__EMBEDDED_DATA;
+    var val = d ? (typeof d.regime === 'string' && isNaN(d.regime) ? d.regime : (d.adv_regime || 'NORMAL')) : 'NORMAL';
+    el.textContent = val;
+  }
+}, 500);
 
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js').catch(e => console.log('SW failed:', e));
