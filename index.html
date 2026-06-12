@@ -1588,7 +1588,7 @@ function render(d) {
       </div>
       <div class="nav-meta">
         <div class="nav-meta-label">Regime</div>
-        <div class="nav-meta-val" style="color:${regimeColor}">${d.regime || 'NORMAL'}</div>
+        <div class="nav-meta-val" style="color:${regimeColor}">${typeof d.regime === 'string' && isNaN(d.regime) ? d.regime : (d.adv_regime || 'NORMAL')}</div>
       </div>
       <span class="nav-pill ${topPillClass}">${topPillText}</span>
     </div>
@@ -1596,7 +1596,7 @@ function render(d) {
 
   <!-- STATUS BAND -->
   <div class="status-band">
-    <div class="s-chip"><span class="s-dot ${d.regime === 'CAPITULATION' ? 'dot-r' : d.regime === 'STRESS' ? 'dot-a' : 'dot-g'}"></span>${d.regime || 'NORMAL'} · ${d.zone || 'NORMAL'} Zone</div>
+    <div class="s-chip"><span class="s-dot ${d.regime === 'CAPITULATION' ? 'dot-r' : d.regime === 'STRESS' ? 'dot-a' : 'dot-g'}"></span>${typeof d.regime === 'string' && isNaN(d.regime) ? d.regime : (d.adv_regime || 'NORMAL')} · ${d.zone || 'NORMAL'} Zone</div>
     <div class="s-chip"><span class="s-dot ${d.liq_pressure === 'LONG_SQUEEZE' ? 'dot-r' : d.liq_pressure === 'SHORT_SQUEEZE' ? 'dot-g' : 'dot-a'}"></span>${liqLabel}</div>
     <div class="s-chip"><span class="s-dot ${(d.sopr_signal||'').includes('CAPITULATION') ? 'dot-g' : (d.sopr_signal||'').includes('DISTRIBUTION') ? 'dot-r' : 'dot-a'}"></span>SOPR: ${(d.sopr_signal||'UNKNOWN').replace(/_/g,' ')}</div>
     <div class="s-chip"><span class="s-dot dot-b"></span>RSI ${fmtNum(rsi,1)}${rsi<=30?' · Oversold':rsi>=70?' · Overbought':''}</div>
