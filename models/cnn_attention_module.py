@@ -229,7 +229,8 @@ def calculate_cnn_attention_stress(
 
         if attn_weights is not None:
             attn_focus = attn_weights[0].mean(dim=0).cpu().numpy()
-            focus_flat = attn_focus[-1, :].tolist()
+            # attn_focus is (T,) — 1D after mean over heads
+            focus_flat = attn_focus.tolist()
         else:
             focus_flat = []
 
