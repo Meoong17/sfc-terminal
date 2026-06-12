@@ -1185,9 +1185,9 @@ const chartDefaults = {
     legend: { labels: { color: '#7c8ba0', font: { family: 'Space Grotesk', size: 10 }, boxWidth: 10, padding: 10 } },
     tooltip: {
       mode: 'index', intersect: false,
-      backgroundColor: '#0d1220',
-      titleColor: '#e8edf5',
-      bodyColor: '#7c8ba0',
+      backgroundColor: '#0e111a',
+      titleColor: '#edf1f7',
+      bodyColor: '#8892a8',
       borderColor: 'rgba(0,212,255,0.15)',
       borderWidth: 1,
       padding: 10,
@@ -1538,35 +1538,30 @@ function render(d) {
       </div>
 
       <div class="kpi">
-        <div class="kpi-accent-top ${sfcEff>=50?'at-red':sfcEff>=25?'at-amber':'at-green'}"></div>
         <div class="kpi-label">SFC Stress</div>
         <div class="kpi-num" style="color:${sfcColor(sfcEff)}">${sfcEff.toFixed(1)}%</div>
         <span class="kpi-badge ${sfcEff>=50?'kb-r':sfcEff>=25?'kb-a':'kb-g'}">${d.zone||'NORMAL'}</span>
       </div>
 
       <div class="kpi">
-        <div class="kpi-accent-top at-amber"></div>
         <div class="kpi-label">DVOL (IV)</div>
         <div class="kpi-num" style="color:var(--amber)">${fmtNum(d.dvol,1)}%</div>
         <div class="kpi-aux">Implied Volatility</div>
       </div>
 
       <div class="kpi">
-        <div class="kpi-accent-top ${d.fng<20?'at-red':d.fng>70?'at-green':'at-amber'}"></div>
         <div class="kpi-label">Fear &amp; Greed</div>
         <div class="kpi-num" style="color:${d.fng<20?'var(--red)':d.fng>70?'var(--green)':'var(--amber)'}">${d.fng ?? '—'}</div>
         <div class="kpi-aux">${d.fng_cls || '—'}</div>
       </div>
 
       <div class="kpi">
-        <div class="kpi-accent-top at-cyan"></div>
         <div class="kpi-label">Confidence</div>
         <div class="kpi-num" style="color:${confColor}">${(conf*100).toFixed(0)}%</div>
         <div class="kpi-aux">Composite signal trust</div>
       </div>
 
       <div class="kpi">
-        <div class="kpi-accent-top at-purple"></div>
         <div class="kpi-label">BTC Dom.</div>
         <div class="kpi-num" style="color:var(--purple)">${fmtNum(d.dom,1)}%</div>
         <div class="kpi-aux">M2 YoY ${fmtNum(d.m2_yoy,2)}%</div>
@@ -1682,32 +1677,6 @@ function render(d) {
               </div>
             `).join('')}
           </div>
-
-          ${d.new_methods_active > 0 ? `
-          <div class="method-grid-sm" style="margin-top:8px">
-            ${[
-              ['M7','#00ff9d', d.m7_fisher!=null?(d.m7_fisher*100).toFixed(1)+'%':'—'],
-              ['M8','#00d4ff', d.m8_yield!=null?(d.m8_yield*100).toFixed(1)+'%':'—'],
-              ['M9','#9d7af8', d.m9_liquidity!=null?(d.m9_liquidity*100).toFixed(1)+'%':'—'],
-              ['M10','#f0b429',d.m10_garch!=null?(d.m10_garch*100).toFixed(1)+'%':'—'],
-              ['M11','#4a9eff',d.m11_var!=null?(d.m11_var*100).toFixed(1)+'%':'—'],
-              ['M12','#ff4060',d.m12_jump!=null?(d.m12_jump*100).toFixed(1)+'%':'—'],
-              ['M13','#00ff9d',d.m13_funding!=null?(d.m13_funding*100).toFixed(1)+'%':'—'],
-              ['M14','#00d4ff',d.m14_skew!=null?(d.m14_skew*100).toFixed(1)+'%':'—'],
-              ['M15','#9d7af8',d.m15_concentration!=null?(d.m15_concentration*100).toFixed(1)+'%':'—'],
-              ['M16','#f0b429',d.m16_regime_ml!=null?(d.m16_regime_ml*100).toFixed(1)+'%':'—'],
-              ['M17','#4a9eff',d.m17_granger!=null?(d.m17_granger*100).toFixed(1)+'%':'—'],
-              ['M18','#ff4060',d.m18_entropy!=null?(d.m18_entropy*100).toFixed(1)+'%':'—'],
-              ['M19','#00ff9d',d.m19_mutual_info!=null?(d.m19_mutual_info*100).toFixed(1)+'%':'—']
-            ].map(([name,color,val])=>`
-              <div class="method-cell-sm">
-                <div class="method-cell-sm-name">${name}</div>
-                <div class="method-cell-sm-val" style="color:${color}">${val}</div>
-              </div>
-            `).join('')}
-          </div>
-          <div style="font-size:9px;color:var(--text-3);margin-top:6px">+${d.new_methods_active} extended methods · avg ${d.new_methods_avg?(d.new_methods_avg*100).toFixed(1):'—'}%</div>
-          ` : ''}
 
           <div class="consensus-row">
             <div class="consensus-ring" style="background:${agree>0.6?'var(--green-dim)':agree>0.3?'var(--amber-dim)':'var(--red-dim)'};border:2px solid ${agreeColor};color:${agreeColor}">${(agree*100).toFixed(0)}%</div>
@@ -2013,6 +1982,7 @@ function render(d) {
         </div>
         <span id="paperStatus" style="font-size:9px;font-weight:600;padding:3px 10px;border-radius:100px;background:var(--green-dim);color:var(--green);border:1px solid var(--border-green)">● IDLE</span>
       </div>
+      <div id="paperBody" style="display:block">
       <div class="paper-stats">
         <div class="paper-stat">
           <div class="paper-stat-label">Equity</div>
@@ -2041,6 +2011,8 @@ function render(d) {
       <div class="paper-controls">
         <button class="paper-btn pb-green" onclick="resetPaperTrading()">Reset</button>
         <button class="paper-btn pb-green" onclick="exportPaperTrades()">Export</button>
+      </div>
+      <div style="cursor:pointer;padding:2px 0;font-size:8px;color:var(--text-3);text-align:center" onclick="togglePaperSection()" id="paperToggle">&#x25b2; Hide</div>
       </div>
     </div>
 
@@ -2190,6 +2162,16 @@ function render(d) {
   buildMethodChart(d);
   if (chartVisible) updatePriceChart();
   processSignalFromSFC(d);
+}
+
+/* ── PAPER SECTION TOGGLE ── */
+let paperVisible = true;
+function togglePaperSection() {
+  paperVisible = !paperVisible;
+  const p = document.getElementById('paperBody');
+  const t = document.getElementById('paperToggle');
+  if (p) p.style.display = paperVisible ? 'block' : 'none';
+  if (t) t.textContent = paperVisible ? '\u25b2 Hide' : '\u25bc Show';
 }
 
 /* ── CHART VISIBILITY ── */
