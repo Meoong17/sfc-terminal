@@ -1162,8 +1162,8 @@ function buildFactorChart(d) {
   const keys = ['Lt', 'St', 'Rt', 'Ft', 'Sc'];
   const labels = ['Liquidity', 'Structural', 'Sentiment', 'Systemic', 'External'];
   const raw = keys.map(k => factors[k] ?? 0);
-  const colors = raw.map(v => v >= 0 ? 'rgba(255,64,96,0.6)' : 'rgba(0,255,157,0.6)');
-  const borderColors = raw.map(v => v >= 0 ? '#ff4060' : '#00ff9d');
+  const colors = raw.map(v => v >= 0 ? 'rgba(0,255,157,0.6)' : 'rgba(255,64,96,0.6)');
+  const borderColors = raw.map(v => v >= 0 ? '#00ff9d' : '#ff4060');
 
   factorChart = new Chart(canvas.getContext('2d'), {
     type: 'bar',
