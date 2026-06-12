@@ -2487,8 +2487,6 @@ function connectSSE() {
       setTimeout(restoreScrollPos, 200);
       if (snap.btc && snap.btc.btc) {
         prevBtcPrice = snap.btc.btc;
-        // Also show initial ticker immediately
-        updateBtcTicker(snap.btc);
       }
     }
   }).catch(() => {});
@@ -2499,7 +2497,7 @@ function connectSSE() {
     const d = JSON.parse(e.data);
     if (!d.price || d.price <= 0) return;
     liveBtcData = d;
-    updateBtcTicker(d);
+    // BTC ticker handled by fetchBtcLive() interval
   });
 
   sseSource.addEventListener('sfc_update', (e) => {
@@ -2547,92 +2545,9 @@ function startPollingFallback() {
   // fetchBtcLive already running on its own interval — no need to restart
 }
 
-function updateBtcTicker(d) {
-  // Ticker bar already rendered by render() — just update values
-  const tickerEl = document.getElementById('liveTicker');
-  if (!tickerEl) {
-    tickerEl = document.createElement('div');
-    tickerEl.id = 'liveTicker';
-    tickerEl.className = 'live-ticker';
-    tickerEl.innerHTML =
-      '<span class="ticker-dot"></span>' +
-      '<span class="ticker-price"></span>' +
-      '<span class="ticker-change"></span>' +
-      '<span class="ticker-stat"><span class="stat-label">High</span><span class="stat-val high">—</span></span>' +
-      '<span class="ticker-stat"><span class="stat-label">Low</span><span class="stat-val low">—</span></span>' +
-      '<span class="ticker-vol"><span class="stat-label">Vol 24h</span>—</span>';
-    // Insert after the KPI hero row (just before news-wrap)
-    const kpiRow = document.querySelector('.kpi-row');
-    if (kpiRow && kpiRow.nextSibling) {
-      kpiRow.parentNode.insertBefore(tickerEl, kpiRow.nextSibling);
-    } else {
-      document.querySelector('.news-wrap')?.before(tickerEl);
-    }
-  }
-
-  // Flash class on price
-  const priceEl = tickerEl.querySelector('.ticker-price');
-  if (priceEl) {
-    if (prevBtcPrice !== null && d.price !== prevBtcPrice) {
-      priceEl.classList.add(d.price > prevBtcPrice ? 'flash-green' : 'flash-red');
-      setTimeout(() => priceEl.classList.remove('flash-green', 'flash-red'), 600);
-    }
-    priceEl.textContent = '$' + d.price.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
-  }
-
-  const chgEl = tickerEl.querySelector('.ticker-change');
-  if (chgEl) {
-    chgEl.className = 'ticker-change ' + (d.change_pct >= 0 ? 'pos' : 'neg');
-    chgEl.innerHTML = (d.change_pct >= 0 ? '▲' : '▼') + ' ' + Math.abs(d.change_pct).toFixed(2) + '%';
-  }
-
-  const highEl = tickerEl.querySelector('.stat-val.high');
-  if (highEl) highEl.textContent = '$' + Math.round(d.high_24h).toLocaleString();
-
-  const lowEl = tickerEl.querySelector('.stat-val.low');
-  if (lowEl) lowEl.textContent = '$' + Math.round(d.low_24h).toLocaleString();
-
-  // Try bid/ask if available (not in streamed data — keep dashes)
-  const volEl = tickerEl.querySelector('.ticker-vol');
-  if (volEl) {
-    const v = d.volume_24h || 0;
-    volEl.innerHTML = '<span class="stat-label">Vol 24h</span>' + (v >= 1e9 ? (v/1e9).toFixed(2) + 'B' : (v/1e6).toFixed(1) + 'M');
-  }
-
-  // Update BTC KPI hero
-  const kpiNum = document.querySelector('.kpi-hero .kpi-num');
-  if (kpiNum) {
-    if (prevBtcPrice !== null && d.price !== prevBtcPrice) {
-      kpiNum.style.color = d.price > prevBtcPrice ? 'var(--green)' : 'var(--red)';
-      setTimeout(() => { kpiNum.style.color = 'var(--cyan)'; }, 400);
-    }
-    kpiNum.textContent = '$' + d.price.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
-  }
-
-  // Update BTC change %
-  const auxEl = document.querySelector('.kpi-hero .kpi-aux');
-  if (auxEl) {
-    auxEl.innerHTML = '<span class="' + (d.change_pct >= 0 ? 'chg-pos' : 'chg-neg') + '">' + (d.change_pct >= 0 ? '▲' : '▼') + ' ' + Math.abs(d.change_pct).toFixed(2) + '% 24h</span>';
-  }
-
-  // Push to chart if meaningful change
-  if (currentData && window.updatePriceChart) {
-    const last = historyPoints[historyPoints.length - 1];
-    if (!last || Math.abs(last.btc - d.price) / last.btc > 0.0002) {
-      const floor = currentData ? d.price * (1 - Math.min((currentData.sfc_effective || currentData.sfc || 0), 80) / 100 * 0.6) : 0;
-      pushHistory(d.price, floor);
-      if (chartVisible) updatePriceChart();
-    }
-    // Update paper trading PnL
-    if (window.processSignalFromSFC) processSignalFromSFC(currentData);
-  }
-
-  prevBtcPrice = d.price;
-}
-
+/* ── NEWS TICKER ── */
 function updateNewsHeadlines(headlines) {
   const track = document.querySelector('.news-track');
-  if (!track) return;
   track.innerHTML = headlines.map((h,i) =>
     `<div class="news-item${i===0?' active':''}">${h.replace(/^[🔴⚪⚠]+/,'').trim()}</div>`
   ).join('');
