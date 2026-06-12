@@ -1162,8 +1162,8 @@ function buildFactorChart(d) {
   const keys = ['Lt', 'St', 'Rt', 'Ft', 'Sc'];
   const labels = ['Liquidity', 'Structural', 'Sentiment', 'Systemic', 'External'];
   const raw = keys.map(k => factors[k] ?? 0);
-  const colors = raw.map(v => v >= 0 ? 'rgba(0,255,157,0.6)' : 'rgba(255,64,96,0.6)');
-  const borderColors = raw.map(v => v >= 0 ? '#00ff9d' : '#ff4060');
+  const colors = raw.map(v => v >= 0 ? 'rgba(255,64,96,0.6)' : 'rgba(0,255,157,0.6)');
+  const borderColors = raw.map(v => v >= 0 ? '#ff4060' : '#00ff9d');
 
   factorChart = new Chart(canvas.getContext('2d'), {
     type: 'bar',
@@ -1376,7 +1376,7 @@ function render(d) {
   const hasCascade = (d.cascade_risk||0) > 0.5;
   const advRegime = d.adv_regime || 'BULL';
   let advLabel = advRegime;
-  let advDotColor = advRegime === 'BEAR' ? 'dot-r' : 'dot-g';
+  let advDotColor = (advRegime === 'BEAR' || advRegime === 'CRISIS' || advRegime === 'CAPITULATION') ? 'dot-r' : 'dot-g';
   if (isExtremeFear && advRegime === 'BULL') {
     advLabel = 'BULL (CAUTIOUS)';
     advDotColor = 'dot-a';
@@ -2052,7 +2052,12 @@ function render(d) {
               <span class="sec-chip sc-critical">${d.shock_severity} SHOCK</span>
               ${d.shock_event?`<div class="sec-event-text">${d.shock_event}</div>`:''}
             </div>
+          ` : (d.cascade_risk||0) > 0.5 ? `
+            <div style="margin-bottom:8px">
+              <span class="sec-chip sc-critical">CASCADE RISK ${((d.cascade_risk||0)*100).toFixed(0)}%</span>
+            </div>
           ` : `<div style="margin-bottom:8px"><span class="sec-chip sc-safe">All Clear</span></div>`}
+          <div class="info-row"><span class="info-k">Crisis Prob</span><span class="info-v" style="color:${(d.adv_crisis_prob||0)>0.1?'var(--red)':'var(--text-1)'}">${fmtNum(((d.adv_crisis_prob||0)*100).toFixed(1),1)}%</span></div>
           <div class="info-row"><span class="info-k">SEC Events</span><span class="info-v">${d.sec_events||0}</span></div>
           <div class="info-row"><span class="info-k">Adv Uncertainty</span><span class="info-v">${fmtNum((d.adv_uncertainty||0)*100,1)}%</span></div>
           <div class="info-row"><span class="info-k">Adv Confidence</span><span class="info-v" style="font-size:10px;color:var(--cyan)">${(d.adv_confidence||'—').replace(/_/g,' ')}</span></div>
