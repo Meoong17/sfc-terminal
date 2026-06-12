@@ -34,25 +34,65 @@ except ImportError:
     print("[SFC] Causal inference not available", file=sys.stderr)
 
 # Import advanced modules (Priority 2-6)
-try:
-    from sfc_advanced import (
-        RegimeDetector, UncertaintyQuantifier, AutoFeatureEngineer,
-        fetch_all_alternative_data, compute_all_advanced
-    )
-    ADVANCED_AVAILABLE = True
-except ImportError as e:
-    ADVANCED_AVAILABLE = False
-    print(f"[SFC] Advanced modules not available: {e}", file=sys.stderr)
+# Lazy import: sfc_advanced (RegimeDetector, UncertaintyQuantifier, etc.)
+ADVANCED_AVAILABLE = None
+_advanced_cache = {"regime": None, "uncertainty": None, "alt_data": None, "wf_backtest": None}
+
+def _get_advanced():
+    """Lazy import advanced modules — ~0.9s import time."""
+    global ADVANCED_AVAILABLE, _advanced_cache
+    if ADVANCED_AVAILABLE is not None:
+        return _advanced_cache
+    
+    try:
+        from sfc_advanced import (
+            RegimeDetector, UncertaintyQuantifier, AutoFeatureEngineer,
+            fetch_all_alternative_data, compute_all_advanced, WalkForwardBacktest
+        )
+        ADVANCED_AVAILABLE = True
+        _advanced_cache = {
+            "regime": RegimeDetector,
+            "uncertainty": UncertaintyQuantifier,
+            "alt_data": fetch_all_alternative_data,
+            "compute": compute_all_advanced,
+            "wf_backtest": WalkForwardBacktest,
+        }
+    except ImportError as e:
+        ADVANCED_AVAILABLE = False
+        print(f"[SFC] Advanced modules not available: {e}", file=sys.stderr)
+        _advanced_cache = {}
+    
+    return _advanced_cache
 
 # Q5 Advanced Pattern Methods (M65-M69)
-try:
-    from models.cnn_attention_module import calculate_cnn_attention_stress
-    CNN_ATTENTION_AVAILABLE = True
-except ImportError:
-    CNN_ATTENTION_AVAILABLE = False
-    print("[SFC] CNN+Attention (M65) not available", file=sys.stderr)
-    def calculate_cnn_attention_stress(*a, **k):
-        return {"m65_cnn_attention": 0.5, "attention_focus": [], "pattern_type": "FALLBACK"}
+# Lazy import: CNN+Attention (M65) — imported only when used
+CNN_ATTENTION_AVAILABLE = None  # None = not checked yet
+_cnn_attention_fn = None
+
+def _get_cnn_attention():
+    """Lazy import CNN+Attention module."""
+    global CNN_ATTENTION_AVAILABLE, _cnn_attention_fn
+    if CNN_ATTENTION_AVAILABLE is not None:
+        return _cnn_attention_fn if CNN_ATTENTION_AVAILABLE else None
+    
+    try:
+        from models.cnn_attention_module import calculate_cnn_attention_stress
+        CNN_ATTENTION_AVAILABLE = True
+        _cnn_attention_fn = calculate_cnn_attention_stress
+        return _cnn_attention_fn
+    except ImportError:
+        CNN_ATTENTION_AVAILABLE = False
+        print("[SFC] CNN+Attention (M65) not available", file=sys.stderr)
+        def _fallback(*a, **k):
+            return {"m65_cnn_attention": 0.5, "attention_focus": [], "pattern_type": "FALLBACK"}
+        _cnn_attention_fn = _fallback
+        return None
+
+def calculate_cnn_attention_stress(*a, **k):
+    fn = _get_cnn_attention()
+    if fn:
+        return fn(*a, **k)
+    return {"m65_cnn_attention": 0.5, "attention_focus": [], "pattern_type": "FALLBACK"}
 
 try:
     from optimization.genetic_algorithm import weekly_feature_optimization
@@ -121,18 +161,44 @@ except ImportError as e:
 # ── QLSTM INFERENCE (M32 — Hybrid Quantum LSTM + GARCH + ProAdapt) ──
 QLSTM_AVAILABLE = False
 QLSTM_INFERENCE_CACHE = {"pred": None, "ts": 0}
+_QLSTM_DAEMON_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".qlstm_cache.json")
 
 def _run_qlstm_inference():
     """Run enhanced QLSTM inference (M32+Hybrid+ProAdapt+XAI).
+    First tries daemon cache file, then falls back to direct inference.
     Returns (prediction_0_1, is_available)
     Also stores enhanced results in module-level vars for output dict."""
     global QLSTM_AVAILABLE, QLSTM_INFERENCE_CACHE
     global _XAI_FEATURES, _GARCH_RESIDUAL, _GARCH_VOL, _PROADAPT_W, _PROADAPT_FINAL
     
     now = time.time()
+    
+    # Check in-memory cache first (1800s TTL)
     if QLSTM_INFERENCE_CACHE["pred"] is not None and now - QLSTM_INFERENCE_CACHE["ts"] < 1800:
         return QLSTM_INFERENCE_CACHE["pred"], True
     
+    # Check daemon cache file (fast, no torch import)
+    try:
+        if os.path.exists(_QLSTM_DAEMON_FILE):
+            with open(_QLSTM_DAEMON_FILE) as f:
+                dc = json.load(f)
+            dc_ts = dc.get("ts", 0)
+            if now - dc_ts < 1800 and dc.get("qlstm_ok"):
+                qlstm_pred_0_1 = dc["qlstm_pred_0_1"]
+                _GARCH_RESIDUAL = dc.get("garch_residual", 0)
+                _GARCH_VOL = dc.get("garch_volatility", 0)
+                _PROADAPT_W = dc.get("proadapt_weight", 0.5)
+                _PROADAPT_FINAL = dc.get("proadapt_final", dc["qlstm_pred"])
+                _XAI_FEATURES = dc.get("xai_top_features", None)
+                QLSTM_INFERENCE_CACHE = {"pred": qlstm_pred_0_1, "ts": now}
+                if not QLSTM_AVAILABLE:
+                    print(f"[SFC] QLSTM from daemon cache: pred={dc['qlstm_pred']:.1f}%", file=sys.stderr)
+                    QLSTM_AVAILABLE = True
+                return qlstm_pred_0_1, True
+    except (json.JSONDecodeError, OSError, KeyError) as e:
+        print(f"[SFC] QLSTM daemon cache read error: {e}", file=sys.stderr)
+    
+    # Fallback: run direct inference (slow, loads torch)
     try:
         sfc2_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "sfc2")
         sys.path.insert(0, sfc2_dir)
@@ -899,18 +965,39 @@ def calculate_m19_mutual_info(btc_rets, macro_rets):
     else: score = 0.15
     return score, {"mi_norm": round(mi_norm,3), "mi_raw": round(mi,3)}
 
-print("[SFC] Starting data collection...", file=sys.stderr)
+print("[SFC] Starting parallel data collection...", file=sys.stderr)
 
-btc, chg, mcap = get_btc()
-fng, fcls = get_fng()
-dom = get_dom()
-dvol = get_dvol()
-m2_val, m2_yoy, _ = get_m2_data()
-dxy = get_dxy()
-pc_oi, pc_vol = get_put_call_ratio()
-ath, ath_date = get_ath()
+# ── PARALLEL API DATA COLLECTION ──
+# All API calls run concurrently via ThreadPoolExecutor (saves ~2.5s)
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
-ohlcv = get_btc_ohlcv_daily(days=30) or _binance_klines(30)
+_api_results = {}
+
+def _fetch_and_store(key, fn, *args, **kwargs):
+    """Fetch API data and store in shared dict."""
+    _api_results[key] = fn(*args, **kwargs)
+
+with ThreadPoolExecutor(max_workers=8) as ex:
+    ex.submit(_fetch_and_store, "btc", get_btc)
+    ex.submit(_fetch_and_store, "fng", get_fng)
+    ex.submit(_fetch_and_store, "dom", get_dom)
+    ex.submit(_fetch_and_store, "dvol", get_dvol)
+    ex.submit(_fetch_and_store, "m2", get_m2_data)
+    ex.submit(_fetch_and_store, "dxy", get_dxy)
+    ex.submit(_fetch_and_store, "pc", get_put_call_ratio)
+    ex.submit(_fetch_and_store, "ath", get_ath)
+    ex.submit(_fetch_and_store, "ohlcv", get_btc_ohlcv_daily, 30)
+
+# Unpack results
+btc, chg, mcap = _api_results.get("btc", (None, None, None))
+fng, fcls = _api_results.get("fng", (None, None))
+dom = _api_results.get("dom", None)
+dvol = _api_results.get("dvol", None)
+m2_val, m2_yoy, _ = _api_results.get("m2", (None, None, None))
+dxy = _api_results.get("dxy", None)
+pc_oi, pc_vol = _api_results.get("pc", (None, None))
+ath, ath_date = _api_results.get("ath", (None, None))
+ohlcv = _api_results.get("ohlcv", None) or _binance_klines(30)
 closes_all = [c["close"] for c in ohlcv] if ohlcv else []
 closes_7d = closes_all[-7:] if len(closes_all) >= 7 else closes_all
 closes_30d = closes_all[-30:] if len(closes_all) >= 30 else closes_all
@@ -1115,73 +1202,77 @@ adv_alt = {}
 adv_regime_boost = 0
 regime_detector = None
 
-if ADVANCED_AVAILABLE:
-    try:
-        # Build feature matrix from all current method scores for regime detection
-        feat_dict = {
-            'sfc_stress': sfc_pct / 100.0 if sfc_pct else 0.5,
-            'dvol': dvol / 100.0 if dvol else 0.5,
-            'fng': fng / 100.0 if fng else 0.5,
-            'btc_momentum': (chg / 10.0 + 1) / 2 if chg is not None else 0.5,
-            'news_stress': 0.5,
-        }
-        
-        # Use historical data for regime fitting
-        all_feats = []
+if ADVANCED_AVAILABLE is None or ADVANCED_AVAILABLE:
+    # Lazy import on first use
+    adv = _get_advanced()
+    if adv.get("regime"):
         try:
-            with open(os.path.join(os.path.dirname(__file__), "data_collection.json")) as f:
-                hist = json.load(f)
-            feat_list = hist.get("features", [])
-            if len(feat_list) > 20:
-                for obs in feat_list:
-                    row = [
-                        float(obs[i]) if i < len(obs) and obs[i] is not None else 0.5
-                        for i in range(min(5, len(obs)))
-                    ]
-                    all_feats.append(row)
-        except:
-            all_feats = [list(feat_dict.values())] * 30
+            RegimeDetector_ = adv["regime"]
+            # Build feature matrix from all current method scores for regime detection
+            feat_dict = {
+                'sfc_stress': sfc_pct / 100.0 if sfc_pct else 0.5,
+                'dvol': dvol / 100.0 if dvol else 0.5,
+                'fng': fng / 100.0 if fng else 0.5,
+                'btc_momentum': (chg / 10.0 + 1) / 2 if chg is not None else 0.5,
+                'news_stress': 0.5,
+            }
+            
+            # Use historical data for regime fitting
+            all_feats = []
+            try:
+                with open(os.path.join(os.path.dirname(__file__), "data_collection.json")) as f:
+                    hist = json.load(f)
+                feat_list = hist.get("features", [])
+                if len(feat_list) > 20:
+                    for obs in feat_list:
+                        row = [
+                            float(obs[i]) if i < len(obs) and obs[i] is not None else 0.5
+                            for i in range(min(5, len(obs)))
+                        ]
+                        all_feats.append(row)
+            except:
+                all_feats = [list(feat_dict.values())] * 30
+            
+            if len(all_feats) >= 20:
+                # Fit regime detector
+                regime_detector = RegimeDetector_(n_regimes=4)
+                regime_detector.fit(np.array(all_feats))
+                
+                # Current regime prediction
+                current_feat = np.array([list(feat_dict.values())])
+                adv_regime = regime_detector.get_regime_status(current_feat)
+                regime_boost, _ = regime_detector.score_stress_boost(current_feat)
+                adv_regime_boost = regime_boost
+                
+                print(f"  [Advanced] Regime: {adv_regime.get('regime','?')} | "
+                      f"Crisis prob: {adv_regime.get('crisis_probability',0):.0%} | "
+                      f"Boost: +{regime_boost}", file=sys.stderr)
+        except Exception as e:
+            print(f"[Advanced] Regime detection error: {e}", file=sys.stderr)
+            adv_regime = {'regime': 'NORMAL', 'crisis_probability': 0.0, 'stability': 0.9}
+            adv_regime_boost = 0
         
-        if len(all_feats) >= 20:
-            # Fit regime detector
-            regime_detector = RegimeDetector(n_regimes=4)
-            regime_detector.fit(np.array(all_feats))
-            
-            # Current regime prediction
-            current_feat = np.array([list(feat_dict.values())])
-            adv_regime = regime_detector.get_regime_status(current_feat)
-            regime_boost, _ = regime_detector.score_stress_boost(current_feat)
-            adv_regime_boost = regime_boost
-            
-            print(f"  [Advanced] Regime: {adv_regime.get('regime','?')} | "
-                  f"Crisis prob: {adv_regime.get('crisis_probability',0):.0%} | "
-                  f"Boost: +{regime_boost}", file=sys.stderr)
-    except Exception as e:
-        print(f"[Advanced] Regime detection error: {e}", file=sys.stderr)
-        adv_regime = {'regime': 'NORMAL', 'crisis_probability': 0.0, 'stability': 0.9}
-        adv_regime_boost = 0
-    
-    # Uncertainty Quantification (Priority 4)
-    try:
-        uq = UncertaintyQuantifier(n_bootstrap=50)
-        # Fit on sfc history if available
-        # (in practice, we use raw sfc score with default calibration)
-        uq_result = uq.predict_with_uncertainty(np.array([sfc_pct / 100.0 if sfc_pct else 0.5]))
-        adv_uncertainty = uq_result
-        print(f"  [Advanced] Uncertainty: {uq_result.get('uncertainty',0):.3f} | "
-              f"Reliable: {uq_result.get('is_reliable',False)}", file=sys.stderr)
-    except Exception as e:
-        print(f"[Advanced] Uncertainty error: {e}", file=sys.stderr)
-    
-    # Alternative Data (Priority 6)
-    try:
-        adv_alt = fetch_all_alternative_data()
-        alt_trends = adv_alt.get('trends_recession', 0.5)
-        alt_reddit = adv_alt.get('reddit_sentiment', 0.0)
-        print(f"  [Advanced] Alt data: recession_search={alt_trends:.2f} | "
-              f"reddit_sentiment={alt_reddit:.3f}", file=sys.stderr)
-    except Exception as e:
-        print(f"[Advanced] Alt data error: {e}", file=sys.stderr)
+        # Uncertainty Quantification (Priority 4)
+        try:
+            UncertaintyQuantifier_ = adv["uncertainty"]
+            uq = UncertaintyQuantifier_(n_bootstrap=50)
+            uq_result = uq.predict_with_uncertainty(np.array([sfc_pct / 100.0 if sfc_pct else 0.5]))
+            adv_uncertainty = uq_result
+            print(f"  [Advanced] Uncertainty: {uq_result.get('uncertainty',0):.3f} | "
+                  f"Reliable: {uq_result.get('is_reliable',False)}", file=sys.stderr)
+        except Exception as e:
+            print(f"[Advanced] Uncertainty error: {e}", file=sys.stderr)
+        
+        # Alternative Data (Priority 6)
+        try:
+            fetch_all_alternative_data_ = adv["alt_data"]
+            adv_alt = fetch_all_alternative_data_()
+            alt_trends = adv_alt.get('trends_recession', 0.5)
+            alt_reddit = adv_alt.get('reddit_sentiment', 0.0)
+            print(f"  [Advanced] Alt data: recession_search={alt_trends:.2f} | "
+                  f"reddit_sentiment={alt_reddit:.3f}", file=sys.stderr)
+        except Exception as e:
+            print(f"[Advanced] Alt data error: {e}", file=sys.stderr)
 
 # ── ML ENSEMBLE PREDICTION (Strategi 3 & 4) ──
 print("[SFC] Computing ML ensemble prediction...", file=sys.stderr)
@@ -1227,7 +1318,7 @@ state, signal = determine_state(dvol, effective_sfc, btc, ft)
 regime, regime_prob, transition_risk = detect_regime(dvol, effective_sfc, news_stress, news_sentiment)
 
 # Apply regime boost from advanced HMM detection to effective SFC
-if ADVANCED_AVAILABLE and adv_regime_boost > 0 and effective_sfc is not None:
+if (ADVANCED_AVAILABLE is None or ADVANCED_AVAILABLE) and adv_regime_boost > 0 and effective_sfc is not None:
     old_sfc = effective_sfc
     effective_sfc = min(effective_sfc + adv_regime_boost, 100.0)
     zone = "CRITICAL" if effective_sfc/100 > 0.75 else "HIGH" if effective_sfc/100 > 0.5 else "ELEVATED" if effective_sfc/100 > 0.25 else "NORMAL"
@@ -1247,9 +1338,12 @@ bt_sharpe_high = None
 bt_calibration_note = None
 
 try:
-    from sfc_advanced import WalkForwardBacktest
+    adv = _get_advanced()
+    WalkForwardBacktest_ = adv.get("wf_backtest")
     import numpy as np
     import json
+    if WalkForwardBacktest_ is None:
+        raise ImportError("WalkForwardBacktest not available")
     
     ml_total = ml_metrics.get("total", 129)
     bt_periods = ml_total
