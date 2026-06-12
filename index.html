@@ -2432,9 +2432,14 @@ async function fetchBtcLive() {
       const floor = currentData ? price * (1 - Math.min((currentData.sfc_effective || currentData.sfc || 0), 80) / 100 * 0.6) : 0;
       pushHistory(price, floor);
       if (chartVisible) updatePriceChart();
-      // Update floor display
-      const floorEl = document.querySelector('[style*="var(--green)"]');
-      if (floorEl) floorEl.textContent = '$' + fmtNum(floor);
+      // Update floor display — use kpi-hero span or info-v, NOT generic green selector
+      const floorEl = document.querySelector('.info-row .info-v');
+      if (!floorEl || !floorEl.textContent.includes('% above')) {
+        const altFloor = document.querySelector('.kpi-hero .kpi-aux span.chg-pos, .kpi-hero .kpi-aux span.chg-neg');
+        if (altFloor) altFloor.textContent = '$' + fmtNum(floor);
+      } else {
+        // info-v already has BTC vs Floor % — leave it
+      }
     }
 
     // ── Update paper trading PnL (mark-to-market) ──
