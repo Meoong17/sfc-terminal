@@ -1967,7 +1967,7 @@ function render(d) {
     </div>` : ''}
 
     <!-- PAPER TRADING -->
-    <div class="card span-full mb-16">
+    <div class="card span-full mb-16" id="paperSection">
       <div class="card-head">
         <div class="card-title">
           <div class="card-icon">
@@ -1981,6 +1981,7 @@ function render(d) {
           <span style="font-weight:400;color:var(--text-3);font-size:10px;text-transform:none;letter-spacing:0">— Signal-driven simulator · $10,000 starting capital</span>
         </div>
         <span id="paperStatus" style="font-size:9px;font-weight:600;padding:3px 10px;border-radius:100px;background:var(--green-dim);color:var(--green);border:1px solid var(--border-green)">● IDLE</span>
+        <span id="paperServerBadge" style="font-size:8px;font-weight:500;padding:2px 7px;border-radius:100px;background:var(--cyan-dim);color:var(--cyan);border:1px solid rgba(0,212,255,0.2);margin-left:6px">SERVER</span>
       </div>
       <div id="paperBody" style="display:block">
       <div class="paper-stats">
@@ -2004,12 +2005,25 @@ function render(d) {
           <div class="paper-stat-label">Max DD</div>
           <div class="paper-stat-val" id="paperDD">—</div>
         </div>
+        <div class="paper-stat">
+          <div class="paper-stat-label">Trades</div>
+          <div class="paper-stat-val" id="paperTradeCount">0</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;padding:0 18px 8px">
+        <div style="flex:1">
+          <div style="font-size:7px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--text-3);margin-bottom:3px">Track Record</div>
+          <div id="paperTrackRecord" style="font-size:8px;color:var(--text-3);line-height:1.7">Loading server track record...</div>
+        </div>
+        <div style="flex:0 0 auto">
+          <div id="paperLastUpdate" style="font-size:7px;color:var(--text-4);text-align:right">—</div>
+        </div>
       </div>
       <div class="paper-log" id="paperLog">
         <div style="color:var(--text-3)">Initializing paper trader...</div>
       </div>
       <div class="paper-controls">
-        <button class="paper-btn pb-green" onclick="resetPaperTrading()">Reset</button>
+        <button class="paper-btn pb-green" onclick="resetPaperTrading()">Reset Client</button>
         <button class="paper-btn pb-green" onclick="exportPaperTrades()">Export</button>
       </div>
       <div style="cursor:pointer;padding:2px 0;font-size:8px;color:var(--text-3);text-align:center" onclick="togglePaperSection()" id="paperToggle">&#x25b2; Hide</div>
@@ -2172,6 +2186,56 @@ function togglePaperSection() {
   const t = document.getElementById('paperToggle');
   if (p) p.style.display = paperVisible ? 'block' : 'none';
   if (t) t.textContent = paperVisible ? '\u25b2 Hide' : '\u25bc Show';
+}
+
+/* ── SERVER PAPER TRADING TRACK RECORD ── */
+async function fetchPaperTrackRecord() {
+  try {
+    const r = await fetch('paper_history.json?t=' + Date.now(), { cache: 'no-cache' });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const data = await r.json();
+    const cur = data.current || {};
+    const el = id => document.getElementById(id);
+    const badge = el('paperServerBadge');
+    if (badge) {
+      badge.textContent = cur.status === 'IN_MARKET' ? '\u25cf IN MKT' : '\u25cb CASH';
+      badge.style.background = cur.status === 'IN_MARKET' ? 'var(--green-dim)' : 'var(--cyan-dim)';
+      badge.style.color = cur.status === 'IN_MARKET' ? 'var(--green)' : 'var(--cyan)';
+    }
+    if (el('paperEquity')) {
+      el('paperEquity').textContent = '$' + fmtNum(Math.round(cur.equity || 10000), 0);
+      el('paperEquity').style.color = (cur.total_return || 0) >= 0 ? 'var(--green)' : 'var(--red)';
+    }
+    if (el('paperReturn')) {
+      el('paperReturn').textContent = (cur.total_return_pct || 0).toFixed(2) + '%';
+      el('paperReturn').style.color = (cur.total_return_pct || 0) >= 0 ? 'var(--green)' : 'var(--red)';
+    }
+    if (el('paperSharpe')) el('paperSharpe').textContent = (cur.sharpe || 0).toFixed(2);
+    if (el('paperSharpe')) el('paperSharpe').style.color = cur.sharpe > 1.5 ? 'var(--green)' : cur.sharpe > 0.5 ? 'var(--amber)' : 'var(--red)';
+    if (el('paperWinRate')) el('paperWinRate').textContent = (cur.win_rate_pct || 0).toFixed(0) + '%';
+    if (el('paperWinRate')) el('paperWinRate').style.color = (cur.win_rate_pct || 0) > 60 ? 'var(--green)' : 'var(--amber)';
+    if (el('paperDD')) el('paperDD').textContent = (cur.max_dd_pct || 0).toFixed(1) + '%';
+    if (el('paperDD')) el('paperDD').style.color = (cur.max_dd_pct || 0) < 10 ? 'var(--green)' : (cur.max_dd_pct || 0) < 20 ? 'var(--amber)' : 'var(--red)';
+    if (el('paperTradeCount')) el('paperTradeCount').textContent = cur.total_trades || 0;
+
+    // Track record text
+    const days = data.daily ? data.daily.length : 0;
+    let recordHtml = '<span style="color:var(--text-2)">Server-side paper trader</span>';
+    if (data.daily && data.daily.length > 1) {
+      const first = data.daily[0];
+      const last = data.daily[data.daily.length - 1];
+      recordHtml += '<br><span style="color:var(--text-2)">' + days + ' day' + (days>1?'s':'') + ' tracked &middot; ';
+      recordHtml += 'Start: $' + fmtNum(Math.round(first.equity),0) + ' &middot; ';
+      recordHtml += 'Latest: $' + fmtNum(Math.round(last.equity),0) + '</span>';
+    }
+    if (el('paperTrackRecord')) el('paperTrackRecord').innerHTML = recordHtml;
+    if (el('paperLastUpdate')) el('paperLastUpdate').textContent = new Date().toLocaleTimeString();
+    return data;
+  } catch (e) {
+    const el = document.getElementById('paperTrackRecord');
+    if (el) el.innerHTML = '<span style="color:var(--text-3)">Server track record not available yet</span>';
+    return null;
+  }
 }
 
 /* ── CHART VISIBILITY ── */
@@ -2422,6 +2486,8 @@ function exportPaperTrades() {
 /* ── INIT ── */
 loadHistory();
 initPaperTrading();
+fetchPaperTrackRecord();
+setInterval(fetchPaperTrackRecord, 60000); // refresh track record every 60s
 if (typeof __EMBEDDED_DATA !== 'undefined' && __EMBEDDED_DATA) {
   currentData = __EMBEDDED_DATA;
   render(__EMBEDDED_DATA);
