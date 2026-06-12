@@ -2485,10 +2485,15 @@ function connectSSE() {
 
   sseSource.addEventListener('sfc_update', (e) => {
     const d = JSON.parse(e.data);
+    // Update in-memory data
     currentData = d;
     window.__EMBEDDED_DATA = d;
-    render(d);
-    startNewsSlide();
+    // Refresh news ticker (lightweight)
+    if (d.news_headlines) {
+      updateNewsHeadlines(d.news_headlines);
+    }
+    // Update KPI values in-place without full re-render
+    updateSfcKpis(d);
   });
 
   sseSource.addEventListener('heartbeat', () => {
@@ -2520,21 +2525,38 @@ function startPollingFallback() {
 }
 
 function updateBtcTicker(d) {
+  // Update ticker bar elements individually — don't replace innerHTML (render() already created them)
   const tickerEl = document.getElementById('liveTicker');
   if (!tickerEl) return;
 
-  tickerEl.innerHTML =
-    '<span class="ticker-dot"></span>' +
-    '<span class="ticker-price' + (prevBtcPrice !== null ? (d.price > prevBtcPrice ? ' flash-green' : d.price < prevBtcPrice ? ' flash-red' : '') : '') + '">$' + d.price.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2}) + '</span>' +
-    '<span class="ticker-change ' + (d.change_pct >= 0 ? 'pos' : 'neg') + '">' + (d.change_pct >= 0 ? '▲' : '▼') + ' ' + Math.abs(d.change_pct).toFixed(2) + '%</span>' +
-    '<span class="ticker-stat"><span class="stat-label">High</span><span class="stat-val high">$' + Math.round(d.high_24h).toLocaleString() + '</span></span>' +
-    '<span class="ticker-stat"><span class="stat-label">Low</span><span class="stat-val low">$' + Math.round(d.low_24h).toLocaleString() + '</span></span>' +
-    '<span class="ticker-vol"><span class="stat-label">Vol 24h</span>' + (d.volume_24h >= 1e9 ? (d.volume_24h/1e9).toFixed(2) + 'B' : (d.volume_24h/1e6).toFixed(1) + 'M') + '</span>';
+  // Flash class on price
+  const priceEl = tickerEl.querySelector('.ticker-price');
+  if (priceEl) {
+    if (prevBtcPrice !== null && d.price !== prevBtcPrice) {
+      priceEl.classList.add(d.price > prevBtcPrice ? 'flash-green' : 'flash-red');
+      setTimeout(() => priceEl.classList.remove('flash-green', 'flash-red'), 600);
+    }
+    priceEl.textContent = '$' + d.price.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+  }
 
-  setTimeout(() => {
-    const tp = tickerEl.querySelector('.ticker-price');
-    if (tp) tp.classList.remove('flash-green', 'flash-red');
-  }, 600);
+  const chgEl = tickerEl.querySelector('.ticker-change');
+  if (chgEl) {
+    chgEl.className = 'ticker-change ' + (d.change_pct >= 0 ? 'pos' : 'neg');
+    chgEl.innerHTML = (d.change_pct >= 0 ? '▲' : '▼') + ' ' + Math.abs(d.change_pct).toFixed(2) + '%';
+  }
+
+  const highEl = tickerEl.querySelector('.stat-val.high');
+  if (highEl) highEl.textContent = '$' + Math.round(d.high_24h).toLocaleString();
+
+  const lowEl = tickerEl.querySelector('.stat-val.low');
+  if (lowEl) lowEl.textContent = '$' + Math.round(d.low_24h).toLocaleString();
+
+  // Try bid/ask if available (not in streamed data — keep dashes)
+  const volEl = tickerEl.querySelector('.ticker-vol');
+  if (volEl) {
+    const v = d.volume_24h || 0;
+    volEl.innerHTML = '<span class="stat-label">Vol 24h</span>' + (v >= 1e9 ? (v/1e9).toFixed(2) + 'B' : (v/1e6).toFixed(1) + 'M');
+  }
 
   // Update BTC KPI hero
   const kpiNum = document.querySelector('.kpi-hero .kpi-num');
@@ -2565,6 +2587,70 @@ function updateBtcTicker(d) {
   }
 
   prevBtcPrice = d.price;
+}
+
+function updateNewsHeadlines(headlines) {
+  const track = document.querySelector('.news-track');
+  if (!track) return;
+  track.innerHTML = headlines.map((h,i) =>
+    `<div class="news-item${i===0?' active':''}">${h.replace(/^[🔴⚪⚠]+/,'').trim()}</div>`
+  ).join('');
+  // Re-init dots
+  const wrap = document.querySelector('.news-wrap');
+  if (!wrap) return;
+  let dotsContainer = wrap.querySelector('.news-dots');
+  if (!dotsContainer) {
+    dotsContainer = document.createElement('div');
+    dotsContainer.className = 'news-dots';
+    wrap.appendChild(dotsContainer);
+  }
+  dotsContainer.innerHTML = headlines.map((_,i) =>
+    `<div class="news-dot${i===0?' active':''}" data-i="${i}"></div>`
+  ).join('');
+  startNewsSlide();
+}
+
+function updateSfcKpis(d) {
+  // Update SFC hero gauge numbers without full re-render
+  const sfcEff = d.sfc_effective || 0;
+  const bigNum = document.querySelector('.sfc-big-num');
+  if (bigNum) {
+    bigNum.innerHTML = sfcEff.toFixed(1) + '<span style="font-size:0.4em;color:var(--text-3);margin-left:2px">%</span>';
+  }
+  const desc = document.querySelector('.sfc-desc');
+  if (desc) desc.textContent = 'Composite Stress Probability';
+
+  const pill = document.querySelector('.sfc-zone-pill');
+  if (pill) {
+    const zone = d.zone || 'NORMAL';
+    pill.textContent = zone + ' Zone';
+    pill.className = 'sfc-zone-pill ' + (zone === 'CRISIS' || zone === 'CAPITULATION' ? 'zone-crisis' : zone === 'CAUTION' ? 'zone-caution' : 'zone-safe');
+  }
+
+  // Update fill bar
+  const fill = document.querySelector('.prog-fill');
+  if (fill) {
+    fill.style.width = Math.min(sfcEff, 100) + '%';
+    fill.className = 'prog-fill ' + (sfcEff >= 50 ? 'fill-red' : sfcEff >= 25 ? 'fill-amber' : 'fill-green');
+  }
+
+  // Update base/mod news bottom row
+  const statRow = document.querySelector('[style*="justify-content:space-between;font-size:9px"]');
+  if (statRow) {
+    const spans = statRow.querySelectorAll('span');
+    if (spans.length >= 3) {
+      spans[0].textContent = 'SFC Base: ' + fmtNum(d.sfc_base, 2) + '%';
+      spans[1].textContent = 'News Δ: ' + fmtNum(d.news_stress, 1);
+      spans[2].textContent = 'Liq Mod: +' + fmtNum(d.liq_mod, 1);
+    }
+  }
+
+  // Update BTC KPI (price already handled by btc_ticker)
+  const auxEl = document.querySelector('.kpi-hero .kpi-aux');
+  if (auxEl) {
+    const dom = d.dom != null ? ' | Dom ' + d.dom.toFixed(1) + '%' : '';
+    auxEl.innerHTML = 'MCap $' + fmtNum(d.btc_mcap/1e9, 2) + 'B' + dom;
+  }
 }
 
 /* ── FETCH (SSE fallback — used when SSE connection fails) ── */
