@@ -735,96 +735,8 @@ body::before {
 .sp-watch { background: var(--amber-dim); color: var(--amber); border: 1px solid rgba(240,180,41,0.2); }
 .sp-cash  { background: var(--red-dim);   color: var(--red);   border: 1px solid rgba(255,64,96,0.2); }
 
-/* ══════════════════════════════════════════
-   LIVE BTC TICKER — TradingView Style
-══════════════════════════════════════════ */
-.live-ticker {
-  display: flex;
-  align-items: center;
-  gap: 18px;
-  padding: 8px 14px;
-  margin-bottom: 6px;
-  background: var(--bg-raise);
-  border: 1px solid var(--border-1);
-  border-radius: var(--r-md);
-  font-size: 11px;
-  flex-wrap: wrap;
-  min-height: 34px;
-}
-.live-ticker .ticker-price {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 15px;
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  transition: color 0.15s;
-}
-.live-ticker .ticker-price.flash-green { color: var(--green); }
-.live-ticker .ticker-price.flash-red   { color: var(--red); }
-.live-ticker .ticker-change {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 11px;
-  font-weight: 500;
-  white-space: nowrap;
-}
-.live-ticker .ticker-change.pos { color: var(--green); }
-.live-ticker .ticker-change.neg { color: var(--red); }
-.live-ticker .ticker-stat {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 10px;
-  color: var(--text-2);
-  white-space: nowrap;
-}
-.live-ticker .ticker-stat .stat-label {
-  color: var(--text-3);
-  margin-right: 3px;
-  font-family: 'Space Grotesk', sans-serif;
-  font-size: 9px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-.live-ticker .ticker-stat .stat-val {
-  color: var(--text-1);
-  font-weight: 500;
-}
-.live-ticker .ticker-stat .stat-val.high { color: var(--green); }
-.live-ticker .ticker-stat .stat-val.low  { color: var(--red); }
-.live-ticker .ticker-vol {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 10px;
-  color: var(--text-2);
-  white-space: nowrap;
-  margin-left: auto;
-}
-.live-ticker .ticker-vol .stat-label {
-  color: var(--text-3);
-  margin-right: 3px;
-  font-family: 'Space Grotesk', sans-serif;
-  font-size: 9px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-.live-ticker .ticker-dot {
-  width: 5px; height: 5px;
-  border-radius: 50%;
-  background: var(--green);
-  animation: pulse-dot 2s ease-in-out infinite;
-  flex-shrink: 0;
-}
-@keyframes pulse-dot {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.3; }
-}
-@media (max-width: 768px) {
-  .live-ticker { gap: 10px; padding: 6px 10px; font-size: 10px; }
-  .live-ticker .ticker-price { font-size: 13px; }
-}
-@media (max-width: 480px) {
-  .live-ticker .ticker-stat .stat-label { display: none; }
-}
 
-/* ══════════════════════════════════════════
-   NEWS TICKER
-══════════════════════════════════════════ */
+/* ── NEWS TICKER ── */
 .news-wrap {
   margin-bottom: 14px;
   position: relative;
@@ -845,6 +757,8 @@ body::before {
   background: linear-gradient(90deg, transparent 0%, var(--bg-card) 100%);
   pointer-events: none;
   z-index: 1;
+}
+.news-track { position: relative; height: 100%; }
 }
 .news-track { position: relative; height: 100%; }
 .news-item {
@@ -1654,18 +1568,6 @@ function render(d) {
         <div class="kpi-num" style="color:var(--purple)">${fmtNum(d.dom,1)}%</div>
         <div class="kpi-aux">M2 YoY ${fmtNum(d.m2_yoy,2)}%</div>
       </div>
-    </div>
-
-    <!-- LIVE BTC TICKER -->
-    <div class="live-ticker" id="liveTicker">
-      <span class="ticker-dot"></span>
-      <span class="ticker-price">$${fmtNum(d.btc)}</span>
-      <span class="ticker-change ${(d.btc_24h||0)>=0?'pos':'neg'}">${(d.btc_24h||0)>=0?'▲':'▼'} ${Math.abs(d.btc_24h||0).toFixed(2)}%</span>
-      <span class="ticker-stat"><span class="stat-label">High</span><span class="stat-val high">—</span></span>
-      <span class="ticker-stat"><span class="stat-label">Low</span><span class="stat-val low">—</span></span>
-      <span class="ticker-stat"><span class="stat-label">Bid</span><span class="stat-val">—</span></span>
-      <span class="ticker-stat"><span class="stat-label">Ask</span><span class="stat-val">—</span></span>
-      <span class="ticker-vol"><span class="stat-label">Vol 24h</span>—</span>
     </div>
 
     <!-- NEWS -->
