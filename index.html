@@ -1588,7 +1588,7 @@ function render(d) {
       </div>
       <div class="nav-meta">
         <div class="nav-meta-label">Regime</div>
-        <div class="nav-meta-val" style="color:${regimeColor}">${d.regime || 'NORMAL'}</div>
+        <div class="nav-meta-val" style="color:${regimeColor}">${typeof d.regime === 'string' && isNaN(d.regime) ? d.regime : (d.adv_regime || 'NORMAL')}</div>
       </div>
       <span class="nav-pill ${topPillClass}">${topPillText}</span>
     </div>
