@@ -1,0 +1,43 @@
+name: Sync & Deploy from Workers
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'   # every 15 minutes
+  workflow_dispatch:          # manual trigger
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: sfc-deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Fetch from Workers
+        run: |
+          curl -sL "https://sfc-terminal.meoong17.workers.dev/" -o index.html
+          echo "Fetched $(wc -c < index.html) bytes"
+
+      - name: Check for changes
+        id: check
+        run: |
+          git diff --quiet index.html && echo "changed=false" >> $GITHUB_OUTPUT || echo "changed=true" >> $GITHUB_OUTPUT
+
+      - name: Commit and push
+        if: steps.check.outputs.changed == 'true'
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add index.html
+          git commit -m "sync: SFC from Workers $(date -u '+%Y-%m-%d %H:%M:%S')"
+          git push
