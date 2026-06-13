@@ -91,6 +91,7 @@ async def event_generator(request: Request):
             "news_headlines", "news_sentiment", "m2_yoy",
             "liq_mod", "liq_total_24h", "cascade_risk", "rsi_14",
             "ath", "ath_date",
+            "kelly_fraction", "composite_confidence", "signal_type",
         ) if k in data}
         payload["ts"] = data.get("ts", datetime.now(timezone.utc).isoformat())
         return {"event": "sfc_update", "data": json.dumps(payload)}
