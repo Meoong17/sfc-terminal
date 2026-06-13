@@ -1511,7 +1511,7 @@ function render(d) {
 
   <!-- STATUS BAND -->
   <div class="status-band">
-    <div class="s-chip"><span class="s-dot ${(d.adv_regime || d.regime) === 'CAPITULATION' ? 'dot-r' : (d.adv_regime || d.regime) === 'STRESS' ? 'dot-a' : 'dot-g'}"></span>${d.adv_regime || d.regime || 'NORMAL'} · ${d.zone || 'NORMAL'} Zone</div>
+    <div class="s-chip"><span class="s-dot ${d.regime === 'CAPITULATION' ? 'dot-r' : d.regime === 'STRESS' ? 'dot-a' : 'dot-g'}"></span>${d.regime || 'NORMAL'} · ${d.zone || 'NORMAL'} Zone</div>
     <div class="s-chip"><span class="s-dot ${d.liq_pressure === 'LONG_SQUEEZE' ? 'dot-r' : d.liq_pressure === 'SHORT_SQUEEZE' ? 'dot-g' : 'dot-a'}"></span>${liqLabel}</div>
     <div class="s-chip"><span class="s-dot ${(d.sopr_signal||'').includes('CAPITULATION') ? 'dot-g' : (d.sopr_signal||'').includes('DISTRIBUTION') ? 'dot-r' : 'dot-a'}"></span>SOPR: ${(d.sopr_signal||'UNKNOWN').replace(/_/g,' ')}</div>
     <div class="s-chip"><span class="s-dot dot-b"></span>RSI ${fmtNum(rsi,1)}${rsi<=30?' · Oversold':rsi>=70?' · Overbought':''}</div>
@@ -1637,7 +1637,7 @@ function render(d) {
             <div class="prog-fill ${sfcFillClass(sfcEff)}" style="width:${Math.min(sfcEff,100)}%"></div>
           </div>
           <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--text-3);margin-bottom:14px;margin-top:2px">
-            <span>SFC Base: ${fmtNum(d.sfc_base,2)}%${d.adv_regime_boost > 0 ? ` <span style="color:var(--amber);font-weight:600">+${d.adv_regime_boost} boost</span>` : ''}</span>
+            <span>SFC Base: ${fmtNum(d.sfc_base,2)}%</span>
             <span>News Δ: ${fmtNum(d.news_stress,1)}</span>
             <span>Liq Mod: +${fmtNum(d.liq_mod,1)}</span>
           </div>
@@ -2179,24 +2179,6 @@ function render(d) {
   buildMethodChart(d);
   if (chartVisible) updatePriceChart();
   processSignalFromSFC(d);
-  // Restore paper log entries from in-memory array
-  var logEl = document.getElementById('paperLog');
-  if (logEl && _paperLogs.length > 0) {
-    logEl.innerHTML = '';
-    var maxLen = Math.min(_paperLogs.length, 100);
-    for (var li = _paperLogs.length - maxLen; li < _paperLogs.length; li++) {
-      var ld = document.createElement('div');
-      ld.textContent = _paperLogs[li];
-      logEl.appendChild(ld);
-    }
-    logEl.scrollTop = logEl.scrollHeight;
-  }
-  // Restore paper status from in-memory trader state (prevent flash)
-  if (paperTrader) {
-    var ps = document.getElementById('paperStatus');
-    if (ps) ps.textContent = paperTrader.status === 'IDLE' ? (paperTrader.positions.length > 0 ? '● IN MARKET' : '● IDLE') : '● ' + paperTrader.status;
-    updatePaperDisplay({ equity: paperTrader.capital });
-  }
   // Update regime display from fresh data
   updateRegimeDisplay(d);
 }
@@ -2205,7 +2187,7 @@ function render(d) {
 function updateRegimeDisplay(d) {
   var el = document.getElementById('regimeDisplay_xyz');
   if (!el) return;
-  var val = d.adv_regime || (typeof d.regime === 'string' && isNaN(d.regime) ? d.regime : 'NORMAL');
+  var val = typeof d.regime === 'string' && isNaN(d.regime) ? d.regime : (d.adv_regime || 'NORMAL');
   var color = val === 'CAPITULATION' ? 'var(--red)' : val === 'STRESS' ? 'var(--amber)' : 'var(--green)';
   el.textContent = val;
   el.style.color = color;
@@ -2216,7 +2198,7 @@ setInterval(function() {
   if (!el) return;
   var d = currentData || window.__EMBEDDED_DATA;
   if (!d) return;
-  var val = d.adv_regime || (typeof d.regime === 'string' && isNaN(d.regime) ? d.regime : 'NORMAL');
+  var val = typeof d.regime === 'string' && isNaN(d.regime) ? d.regime : (d.adv_regime || 'NORMAL');
   var txt = el.textContent;
   // If it contains a $ sign or a number with decimal, overwrite
   if (/^\$?[\d,]+\.?\d*$/.test(txt.trim())) {
@@ -2475,10 +2457,8 @@ function updatePaperDisplay(state) {
     el('paperDD').style.color = perf.maxDD < 0.1 ? 'var(--green)' : perf.maxDD < 0.2 ? 'var(--amber)' : 'var(--red)';
   }
 }
-// In-memory log storage — survives render() DOM rebuild
-var _paperLogs = [];
+
 function addPaperLog(msg) {
-  _paperLogs.push(msg);
   const log = document.getElementById('paperLog');
   if (!log) return;
   const div = document.createElement('div');
@@ -2490,7 +2470,6 @@ function addPaperLog(msg) {
 
 function resetPaperTrading() {
   paperTrader = new PaperTrader(10000);
-  _paperLogs = [];
   try { localStorage.removeItem('sfc_paper_trades'); } catch(e) {}
   const log = document.getElementById('paperLog');
   if (log) log.innerHTML = '<div>🟢 Paper trading reset to $10,000 capital</div>';
