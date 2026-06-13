@@ -141,6 +141,20 @@ export default {
       });
     }
 
+    // /paper_history.json — paper trading track record
+    if (path === '/paper_history.json') {
+      const resp = await fetchAny(urls, '/paper_history.json', 'application/json');
+      if (!resp) return new Response('{"daily":[],"current":{}}', {
+        status: 200,
+        headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache', 'Access-Control-Allow-Origin': '*' },
+      });
+      const data = await resp.json();
+      return new Response(JSON.stringify(data), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache', 'Access-Control-Allow-Origin': '*' },
+      });
+    }
+
     // /health
     if (path === '/health') {
       const resp = await fetchAny(urls, '/health', 'application/json');

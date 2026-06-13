@@ -22,7 +22,7 @@ HISTORY_FILE = SCRIPT_DIR / "paper_history.json"  # daily snapshots
 class PaperTrader:
     """Server-side paper trader with persistent state."""
 
-    INITIAL_CAPITAL = 10000.0
+    INITIAL_CAPITAL = 50000.0
     MAX_POSITION_PCT = 0.25  # max 25% of capital per position
 
     def __init__(self):
