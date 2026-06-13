@@ -15,6 +15,20 @@ from dotenv import load_dotenv
 load_dotenv()
 FRED_KEY = os.getenv("FRED_API_KEY", "")
 
+# ── MICROSTRUCTURE CHANGE DETECTION CACHE ──
+_MICRO_CACHE_FILE = os.path.join(os.path.dirname(__file__), '.micro_cache.json')
+
+def _load_micro_cache():
+    try:
+        with open(_MICRO_CACHE_FILE) as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
+
+def _save_micro_cache(state):
+    with open(_MICRO_CACHE_FILE, 'w') as f:
+        json.dump(state, f)
+
 # ──────────────────────────────────────────────────────
 # TIER 0: MICROSTRUCTURE (M20-M23)
 # Binance public REST API — free, no key required
@@ -170,7 +184,7 @@ def _binance_ticker(symbol="BTCUSDT"):
         return None
 
 
-def calculate_m20_order_book_imbalance():
+def calculate_m20_order_book_imbalance(prev=None):
     """
     M20: Order Book Imbalance (OBI)
     OBI = (Bid Vol - Ask Vol) / (Bid Vol + Ask Vol)
@@ -178,13 +192,13 @@ def calculate_m20_order_book_imbalance():
     """
     bids, asks = _binance_depth(limit=20)
     if bids is None or asks is None:
-        return None, None
+        return None, None, {}
 
     bid_vol = sum(v for _, v in bids)
     ask_vol = sum(v for _, v in asks)
     total = bid_vol + ask_vol
     if total == 0:
-        return None, None
+        return None, None, {}
 
     obi = (bid_vol - ask_vol) / total  # -1 to +1
     obi_norm = (obi + 1) / 2           # 0 to 1
@@ -201,11 +215,35 @@ def calculate_m20_order_book_imbalance():
     else:
         score = 0.25       # Balanced
 
-    return score, {"obi": round(obi, 4), "obi_norm": round(obi_norm, 4),
-                   "bid_vol": round(bid_vol, 2), "ask_vol": round(ask_vol, 2)}
+    # ── Change detection ──
+    change = {}
+    if prev and "obi_norm" in prev:
+        prev_obi = prev["obi_norm"]
+        obi_delta = obi_norm - prev_obi
+        if obi_delta < -0.15:
+            change["obi_change"] = "SELL_SURGE"      # Sell pressure meningkat drastis
+        elif obi_delta < -0.08:
+            change["obi_change"] = "SELLING_UP"
+        elif obi_delta > 0.15:
+            change["obi_change"] = "BUY_SURGE"
+        elif obi_delta > 0.08:
+            change["obi_change"] = "BUYING_UP"
+        else:
+            change["obi_change"] = "STABLE"
+        change["obi_delta"] = round(obi_delta, 4)
+    else:
+        change["obi_change"] = "FIRST_RUN"
+        change["obi_delta"] = 0
+
+    change["obi"] = round(obi, 4)
+    change["obi_norm"] = round(obi_norm, 4)
+    change["bid_vol"] = round(bid_vol, 2)
+    change["ask_vol"] = round(ask_vol, 2)
+
+    return score, change
 
 
-def calculate_m21_large_trade_flow():
+def calculate_m21_large_trade_flow(prev=None):
     """
     M21: Large Trade Flow Ratio
     Track large trades (>$50K notional) vs small retail
@@ -213,7 +251,7 @@ def calculate_m21_large_trade_flow():
     """
     trades = _binance_trades(limit=100)
     if not trades:
-        return None, None
+        return None, None, {}
 
     # Estimate large trade threshold: $50K notional
     large_threshold = 50000  # USD
@@ -239,7 +277,8 @@ def calculate_m21_large_trade_flow():
     if total_large == 0:
         # No large trades = retail dominated = neutral
         return 0.30, {"large_sell_notional": 0, "large_buy_notional": 0,
-                       "large_ratio": 0}
+                       "large_ratio": 0, "large_sell_ratio": 0.5,
+                       "large_share": 0}
 
     large_sell_ratio = large_sells / total_large if total_large > 0 else 0.5
 
@@ -254,13 +293,33 @@ def calculate_m21_large_trade_flow():
     else:
         score = 0.45
 
-    return score, {"large_sell_notional": round(large_sells, 0),
-                   "large_buy_notional": round(large_buys, 0),
-                   "large_sell_ratio": round(large_sell_ratio, 4),
-                   "large_share": round(total_large / (total_large + total_small), 4) if (total_large + total_small) > 0 else 0}
+    # ── Change detection ──
+    detail = {"large_sell_notional": round(large_sells, 0),
+              "large_buy_notional": round(large_buys, 0),
+              "large_sell_ratio": round(large_sell_ratio, 4),
+              "large_share": round(total_large / (total_large + total_small), 4) if (total_large + total_small) > 0 else 0}
+    if prev and "large_sell_ratio" in prev:
+        prev_ratio = prev["large_sell_ratio"]
+        delta = large_sell_ratio - prev_ratio
+        if delta > 0.20:
+            detail["flow_change"] = "SELL_SURGE"
+        elif delta > 0.10:
+            detail["flow_change"] = "SELLING_UP"
+        elif delta < -0.20:
+            detail["flow_change"] = "BUY_SURGE"
+        elif delta < -0.10:
+            detail["flow_change"] = "BUYING_UP"
+        else:
+            detail["flow_change"] = "STABLE"
+        detail["flow_delta"] = round(delta, 4)
+    else:
+        detail["flow_change"] = "FIRST_RUN"
+        detail["flow_delta"] = 0
+
+    return score, detail
 
 
-def calculate_m22_spread_momentum():
+def calculate_m22_spread_momentum(prev=None):
     """
     M22: Bid-Ask Spread Momentum
     Spread = market stress barometer
@@ -268,13 +327,13 @@ def calculate_m22_spread_momentum():
     """
     ticker = _binance_ticker()
     if not ticker:
-        return None, None
+        return None, None, {}
 
     bid = ticker.get("bidPrice", 0)
     ask = ticker.get("askPrice", 0)
     mid = ticker.get("lastPrice", 0)
     if bid <= 0 or ask <= 0 or mid <= 0:
-        return None, None
+        return None, None, {}
 
     spread_bps = (ask - bid) / mid * 10000  # Spread in bps
     high = ticker.get("highPrice", mid)
@@ -303,24 +362,44 @@ def calculate_m22_spread_momentum():
 
     score = min(spread_score + range_penalty, 0.95)
 
-    return score, {"spread_bps": round(spread_bps, 4), "range_bps": round(range_bps, 2),
-                   "bid": bid, "ask": ask}
+    # ── Change detection ──
+    detail = {"spread_bps": round(spread_bps, 4), "range_bps": round(range_bps, 2),
+              "bid": bid, "ask": ask, "mid": mid}
+    if prev and "spread_bps" in prev:
+        prev_spread = prev["spread_bps"]
+        delta = spread_bps - prev_spread
+        if delta > 3:
+            detail["spread_change"] = "WIDENING_FAST"
+        elif delta > 1:
+            detail["spread_change"] = "WIDENING"
+        elif delta < -3:
+            detail["spread_change"] = "NARROWING_FAST"
+        elif delta < -1:
+            detail["spread_change"] = "NARROWING"
+        else:
+            detail["spread_change"] = "STABLE"
+        detail["spread_delta"] = round(delta, 4)
+    else:
+        detail["spread_change"] = "FIRST_RUN"
+        detail["spread_delta"] = 0
+
+    return score, detail
 
 
-def calculate_m23_liquidity_fractals():
+def calculate_m23_liquidity_fractals(prev=None):
     """
     M23: Liquidity Fractals — is there enough depth to absorb large orders?
     Data: Binance order book depth (free REST, no key)
     """
     bids, asks = _binance_depth(limit=100)
     if bids is None or asks is None:
-        return None, None
+        return None, None, {}
 
     # Slippage estimate: how far does $1M market buy move the price?
     target = 1_000_000  # $1M USD notional
     mid = (bids[0][0] + asks[0][0]) / 2 if bids and asks else 0
     if mid <= 0:
-        return None, None
+        return None, None, {}
 
     # Simulate a $1M market buy (hitting asks)
     cum_buy = 0
@@ -383,10 +462,30 @@ def calculate_m23_liquidity_fractals():
     else:
         score = 0.25
 
-    return score, {"slippage_pct": round(avg_slippage, 3),
-                   "levels_used_buy": levels_used_buy,
-                   "levels_used_sell": levels_used_sell,
-                   "mid_price": round(mid, 2)}
+    # ── Change detection ──
+    detail = {"slippage_pct": round(avg_slippage, 3),
+              "levels_used_buy": levels_used_buy,
+              "levels_used_sell": levels_used_sell,
+              "mid_price": round(mid, 2)}
+    if prev and "slippage_pct" in prev:
+        prev_slippage = prev["slippage_pct"]
+        delta = avg_slippage - prev_slippage
+        if delta > 1.0:
+            detail["liq_change"] = "THINNING_FAST"
+        elif delta > 0.3:
+            detail["liq_change"] = "THINNING"
+        elif delta < -1.0:
+            detail["liq_change"] = "DEEPENING_FAST"
+        elif delta < -0.3:
+            detail["liq_change"] = "DEEPENING"
+        else:
+            detail["liq_change"] = "STABLE"
+        detail["slippage_delta"] = round(delta, 3)
+    else:
+        detail["liq_change"] = "FIRST_RUN"
+        detail["slippage_delta"] = 0
+
+    return score, detail
 
 
 # ──────────────────────────────────────────────────────
@@ -987,27 +1086,55 @@ def compute_all_institutional(btc_current=None):
     results = {}
     details = {}
     active = 0
+    micro_change_flags = {}  # Change detection flags
+    micro_deteriorating = False
 
-    # M20-M23: Microstructure
-    s, d = calculate_m20_order_book_imbalance()
+    # ── Load microstructure state from previous run ──
+    micro_prev = _load_micro_cache()
+    micro_curr = {}
+
+    # M20-M23: Microstructure (with change detection)
+    s, d = calculate_m20_order_book_imbalance(prev=micro_prev.get("m20"))
     if s is not None:
         results["m20_obi"] = s; details["m20_detail"] = d; active += 1
-        print(f"  ✓ M20 (OBI): {s:.3f} — OBI={d.get('obi_norm', 0):.3f}", file=sys.stderr)
+        micro_curr["m20"] = {"obi_norm": d.get("obi_norm", 0.5)}
+        if d.get("obi_change") in ("SELL_SURGE",):
+            micro_change_flags["obi"] = "SELL_SURGE"
+            micro_deteriorating = True
+        print(f"  ✓ M20 (OBI): {s:.3f} — OBI={d.get('obi_norm', 0):.3f} | chg={d.get('obi_change', '?')}", file=sys.stderr)
 
-    s, d = calculate_m21_large_trade_flow()
+    s, d = calculate_m21_large_trade_flow(prev=micro_prev.get("m21"))
     if s is not None:
         results["m21_trade_flow"] = s; details["m21_detail"] = d; active += 1
-        print(f"  ✓ M21 (TradeFlow): {s:.3f} — sell_ratio={d.get('large_sell_ratio', 0):.3f}", file=sys.stderr)
+        micro_curr["m21"] = {"large_sell_ratio": d.get("large_sell_ratio", 0.5)}
+        if d.get("flow_change") in ("SELL_SURGE",):
+            micro_change_flags["flow"] = "SELL_SURGE"
+            micro_deteriorating = True
+        print(f"  ✓ M21 (TradeFlow): {s:.3f} — sell_ratio={d.get('large_sell_ratio', 0):.3f} | chg={d.get('flow_change', '?')}", file=sys.stderr)
 
-    s, d = calculate_m22_spread_momentum()
+    s, d = calculate_m22_spread_momentum(prev=micro_prev.get("m22"))
     if s is not None:
         results["m22_spread"] = s; details["m22_detail"] = d; active += 1
-        print(f"  ✓ M22 (Spread): {s:.3f} — spread_bps={d.get('spread_bps', 0):.1f}", file=sys.stderr)
+        micro_curr["m22"] = {"spread_bps": d.get("spread_bps", 0)}
+        if d.get("spread_change") in ("WIDENING_FAST",):
+            micro_change_flags["spread"] = "WIDENING_FAST"
+            micro_deteriorating = True
+        print(f"  ✓ M22 (Spread): {s:.3f} — spread_bps={d.get('spread_bps', 0):.1f} | chg={d.get('spread_change', '?')}", file=sys.stderr)
 
-    s, d = calculate_m23_liquidity_fractals()
+    s, d = calculate_m23_liquidity_fractals(prev=micro_prev.get("m23"))
     if s is not None:
         results["m23_liquidity"] = s; details["m23_detail"] = d; active += 1
-        print(f"  ✓ M23 (Liquidity): {s:.3f} — slippage={d.get('slippage_pct', 0):.3f}%", file=sys.stderr)
+        micro_curr["m23"] = {"slippage_pct": d.get("slippage_pct", 0)}
+        if d.get("liq_change") in ("THINNING_FAST",):
+            micro_change_flags["liq"] = "THINNING_FAST"
+            micro_deteriorating = True
+        print(f"  ✓ M23 (Liquidity): {s:.3f} — slippage={d.get('slippage_pct', 0):.3f}% | chg={d.get('liq_change', '?')}", file=sys.stderr)
+
+    # ── Save current microstructure state for next run ──
+    _save_micro_cache(micro_curr)
+
+    # Aggregate micro trend: count deteriorating signals
+    micro_trend_score = sum(1 for f in micro_change_flags.values() if f in ("SELL_SURGE", "WIDENING_FAST", "THINNING_FAST")) / 3.0
 
     # M24-M28: Behavioral/Tail Risk
     s, d = calculate_m24_cape()
@@ -1052,9 +1179,11 @@ def compute_all_institutional(btc_current=None):
         print(f"  ✓ M31 (Altman): {s:.3f} — z={d.get('z_score', 0):.2f}", file=sys.stderr)
 
     avg_score = sum(results.values()) / len(results) if results else None
+    if micro_change_flags:
+        print(f"  → Micro change flags: {micro_change_flags} | trend_score={micro_trend_score:.2f} | deteriorating={micro_deteriorating}", file=sys.stderr)
     print(f"  → Institutional methods active: {active}/12 | avg: {avg_score:.3f}", file=sys.stderr)
 
-    return results, details, active, avg_score
+    return results, details, active, avg_score, micro_change_flags, micro_trend_score, micro_deteriorating
 
 
 if __name__ == "__main__":
