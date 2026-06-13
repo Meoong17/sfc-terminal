@@ -1650,15 +1650,10 @@ composite_confidence = max(0.05, min(cc_base - cc_penalty, 0.95))
 composite_confidence = round(composite_confidence, 3)
 
 # ── Q5 Advanced Methods: M65-M69 ──
-# M65: CNN+Attention pattern recognition (skip if PyTorch not available)
-if CNN_ATTENTION_AVAILABLE:
+# M65: CNN+Attention pattern recognition
+if _get_cnn_attention():
     try:
-        # Check if torch available — CNN needs data window, skip with fallback
-        try:
-            import torch
-            _m65_result = calculate_cnn_attention_stress(np.array([[0.5]*41]))
-        except ImportError:
-            _m65_result = {"m65_cnn_attention": 0.5, "attention_focus": [], "pattern_type": "FALLBACK — PyTorch not in main Python"}
+        _m65_result = calculate_cnn_attention_stress(np.array([[0.5]*41]))
     except Exception as _m65_e:
         _m65_result = {"m65_cnn_attention": 0.5, "attention_focus": [], "pattern_type": f"FALLBACK — {_m65_e}"}
 else:
