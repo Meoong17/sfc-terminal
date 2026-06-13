@@ -1942,12 +1942,6 @@ m68_str = f" DRL={_m68_signal}" if DRL_AVAILABLE else ""
 m69_str = f" SYS={_m69_overall:.2f}" if GNN_AVAILABLE else ""
 print(f"\n✅ BTC={btc_str} | SFC={effective_sfc:.1f}% | Zone={zone} | RSI={rsi_str} | SOPR={sopr_str} | News={news_stress:.1f} | {regime} | Methods={total_active_methods}/32{qlstm_str}{m65_str}{m68_str}{m69_str}", file=sys.stderr)
 
-# ── Paper Trading Execution ──
-try:
-    import subprocess
-    subprocess.run(
-        [sys.executable, os.path.join(os.path.dirname(__file__), "paper_trader.py")],
-        capture_output=True, text=True, timeout=15,
-    )
-except Exception as e:
-    print(f"[SFC] Paper trader failed: {e}", file=sys.stderr)
+# Paper trading moved to pipeline script (sfc-pipeline.sh) to avoid
+# race condition: collect.py stdout > data.json is still buffered
+# when paper_trader.py runs as subprocess, causing empty-file crash.

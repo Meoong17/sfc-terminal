@@ -288,6 +288,9 @@ def main():
         return
 
     data = json.loads(DATA_FILE.read_text())
+    if not data:
+        print("[PaperTrader] data.json is empty — skipping this cycle")
+        return
     btc = data.get("btc", 0)
     if not btc:
         print("[PaperTrader] No BTC price in data")
