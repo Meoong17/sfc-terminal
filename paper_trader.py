@@ -185,7 +185,8 @@ class PaperTrader:
         for pos in self.positions:
             if pos["type"] == "LONG":
                 unrealized += (price - pos["entry_price"]) / pos["entry_price"] * pos["size"]
-        equity = self.capital + unrealized
+        self._unrealized = unrealized
+        equity = self.capital + sum(pos["size"] for pos in self.positions) + unrealized
         self.equity_history.append({
             "ts": datetime.now(timezone.utc).isoformat(),
             "btc": price,
@@ -278,6 +279,7 @@ class PaperTrader:
             "total_trades": len(self.trades),
             "closed_trades": len(closed),
             "open_positions": len(self.positions),
+            "unrealized_pnl": round(getattr(self, '_unrealized', 0), 2),
             "status": "IN_MARKET" if self.positions else "CASH",
         }
 
