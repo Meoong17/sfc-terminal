@@ -1379,9 +1379,8 @@ if m2_yoy is not None:
 effective_sfc = min(sfc_pct + news_stress + liq_mod, 100.0) if sfc_pct is not None else None
 effective_sfc = max(effective_sfc, 0.0) if effective_sfc else None
 
-# Floor and state (dynamic ATH)
+# Floor (dynamic ATH) — uses pre-boost SFC because drawdown is a real market metric
 fb, ft, dv_sfc, phi = compute_floor_v2(btc, effective_sfc)
-state, signal = determine_state(dvol, effective_sfc, btc, ft)
 
 regime, regime_prob, transition_risk = detect_regime(dvol, effective_sfc, news_stress, news_sentiment)
 
@@ -1391,6 +1390,11 @@ if (ADVANCED_AVAILABLE is None or ADVANCED_AVAILABLE) and adv_regime_boost > 0 a
     effective_sfc = min(effective_sfc + adv_regime_boost, 100.0)
     zone = "CRITICAL" if effective_sfc/100 > 0.75 else "HIGH" if effective_sfc/100 > 0.5 else "ELEVATED" if effective_sfc/100 > 0.25 else "NORMAL"
     print(f"  [Advanced] SFC boosted by regime: {old_sfc:.1f}% → {effective_sfc:.1f}% (+{adv_regime_boost}) | Zone: {zone}", file=sys.stderr)
+
+# State and signal — use post-boost effective_sfc to stay consistent with zone/signal_type
+if effective_sfc is not None:
+    zone = "CRITICAL" if effective_sfc/100 > 0.75 else "HIGH" if effective_sfc/100 > 0.5 else "ELEVATED" if effective_sfc/100 > 0.25 else "NORMAL"
+state, signal = determine_state(dvol, effective_sfc, btc, ft)
 
 # ── BACKTEST METRICS (Priority 3) with Realistic Confidence Bounds ──
 bt_sharpe = None
