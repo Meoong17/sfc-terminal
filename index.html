@@ -759,8 +759,6 @@ body::before {
   z-index: 1;
 }
 .news-track { position: relative; height: 100%; }
-}
-.news-track { position: relative; height: 100%; }
 .news-item {
   position: absolute;
   inset: 0;
@@ -1590,7 +1588,7 @@ function render(d) {
           <div class="card-title">
             <div class="card-icon">
               <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                <circle cx="6" cy="6" r="5" stroke="${sfcColor(sfcEff).replace('var(--','').replace(')','')=='cyan'?'#00d4ff':sfcEff>=50?'#ff4060':sfcEff>=25?'#f0b429':'#00ff9d'}" stroke-width="1.5"/>
+                <circle cx="6" cy="6" r="5" stroke="${sfcEff>=50?'#ff4060':sfcEff>=25?'#f0b429':'#00ff9d'}" stroke-width="1.5"/>
                 <path d="M6 3v3l2 1" stroke="${sfcEff>=50?'#ff4060':sfcEff>=25?'#f0b429':'#00ff9d'}" stroke-width="1.2" stroke-linecap="round"/>
               </svg>
             </div>
@@ -1837,7 +1835,7 @@ function render(d) {
           <div class="info-row"><span class="info-k">Transition Risk</span><span class="info-v" style="color:${(d.transition_risk||0)>0.5?'var(--red)':(d.transition_risk||0)>0.25?'var(--amber)':'var(--green)'}">${fmtNum((d.transition_risk||0)*100,0)}%</span></div>
           <div class="info-row"><span class="info-k">Readiness</span><span class="info-v" style="color:${(d.readiness_score||0)>=0.8?'var(--green)':(d.readiness_score||0)>=0.5?'var(--amber)':'var(--text-2)'}">${((d.readiness_score||0)*100).toFixed(0)}%</span></div>
           <div class="prog-track">
-            <div class="prog-fill pf-green" style="width:${((d.readiness_score||0)*100).toFixed(0)}%"></div>
+            <div class="prog-fill ${(d.readiness_score||0)>=0.5?'pf-green':'pf-amber'}" style="width:${((d.readiness_score||0)*100).toFixed(0)}%"></div>
           </div>
           <div style="font-size:8px;color:var(--text-3);margin-top:6px;line-height:1.5">Floor = Price × (1 − SFC% × 0.6)</div>
         </div>
@@ -1878,7 +1876,7 @@ function render(d) {
             <div class="stat-note">½ Kelly — reduced variance</div>
           </div>
         </div>
-        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
+        <div class="stat-3 mb-12">
           <div class="info-row"><span class="info-k">Alert Window</span><span class="info-v">~${d.alert_window_hours||48}h</span></div>
           <div class="info-row"><span class="info-k">Timing Precision</span><span class="info-v" style="color:${d.timing_precision==='HIGH'?'var(--green)':'var(--amber)'}">${d.timing_precision||'LOW'}</span></div>
           <div class="info-row"><span class="info-k">Signal Type</span><span class="info-v" style="color:${d.fng<15||(d.cascade_risk||0)>0.5?'var(--red)':'var(--green)'}">${d.fng<15?(d.fng_cls||'EXTREME FEAR'):(d.cascade_risk||0)>0.5?'CASCADE RISK':'NORMAL'}</span></div>
@@ -2092,7 +2090,7 @@ function render(d) {
               <span class="sec-chip sc-critical">CASCADE RISK ${((d.cascade_risk||0)*100).toFixed(0)}%</span>
             </div>
           ` : `<div style="margin-bottom:8px"><span class="sec-chip sc-safe">All Clear</span></div>`}
-          <div class="info-row"><span class="info-k">Crisis Prob</span><span class="info-v" style="color:${(d.adv_crisis_prob||0)>0.1?'var(--red)':'var(--text-1)'}">${fmtNum(((d.adv_crisis_prob||0)*100).toFixed(1),1)}%</span></div>
+          <div class="info-row"><span class="info-k">Crisis Prob</span><span class="info-v" style="color:${(d.adv_crisis_prob||0)>0.1?'var(--red)':'var(--text-1)'}">${fmtNum((d.adv_crisis_prob||0)*100, 1)}%</span></div>
           <div class="info-row"><span class="info-k">SEC Events</span><span class="info-v">${d.sec_events||0}</span></div>
           <div class="info-row"><span class="info-k">Adv Uncertainty</span><span class="info-v">${fmtNum((d.adv_uncertainty||0)*100,1)}%</span></div>
           <div class="info-row"><span class="info-k">Adv Confidence</span><span class="info-v" style="font-size:10px;color:var(--cyan)">${(d.adv_confidence||'—').replace(/_/g,' ')}</span></div>
@@ -2434,7 +2432,9 @@ function processSignalFromSFC(d) {
   }
   const equity = paperTrader.updatePnL(price);
   updatePaperDisplay({ equity, price });
-  try { localStorage.setItem('sfc_paper_trades', JSON.stringify({ capital: paperTrader.capital, positions: paperTrader.positions, trades: paperTrader.trades.slice(-200), pnlHistory: paperTrader.pnlHistory.slice(-500), status: paperTrader.status })); } catch(e) {}
+  // NOTE: localStorage persistence intentionally REMOVED — server paper_history.json
+  // is the source of truth. Previous phantom-position bug was caused by stale
+  // localStorage diverging from server state on page reload.
 }
 
 function updatePaperDisplay(state) {
@@ -2510,6 +2510,14 @@ setInterval(fetchLiveData, 30000);
 
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js').catch(e => console.log('SW failed:', e));
+  // When a new SW takes over, force a reload to pick up fresh index.html —
+  // otherwise the page is stuck on the old cached HTML until next manual refresh.
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (navigator.serviceWorker.controller) {
+      console.log('[SW] New controller — reloading');
+      window.location.reload();
+    }
+  });
 }
 </script>
 </body>
