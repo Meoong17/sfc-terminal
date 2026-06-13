@@ -155,6 +155,20 @@ export default {
       });
     }
 
+    // /paper_trades.json — paper trading server state (for client-side init)
+    if (path === '/paper_trades.json') {
+      const resp = await fetchAny(urls, '/paper_trades.json', 'application/json');
+      if (!resp) return new Response('{"capital":50000,"positions":[],"trades":[],"equity_history":[],"daily_snapshots":{}}', {
+        status: 200,
+        headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache', 'Access-Control-Allow-Origin': '*' },
+      });
+      const data = await resp.json();
+      return new Response(JSON.stringify(data), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache', 'Access-Control-Allow-Origin': '*' },
+      });
+    }
+
     // /health
     if (path === '/health') {
       const resp = await fetchAny(urls, '/health', 'application/json');
