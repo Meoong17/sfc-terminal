@@ -2500,6 +2500,8 @@ class PaperTrader {
     // Update PnL for reporting
     this._updatePnL(price);
     this._updatePeak();
+    // Trailing stop check — close if price dropped 15%+ from peak
+    this._checkTrailingStop(price);
     this._dailySnapshot();
   }
 
@@ -2507,6 +2509,7 @@ class PaperTrader {
     this.positions.push({
       type: 'LONG',
       entry_price: price,
+      highest_price: price,
       size: size,
       entry_date: new Date().toISOString(),
       reason: decision.reason || '',
@@ -2542,6 +2545,26 @@ class PaperTrader {
     }
     this.positions = [];
     this.status = 'IDLE';
+  }
+
+  _checkTrailingStop(price) {
+    const TRAILING_PCT = 0.15; // 15% trailing stop
+    const toClose = [];
+    for (const pos of this.positions) {
+      // Update highest price seen
+      if (price > pos.highest_price) {
+        pos.highest_price = price;
+      }
+      // Check if price dropped 15%+ from peak
+      const dropPct = (pos.highest_price - price) / pos.highest_price;
+      if (dropPct >= TRAILING_PCT) {
+        toClose.push(pos);
+      }
+    }
+    if (toClose.length > 0) {
+      this._trailingStopTriggered = true;
+      this._closeAllPositions(price, `Trailing Stop ${(TRAILING_PCT*100).toFixed(0)}% · Drop ${Math.round(toClose[0].highest_price)}→${Math.round(price)}`);
+    }
   }
 
   _updatePnL(price) {
@@ -2712,7 +2735,11 @@ function processSignalFromSFC(d) {
     if (lastTrade.type === 'OPEN') {
       addPaperLog(`🟢 [OPEN] LONG $${fmtNum(decision.size,0)} at $${fmtNum(decision.btc_price,0)} — ${decision.reason}`);
     } else if (lastTrade.type === 'CLOSE') {
-      addPaperLog(`🔴 [CLOSE] All at $${fmtNum(decision.btc_price,0)} — ${decision.reason}`);
+      if (lastTrade.reason && lastTrade.reason.startsWith('Trailing Stop')) {
+        addPaperLog(`🔴 [TRAILING STOP] $${fmtNum(decision.btc_price,0)} — ${lastTrade.reason}`);
+      } else {
+        addPaperLog(`🔴 [CLOSE] All at $${fmtNum(decision.btc_price,0)} — ${decision.reason}`);
+      }
     }
   } else if (decision.action === 'HOLD' && paperTrader.positions.length === 0 && Math.random() < 0.05) {
     addPaperLog(`👀 Watching — ${decision.reason}`);
