@@ -81,7 +81,9 @@ class PaperTrader:
         if kelly <= 0:
             action = "CASH"
             reason = "No edge"
-            if is_extreme_fear:
+            if data.get("kelly_override_reason") == "TRANSITION_RISK_OVER_60":
+                reason = "Transition Risk >60% · Forced CASH"
+            elif is_extreme_fear:
                 reason = f"FNG {fng} · Extreme Fear"
             elif has_cascade:
                 reason = f"Cascade Risk {cascade*100:.0f}%"

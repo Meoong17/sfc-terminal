@@ -1649,6 +1649,19 @@ if transition_risk > 0.5:
 composite_confidence = max(0.05, min(cc_base - cc_penalty, 0.95))
 composite_confidence = round(composite_confidence, 3)
 
+# ── Transition Risk Guard: force CASH when regime flip risk exceeds threshold ──
+# When transition_risk > 60%, override kelly to 0 → model stays CASH
+# When transition_risk > 50%, halve the kelly allocation
+if transition_risk > 0.60:
+    _kelly_override = 0.0
+    _kelly_override_reason = "TRANSITION_RISK_OVER_60"
+elif transition_risk > 0.50:
+    _kelly_override = 0.5
+    _kelly_override_reason = "TRANSITION_RISK_OVER_50"
+else:
+    _kelly_override = 1.0
+    _kelly_override_reason = None
+
 # ── Q5 Advanced Methods: M65-M69 ──
 # M65: CNN+Attention pattern recognition
 if _get_cnn_attention():
@@ -1891,11 +1904,12 @@ out = {
     # — Kelly Criterion Position Sizing (Gap 2 dari Reality Check) —
     "kelly_p_win": round(composite_confidence, 3),
     "kelly_b_payoff": 2.0,  # default risk/reward ratio
-    "kelly_fraction": round(max(0, (composite_confidence * 2.0 - (1 - composite_confidence)) / 2.0), 4),
-    "kelly_half": round(max(0, (composite_confidence * 2.0 - (1 - composite_confidence)) / 4.0), 4),
-    "kelly_quarter": round(max(0, (composite_confidence * 2.0 - (1 - composite_confidence)) / 8.0), 4),
+    "kelly_fraction": round(max(0, (composite_confidence * 2.0 - (1 - composite_confidence)) / 2.0) * _kelly_override, 4),
+    "kelly_half": round(max(0, (composite_confidence * 2.0 - (1 - composite_confidence)) / 4.0) * _kelly_override, 4),
+    "kelly_quarter": round(max(0, (composite_confidence * 2.0 - (1 - composite_confidence)) / 8.0) * _kelly_override, 4),
+    "kelly_override_reason": _kelly_override_reason,
     # — Signal Timing (alert window estimation) —
-    "signal_type": "STRESS" if effective_sfc and effective_sfc > 25 else "CALM",
+    "signal_type": "STRESS_TRANSITION" if transition_risk > 0.60 else "STRESS" if effective_sfc and effective_sfc > 25 else "CALM",
     "signal_strength": round(min(effective_sfc / 50.0 if effective_sfc else 0, 1.0), 3),
     "timing_precision": "LOW" if composite_confidence < 0.3 else "MEDIUM" if composite_confidence < 0.6 else "HIGH",
     "alert_window_hours": round(24 + 48 * (1 - composite_confidence), 1),  # wider window = lower confidence
