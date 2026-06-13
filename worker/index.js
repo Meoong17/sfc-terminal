@@ -5,7 +5,7 @@
 // 1. Cloudflare Tunnel (set via env TUNNEL_URL or hardcoded below)
 // 2. Direct VPS IP (blocked by some Tencent Cloud security groups)
 
-const TUNNEL = 'https://romance-references-gossip-questions.trycloudflare.com';
+const TUNNEL = 'https://galleries-actively-grew-require.trycloudflare.com';
 const BACKUP = 'http://43.134.89.23:8765';
 
 async function fetchAny(urls, path, accept) {
