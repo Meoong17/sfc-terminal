@@ -1,6 +1,6 @@
 """
 news_sources.py — Multi-source free news aggregator
-20+ free sources including RSS feeds, Reddit, Google News
+23 sources: crypto RSS, Reddit, Google News, market macro feeds
 """
 
 import os, re, html, time, hashlib
@@ -41,25 +41,33 @@ BULLISH = {
 
 # RSS Feed Definitions
 RSS_FEEDS = [
+    # === CRYPTO (Rt / St factor) ===
+    {"url": "https://bitcoinmagazine.com/feed", "name": "BitcoinMag", "weight": 2.5, "factor": "Rt"},
     {"url": "https://cointelegraph.com/rss", "name": "CoinTelegraph", "weight": 2.5, "factor": "Rt"},
     {"url": "https://coindesk.com/arc/outboundfeeds/rss/", "name": "CoinDesk", "weight": 2.5, "factor": "Rt"},
     {"url": "https://decrypt.co/feed", "name": "Decrypt", "weight": 2.0, "factor": "Rt"},
     {"url": "https://theblock.co/rss.xml", "name": "TheBlock", "weight": 2.0, "factor": "Ft"},
     {"url": "https://beincrypto.com/feed/", "name": "BeInCrypto", "weight": 1.5, "factor": "Rt"},
+    {"url": "https://www.newsbtc.com/feed/", "name": "NewsBTC", "weight": 2.0, "factor": "Rt"},
+    {"url": "https://u.today/rss", "name": "U.Today", "weight": 1.5, "factor": "Rt"},
+    {"url": "https://ambcrypto.com/feed/", "name": "AMBCrypto", "weight": 1.5, "factor": "Rt"},
+    {"url": "https://news.bitcoin.com/feed/", "name": "Bitcoin.com", "weight": 1.5, "factor": "Rt"},
+    {"url": "https://www.binance.com/en/support/announcement/c-48?rss=1", "name": "Binance", "weight": 2.0, "factor": "St"},
+    # === MACRO / MARKETS (Ft / Lt / Sc factor) ===
     {"url": "https://feeds.a.dj.com/rss/RSSMarketsMain.xml", "name": "WSJ Markets", "weight": 3.0, "factor": "Ft"},
-    {"url": "https://feeds.reuters.com/reuters/businessNews", "name": "Reuters Biz", "weight": 3.0, "factor": "Ft"},
-    {"url": "https://feeds.reuters.com/reuters/topNews", "name": "Reuters Top", "weight": 2.5, "factor": "Sc"},
     {"url": "https://www.investing.com/rss/news_14.rss", "name": "Investing.com", "weight": 2.0, "factor": "Lt"},
-    {"url": "https://www.zerohedge.com/fullrss2.xml", "name": "ZeroHedge", "weight": 2.5, "factor": "Ft"},
     {"url": "https://www.ft.com/rss/home/uk", "name": "FT", "weight": 3.0, "factor": "Ft"},
+    {"url": "https://feeds.marketwatch.com/marketwatch/topstories/", "name": "MarketWatch", "weight": 2.5, "factor": "Ft"},
+    # === REDDIT (social sentiment) ===
     {"url": "https://www.reddit.com/r/Bitcoin/hot.rss?limit=10", "name": "r/Bitcoin", "weight": 1.5, "factor": "Rt"},
     {"url": "https://www.reddit.com/r/economics/hot.rss?limit=10", "name": "r/Economics", "weight": 2.0, "factor": "Lt"},
     {"url": "https://www.reddit.com/r/wallstreetbets/hot.rss?limit=5", "name": "r/WSB", "weight": 1.5, "factor": "Rt"},
     {"url": "https://www.reddit.com/r/CryptoCurrency/hot.rss?limit=10", "name": "r/Crypto", "weight": 1.5, "factor": "Rt"},
+    # === GOOGLE NEWS (targeted search) ===
     {"url": "https://news.google.com/rss/search?q=bitcoin+cryptocurrency&hl=en-US&gl=US&ceid=US:en", "name": "Google:BTC", "weight": 2.0, "factor": "Rt"},
     {"url": "https://news.google.com/rss/search?q=federal+reserve+interest+rate&hl=en-US&gl=US&ceid=US:en", "name": "Google:Fed", "weight": 2.5, "factor": "Lt"},
     {"url": "https://news.google.com/rss/search?q=global+financial+crisis+bank+stress&hl=en-US&gl=US&ceid=US:en", "name": "Google:Crisis", "weight": 3.0, "factor": "Ft"},
-    {"url": "https://www.binance.com/en/support/announcement/c-48?rss=1", "name": "Binance", "weight": 2.0, "factor": "St"},
+    {"url": "https://news.google.com/rss/search?q=crypto+regulation+sec+etf&hl=en-US&gl=US&ceid=US:en", "name": "Google:Reg", "weight": 2.0, "factor": "Sc"},
 ]
 
 HEADERS = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 SFC-Terminal/7"}

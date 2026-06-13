@@ -2,7 +2,7 @@
 """
 SFC v2.1 REALTIME COLLECTOR — No LLM Version
 5-minute auto-update for GitHub Pages
-Multi-source news aggregator (20+ free sources)
+Multi-source news aggregator (23 sources)
 """
 
 import json, os, sys, subprocess, math, requests, time
