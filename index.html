@@ -2239,7 +2239,7 @@ async function fetchPaperTrackRecord() {
     const cur = data.current || {};
     const el = id => document.getElementById(id);
     if (el('paperEquity')) {
-      el('paperEquity').textContent = '$' + fmtNum(Math.round(cur.equity || 10000), 0);
+      el('paperEquity').textContent = '$' + fmtNum(cur.equity || 50000, 2);
       el('paperEquity').style.color = (cur.total_return || 0) >= 0 ? 'var(--green)' : 'var(--red)';
     }
     if (el('paperReturn')) {
@@ -2266,8 +2266,8 @@ async function fetchPaperTrackRecord() {
       const first = data.daily[0];
       const last = data.daily[data.daily.length - 1];
       recordHtml += '<br><span style="color:var(--text-2)">' + days + ' day' + (days>1?'s':'') + ' tracked &middot; ';
-      recordHtml += 'Start: $' + fmtNum(Math.round(first.equity),0) + ' &middot; ';
-      recordHtml += 'Latest: $' + fmtNum(Math.round(last.equity),0) + '</span>';
+      recordHtml += 'Start: $' + fmtNum(first.equity, 2) + ' &middot; ';
+      recordHtml += 'Latest: $' + fmtNum(last.equity, 2) + '</span>';
     }
     if (el('paperTrackRecord')) el('paperTrackRecord').innerHTML = recordHtml;
     if (el('paperLastUpdate')) el('paperLastUpdate').textContent = new Date().toLocaleTimeString();
@@ -2706,7 +2706,7 @@ function updatePaperDisplay(perf) {
   const el = id => document.getElementById(id);
   if (!el('paperEquity')) return;
 
-  el('paperEquity').textContent = '$' + fmtNum(Math.round(perf.equity), 0);
+  el('paperEquity').textContent = '$' + fmtNum(perf.equity, 2);
   el('paperEquity').style.color = perf.total_return >= 0 ? 'var(--green)' : 'var(--red)';
   el('paperReturn').textContent = perf.total_return_pct.toFixed(2) + '%';
   el('paperReturn').style.color = perf.total_return >= 0 ? 'var(--green)' : 'var(--red)';
