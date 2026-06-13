@@ -1,10 +1,9 @@
 /**
- * Service Worker v9 — Stale-while-revalidate + version check
- * Never serve data.json older than 30 minutes without attempting refresh
+ * Service Worker v10 — Network-first for index.html + reload guard
  */
 
-const CACHE_NAME = "sfc-terminal-v11";
-const DATA_CACHE = "sfc-data-v4";
+const CACHE_NAME = "sfc-terminal-v12";
+const DATA_CACHE = "sfc-data-v5";
 const MAX_DATA_AGE_MS = 5 * 60 * 1000; // 5 minutes (was 30 min — dashboard was serving stale data)
 
 const STATIC_ASSETS = [
@@ -75,6 +74,19 @@ self.addEventListener("fetch", e => {
 
         return cachedResponse;
       })
+    );
+    return;
+  }
+
+  // Index HTML — network-first: serve fresh if possible, fallback to cache
+  if (url.pathname.endsWith("index.html") || url.pathname === "/") {
+    e.respondWith(
+      fetch(e.request).then(res => {
+        if (res.ok) {
+          caches.open(CACHE_NAME).then(c => c.put(e.request, res.clone()));
+        }
+        return res;
+      }).catch(() => caches.match(e.request).then(cached => cached || caches.match("/index.html")))
     );
     return;
   }

@@ -1201,6 +1201,7 @@ const chartDefaults = {
 };
 
 function buildFactorChart(d) {
+  if (!d) return;
   const canvas = document.getElementById('factorChart');
   if (!canvas) return;
   if (factorChart) factorChart.destroy();
@@ -1231,6 +1232,7 @@ function buildFactorChart(d) {
 }
 
 function buildMethodChart(d) {
+  if (!d) return;
   const canvas = document.getElementById('methodChart');
   if (!canvas) return;
   if (methodChart) methodChart.destroy();
@@ -1274,6 +1276,7 @@ function buildMethodChart(d) {
     },
     options: {
       ...chartDefaults,
+      maintainAspectRatio: false,
       plugins: { ...chartDefaults.plugins, legend: { display: false } },
       scales: { y: { ...chartDefaults.scales.y, beginAtZero: true, ticks: { ...chartDefaults.scales.y.ticks, callback: v => v + '%' } } }
     }
@@ -2514,8 +2517,11 @@ if ('serviceWorker' in navigator) {
   // otherwise the page is stuck on the old cached HTML until next manual refresh.
   navigator.serviceWorker.addEventListener('controllerchange', () => {
     if (navigator.serviceWorker.controller) {
-      console.log('[SW] New controller — reloading');
-      window.location.reload();
+      if (!window._sfcReloading) {
+        window._sfcReloading = true;
+        console.log('[SW] New controller — reloading');
+        window.location.reload();
+      }
     }
   });
 }
