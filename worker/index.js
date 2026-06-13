@@ -38,19 +38,27 @@ export default {
       });
     }
 
-    // /events — SSE stream
+    // /events — SSE stream (NO timeout — stream must stay open indefinitely)
     if (path === '/events') {
-      const resp = await fetchAny(urls, '/events', 'text/event-stream');
-      if (!resp) return new Response('Backend unreachable', { status: 502 });
-      return new Response(resp.body, {
-        status: resp.status,
-        headers: {
-          'Content-Type': 'text/event-stream',
-          'Cache-Control': 'no-cache',
-          'Connection': 'keep-alive',
-          'Access-Control-Allow-Origin': '*',
-        },
-      });
+      for (const base of urls) {
+        try {
+          const resp = await fetch(base + '/events', {
+            headers: { 'Accept': 'text/event-stream' },
+          });
+          if (resp.ok) {
+            return new Response(resp.body, {
+              status: resp.status,
+              headers: {
+                'Content-Type': 'text/event-stream',
+                'Cache-Control': 'no-cache',
+                'Connection': 'keep-alive',
+                'Access-Control-Allow-Origin': '*',
+              },
+            });
+          }
+        } catch (_) {}
+      }
+      return new Response('Backend unreachable', { status: 502 });
     }
 
     // /snapshot — initial data
