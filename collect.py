@@ -348,12 +348,33 @@ def get_ath():
     return FALLBACK_ATH, ""
 
 def get_fng():
+    """Fear & Greed from CoinMarketCap API."""
     try:
-        r = requests.get("https://api.alternative.me/fng/?limit=1", timeout=10)
-        d = r.json()["data"][0]
-        return int(d["value"]), d["value_classification"]
-    except:
-        return None, None
+        r = requests.get(
+            "https://api.coinmarketcap.com/data-api/v3/fear-greed/chart?start=1367193600&end=" + str(int(time.time())),
+            timeout=10,
+            headers={"User-Agent": "Mozilla/5.0"}
+        )
+        if r.status_code != 200:
+            raise ValueError(f"HTTP {r.status_code}")
+        hv = r.json()["data"]["historicalValues"]
+        now = hv["now"]
+        val = int(now["score"])
+        name_map = {
+            "Extreme fear": "Extreme Fear", "Fear": "Fear",
+            "Neutral": "Neutral", "Greed": "Greed",
+            "Extreme greed": "Extreme Greed"
+        }
+        cls = name_map.get(now["name"], now["name"])
+        return val, cls
+    except Exception as e:
+        print(f"[SFC] CMC F&G failed: {e}, falling back to Alternative.me", file=sys.stderr)
+        try:
+            r = requests.get("https://api.alternative.me/fng/?limit=1", timeout=10)
+            d = r.json()["data"][0]
+            return int(d["value"]), d["value_classification"]
+        except:
+            return None, None
 
 def get_dom():
     """BTC dominance — try CoinMarketCap first, fallback to CoinGecko"""

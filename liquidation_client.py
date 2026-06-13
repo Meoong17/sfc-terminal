@@ -68,7 +68,7 @@ def fetch_okx_liquidations(symbol="BTC-USDT-SWAP", limit=100):
     url = f"{OKX_BASE}/api/v5/public/liquidation-orders"
     params = {
         "instType": "SWAP",
-        "instFamily": symbol,
+        "instFamily": "BTC-USDT",
         "state": "filled",
         "limit": min(limit, 100)
     }
