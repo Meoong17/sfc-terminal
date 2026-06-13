@@ -2,15 +2,13 @@ name: Sync & Deploy from Workers
 
 on:
   schedule:
-    - cron: '*/15 * * * *'   # every 15 minutes
-  workflow_dispatch:          # manual trigger
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
   push:
     branches: [main]
 
 permissions:
   contents: write
-  pages: write
-  id-token: write
 
 concurrency:
   group: sfc-deploy-${{ github.ref }}
