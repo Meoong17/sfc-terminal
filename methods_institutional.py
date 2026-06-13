@@ -1188,7 +1188,8 @@ def compute_all_institutional(btc_current=None):
 
 if __name__ == "__main__":
     print("Testing Institutional Methods (M20-M31)...", file=sys.stderr)
-    results, details, active, avg = compute_all_institutional(btc_current=95000)
+    results, details, active, avg, micro_flags, micro_trend, micro_bad = compute_all_institutional(btc_current=95000)
     for k, v in results.items():
         print(f"  {k}: {round(v, 4)}")
     print(f"\nActive: {active}/12 | Average: {round(avg, 4) if avg else 'N/A'}")
+    print(f"Micro flags: {micro_flags} | trend={micro_trend:.2f} | bad={micro_bad}")

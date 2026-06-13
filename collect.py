@@ -1109,7 +1109,7 @@ m19_s, m19_d = calculate_m19_mutual_info(rets_pct, dxy_rets)
 
 # ── INSTITUTIONAL METHODS (M20-M31) ──
 print("[SFC] Computing M20-M31 institutional methods...", file=sys.stderr)
-inst_results, inst_details, inst_active, inst_avg = compute_all_institutional(btc_current=btc)
+inst_results, inst_details, inst_active, inst_avg, micro_change_flags, micro_trend_score, micro_deteriorating = compute_all_institutional(btc_current=btc)
 
 # ── QLSTM INFERENCE (M32 — Hybrid Quantum LSTM) ──
 print("[SFC] Running QLSTM inference (M32)...", file=sys.stderr)
@@ -1836,6 +1836,10 @@ out = {
     "m30_detail": inst_details.get("m30_detail"),
     "m31_altman": round(inst_results.get("m31_altman", 0), 3) if "m31_altman" in inst_results else None,
     "m31_detail": inst_details.get("m31_detail"),
+    # Microstructure change detection (M20-M23 cross-run deltas)
+    "micro_change_flags": micro_change_flags,
+    "micro_trend_score": round(micro_trend_score, 3) if micro_change_flags else None,
+    "micro_deteriorating": micro_deteriorating if micro_change_flags else None,
     # QLSTM — Quantum Hybrid LSTM (M32) with GARCH + ProAdapt
     "m32_qlstm": round(qlstm_pred, 4) if qlstm_pred is not None else None,
     "m32_active": qlstm_ok,
