@@ -1499,7 +1499,7 @@ function render(d) {
     <div class="nav-right">
       <div class="nav-meta">
         <div class="nav-meta-label">Last Update</div>
-        <div class="nav-meta-val">${d.ts ? new Date(d.ts).toLocaleTimeString() : '—'}</div>
+        <div class="nav-meta-val" id="navLastUpdate">${d.ts ? new Date(d.ts).toLocaleTimeString() : '—'}</div>
       </div>
       <div class="nav-meta">
         <div class="nav-meta-label">Regime</div>
@@ -1531,12 +1531,12 @@ function render(d) {
     <div class="kpi-row mb-16">
       <div class="kpi kpi-hero">
         <div class="kpi-label">BTC / USD</div>
-        <div class="kpi-num" style="color:var(--cyan)">$${fmtNum(d.btc)}</div>
+        <div class="kpi-num" id="btcPriceKpi" style="color:var(--cyan)">$${fmtNum(d.btc)}</div>
         <div class="kpi-aux" style="margin-top:6px">
-          <span class="${getChgCls(btcChg)}">${btcChg>0?'▲':btcChg<0?'▼':'●'} ${Math.abs(btcChg).toFixed(2)}% 24h</span>
+          <span class="${getChgCls(btcChg)}" id="btcChgKpi">${btcChg>0?'▲':btcChg<0?'▼':'●'} ${Math.abs(btcChg).toFixed(2)}% 24h</span>
           &nbsp;·&nbsp; MCap $${d.btc_mcap ? (d.btc_mcap/1e12).toFixed(2)+'T' : '—'}
         </div>
-        <div style="margin-top:8px;font-size:10px;color:var(--text-3)">ATH <span style="color:var(--amber);font-family:JetBrains Mono,monospace">$${fmtNum(d.ath)}</span> &nbsp;·&nbsp; Floor <span style="font-family:JetBrains Mono,monospace;color:var(--green)">$${fmtNum(d.floor_total)}</span></div>
+        <div style="margin-top:8px;font-size:10px;color:var(--text-3)">ATH <span id="btcAthKpi" style="color:var(--amber);font-family:JetBrains Mono,monospace">$${fmtNum(d.ath)}</span> &nbsp;·&nbsp; Floor <span id="btcFloorKpi" style="font-family:JetBrains Mono,monospace;color:var(--green)">$${fmtNum(d.floor_total)}</span></div>
       </div>
 
       <div class="kpi">
@@ -2292,7 +2292,103 @@ function toggleHelp() {
   if (p) p.style.display = helpVisible ? 'block' : 'none';
 }
 
-/* ── FETCH ── */
+/* ── PARTIAL UPDATE (BTC ticker — smooth, no DOM rebuild) ── */
+function partialUpdate(btcData) {
+  // Update BTC price
+  const priceEl = document.getElementById('btcPriceKpi');
+  if (priceEl && btcData.price != null) {
+    priceEl.textContent = '$' + fmtNum(btcData.price);
+  }
+
+  // Update 24h change
+  const chgEl = document.getElementById('btcChgKpi');
+  if (chgEl && btcData.change_pct != null) {
+    const chg = btcData.change_pct;
+    chgEl.textContent = (chg > 0 ? '\u25B2' : chg < 0 ? '\u25BC' : '\u25CF') + ' ' + Math.abs(chg).toFixed(2) + '% 24h';
+    chgEl.className = chg > 0 ? 'chg-p' : chg < 0 ? 'chg-n' : 'chg-z';
+  }
+
+  // Update last update timestamp
+  const tsEl = document.getElementById('navLastUpdate');
+  if (tsEl) {
+    tsEl.textContent = new Date().toLocaleTimeString();
+  }
+}
+
+/* ── SSE CONNECTION ── */
+let sseSource = null;
+let sseReconnectTimer = null;
+
+function startSSE() {
+  // Close existing connection if any
+  if (sseSource) {
+    sseSource.close();
+    sseSource = null;
+  }
+  if (sseReconnectTimer) {
+    clearTimeout(sseReconnectTimer);
+    sseReconnectTimer = null;
+  }
+
+  try {
+    sseSource = new EventSource('/events');
+
+    sseSource.addEventListener('btc_ticker', function(e) {
+      try {
+        const data = JSON.parse(e.data);
+        partialUpdate(data);
+      } catch (err) {
+        console.log('[SSE] btc_ticker parse error:', err);
+      }
+    });
+
+    sseSource.addEventListener('sfc_update', function(e) {
+      try {
+        const data = JSON.parse(e.data);
+        if (data.btc != null || data.sfc_effective != null) {
+          // Merge BTC ticker data from btc_ticker event into sfc data
+          // to avoid stale BTC in the full render
+          if (currentData) {
+            Object.assign(data, { btc: data.btc || currentData.btc });
+          }
+          currentData = data;
+          render(data);
+          startNewsSlide();
+        }
+      } catch (err) {
+        console.log('[SSE] sfc_update parse error:', err);
+      }
+    });
+
+    sseSource.onerror = function() {
+      console.log('[SSE] Connection lost — will retry');
+      if (sseSource) {
+        sseSource.close();
+        sseSource = null;
+      }
+      // Reconnect after 5s
+      sseReconnectTimer = setTimeout(startSSE, 5000);
+    };
+  } catch (e) {
+    console.log('[SSE] Failed to create EventSource:', e);
+    // Fallback: start polling after a delay
+    sseReconnectTimer = setTimeout(startSSE, 10000);
+  }
+}
+
+/* ── INITIAL DATA FETCH (via SSE snapshot) ── */
+async function fetchInitialData() {
+  try {
+    const r = await fetch('/snapshot');
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return await r.json();
+  } catch (e) {
+    console.log('[Init] Snapshot fetch failed:', e);
+    return null;
+  }
+}
+
+/* ── FETCH (fallback polling — used only if SSE fails) ── */
 async function fetchLiveData() {
   try {
     // Save actual scroll position before DOM rebuild
@@ -2495,20 +2591,51 @@ loadHistory();
 initPaperTrading();
 fetchPaperTrackRecord();
 setInterval(fetchPaperTrackRecord, 60000); // refresh track record every 60s
-if (typeof __EMBEDDED_DATA !== 'undefined' && __EMBEDDED_DATA) {
-  currentData = __EMBEDDED_DATA;
-  render(__EMBEDDED_DATA);
+
+// Load initial data from SSE snapshot — full render ONCE
+let _sseAvailable = false;
+
+async function bootSFC() {
+  let initial = null;
+  try {
+    const r = await fetch('/snapshot');
+    if (r.ok) initial = await r.json();
+  } catch (e) { /* snapshot not available */ }
+
+  if (initial && (initial.sfc || initial.btc)) {
+    _sseAvailable = true;  // SSE server detected
+    // SSE server: snapshot returns {btc: ..., sfc: ...}
+    // Merge into a flat data object that render() expects
+    const merged = Object.assign({}, initial.sfc || {}, {
+      btc: initial.btc?.btc ?? initial.sfc?.btc,
+      btc_24h: initial.btc?.change_pct ?? initial.sfc?.btc_24h,
+    });
+    currentData = merged;
+    render(merged);
+  } else if (typeof __EMBEDDED_DATA !== 'undefined' && __EMBEDDED_DATA) {
+    currentData = __EMBEDDED_DATA;
+    render(__EMBEDDED_DATA);
+  } else if (window.__EMBEDDED_DATA) {
+    currentData = window.__EMBEDDED_DATA;
+    render(window.__EMBEDDED_DATA);
+  } else {
+    // Fallback: direct fetch of data.json
+    await fetchLiveData();
+  }
   setTimeout(startNewsSlide, 100);
   setTimeout(restoreScrollPos, 200);
-} else if (window.__EMBEDDED_DATA) {
-  currentData = window.__EMBEDDED_DATA;
-  render(window.__EMBEDDED_DATA);
-  setTimeout(startNewsSlide, 100);
-  setTimeout(restoreScrollPos, 200);
-} else {
-  fetchLiveData().then(() => setTimeout(startNewsSlide, 100));
+  // Start SSE only if server was detected (/snapshot responded)
+  if (_sseAvailable) {
+    startSSE();
+  } else {
+    // No SSE server — fall back to polling data.json every 30s
+    setInterval(fetchLiveData, 30000);
+  }
 }
-setInterval(fetchLiveData, 30000);
+bootSFC();
+
+// SSE handles real-time updates when available.
+// On static (GitHub Pages / Workers), polling data.json every 30s is used instead.
 
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js').catch(e => console.log('SW failed:', e));
