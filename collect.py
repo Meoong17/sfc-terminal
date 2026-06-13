@@ -420,17 +420,35 @@ def get_m2_data():
     return None, None, None
 
 def get_dxy():
-    key = os.getenv("FRED_API_KEY", "")
-    if not key:
-        return None
+    # DXY (US Dollar Index) calculated from exchange rates via free API
+    # ICE DXY = 50.14348112 * EUR^(-0.576) * JPY^(0.136) * GBP^(-0.119)
+    #                       * CAD^(0.091) * SEK^(0.042) * CHF^(0.036)
     try:
-        r = requests.get(f"https://api.stlouisfed.org/fred/series/observations?series_id=DTWEXBGS&api_key={key}&file_type=json&sort_order=desc&limit=2", timeout=15)
-        obs = r.json().get("observations", [])
-        if obs and obs[0]["value"] != ".":
-            return round(float(obs[0]["value"]), 2)
-    except:
-        pass
-    return None
+        r = requests.get("https://open.er-api.com/v6/latest/USD", timeout=10)
+        if r.status_code != 200:
+            raise ValueError(f"HTTP {r.status_code}")
+        rates = r.json().get("rates", {})
+        eur = 1.0 / rates["EUR"]   # USD per EUR
+        jpy = rates["JPY"]          # JPY per USD
+        gbp = 1.0 / rates["GBP"]    # USD per GBP
+        cad = rates["CAD"]          # CAD per USD
+        sek = rates["SEK"]          # SEK per USD
+        chf = rates["CHF"]          # CHF per USD
+        dxy = 50.14348112 * (eur ** -0.576) * (jpy ** 0.136) * (gbp ** -0.119) * (cad ** 0.091) * (sek ** 0.042) * (chf ** 0.036)
+        return round(dxy, 2)
+    except Exception as e:
+        print(f"[SFC] DXY calc failed: {e}, fallback FRED", file=sys.stderr)
+        try:
+            key = os.getenv("FRED_API_KEY", "")
+            if not key:
+                return None
+            r = requests.get(f"https://api.stlouisfed.org/fred/series/observations?series_id=DTWEXBGS&api_key={key}&file_type=json&sort_order=desc&limit=2", timeout=15)
+            obs = r.json().get("observations", [])
+            if obs and obs[0]["value"] != ".":
+                return round(float(obs[0]["value"]), 2)
+        except:
+            pass
+        return None
 
 def get_put_call_ratio():
     try:
