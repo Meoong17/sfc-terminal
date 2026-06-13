@@ -14,6 +14,8 @@ from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from sse_starlette.sse import EventSourceResponse
 import uvicorn
 
@@ -167,6 +169,12 @@ async def snapshot():
             sfc = json.load(f)
     except: pass
     return {"btc": btc, "sfc": sfc, "ts": datetime.now(timezone.utc).isoformat()}
+
+
+# ── Serve static frontend files ──
+
+# Mount static files AFTER API routes so FastAPI matches API first
+app.mount("/", StaticFiles(directory=str(BASE_DIR), html=True), name="static")
 
 
 if __name__ == "__main__":
