@@ -1810,11 +1810,16 @@ out = {
     "composite_confidence": composite_confidence,
     "confidence_components": {
         "method_agree": round(method_agreement, 3),
+        "low_stress_boost": round(max(0, 1.0 - (effective_sfc/100)) * 0.08, 4),
         "rsi": round(rsi_conf, 3),
         "sopr": round(-0.05 if sopr_proxy is not None and sopr_proxy < 0.98 else 0.0, 3),
         "dvol": round(dvol_conf, 3),
+        "squeeze_penalty": round(-0.06 if liq_pressure in ('LONG_SQUEEZE', 'SHORT_SQUEEZE') else 0.0, 3),
         "cascade_penalty": round(-(0.10 if cascade_risk > 0.5 else 0.05 if cascade_risk > 0.35 else 0.0), 3),
-        "fear_penalty": round(-(0.06 if fng is not None and fng < 15 else 0.0), 3)
+        "fear_penalty": round(-(0.06 if fng is not None and fng < 15 else 0.0), 3),
+        "news_penalty": round(-(0.04 if news_sentiment < -0.5 else 0.02 if news_sentiment < -0.3 else 0.0), 3),
+        "vol_penalty": round(-0.05 if dvol is not None and dvol > 80 else 0.0, 3),
+        "transition_penalty": round(-0.05 if transition_risk > 0.5 else 0.0, 3)
     },
     "m1_klr": round(m1_klr * 100, 1),
     "m2_logit": round(m2_logit * 100, 1),
