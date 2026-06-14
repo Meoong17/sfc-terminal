@@ -1206,14 +1206,34 @@ m2_val, m2_yoy, _ = _api_results.get("m2", (None, None, None))
 dxy = _api_results.get("dxy", None)
 pc_oi, pc_vol = _api_results.get("pc", (None, None))
 ath, ath_date = _api_results.get("ath", (None, None))
-ohlcv = _api_results.get("ohlcv", None) or _binance_klines(30)
+ohlcv = _api_results.get("ohlcv", None) or _binance_monthly_klines(36)
 closes_all = [c["close"] for c in ohlcv] if ohlcv else []
-closes_7d = closes_all[-7:] if len(closes_all) >= 7 else closes_all
-closes_30d = closes_all[-30:] if len(closes_all) >= 30 else closes_all
-rsi_14 = compute_rsi(closes_all, period=14)
+closes_7m = closes_all[-7:] if len(closes_all) >= 7 else closes_all
+closes_30m = closes_all[-30:] if len(closes_all) >= 30 else closes_all
+rsi_14m = compute_rsi(closes_all, period=14)
 
-# Score factors from market data
-factors = score_factors_from_market(btc, chg, dom, dvol, fng, pc_oi, m2_yoy, dxy)
+# ── Store daily snapshot for 30d rolling averages ──
+_market_cache = _store_market_snapshot(btc, chg, dom, dvol, fng, pc_oi, m2_yoy, dxy)
+_chg_30d = _get_30d_rolling("btc_24h", _market_cache)
+_dom_30d = _get_30d_rolling("dom", _market_cache)
+_dvol_30d = _get_30d_rolling("dvol", _market_cache)
+_fng_30d = _get_30d_rolling("fng", _market_cache)
+_pc_30d = _get_30d_rolling("pc_oi", _market_cache)
+_m2_30d = _get_30d_rolling("m2_yoy", _market_cache, m2_yoy)
+_dxy_30d = _get_30d_rolling("dxy", _market_cache)
+
+# Use 30d rolling averages for factors (long-term view); fallback to spot
+_factors_btc_24h = _chg_30d if _chg_30d is not None else chg
+_factors_dom = _dom_30d if _dom_30d is not None else dom
+_factors_dvol = _dvol_30d if _dvol_30d is not None else dvol
+_factors_fng = _fng_30d if _fng_30d is not None else fng
+_factors_pc = _pc_30d if _pc_30d is not None else pc_oi
+_factors_m2 = _m2_30d if _m2_30d is not None else m2_yoy
+_factors_dxy = _dxy_30d if _dxy_30d is not None else dxy
+print(f"[SFC] 30d rolling averages: BTC24h={_factors_btc_24h} DOM={_factors_dom} DVOL={_factors_dvol} FnG={_factors_fng} M2={_factors_m2}", file=sys.stderr)
+
+# Score factors from market data (using 30d rolling averages)
+factors = score_factors_from_market(btc, _factors_btc_24h, _factors_dom, _factors_dvol, _factors_fng, _factors_pc, _factors_m2, _factors_dxy)
 
 # Calculate SFC ensemble
 sfc_pct, zone, factors_raw, norm_factors, m1_klr, m2_logit, m3_bayes, m4_ewc, m5_qreg, m6_regime, method_agreement = calculate_sfc_ensemble(factors)
@@ -1637,22 +1657,22 @@ except Exception as e:
     print(f"[Backtest] Error: {e}", file=sys.stderr)
 
 # Technical indicators
-sopr_proxy, sopr_signal, sopr_score = compute_sopr_proxy(closes_7d, closes_30d, btc)
+sopr_proxy, sopr_signal, sopr_score = compute_sopr_proxy(closes_7m, closes_30m, btc)
 
 # Composite confidence — dynamic components
 # RSI confidence: extremes = momentum/extreme = unpredictable = lower confidence
-if rsi_14 is not None:
-    if rsi_14 < 20:
+if rsi_14m is not None:
+    if rsi_14m < 20:
         rsi_conf = -0.10   # severely oversold → very uncertain
-    elif rsi_14 < 30:
+    elif rsi_14m < 30:
         rsi_conf = -0.07   # oversold → uncertain
-    elif rsi_14 < 40:
+    elif rsi_14m < 40:
         rsi_conf = -0.03   # approaching oversold → slightly uncertain
-    elif rsi_14 > 80:
+    elif rsi_14m > 80:
         rsi_conf = -0.10   # severely overbought → very uncertain
-    elif rsi_14 > 70:
+    elif rsi_14m > 70:
         rsi_conf = -0.07   # overbought → uncertain
-    elif rsi_14 > 60:
+    elif rsi_14m > 60:
         rsi_conf = -0.03   # approaching overbought → slightly uncertain
     else:
         rsi_conf = 0.03    # neutral RSI = calm = confident
@@ -1725,10 +1745,10 @@ if liq_total_24h is None:
         liq_density = round(min(dvol / 150.0, 1.0), 3)
         cascade_risk = round(min((sopr_score or 0.5) * 0.3 + (dvol / 200.0), 0.95), 3)
     # Liquidation pressure based on RSI + trend
-    if rsi_14 is not None:
-        if rsi_14 < 25 and sopr_proxy and sopr_proxy < 0.97:
+    if rsi_14m is not None:
+        if rsi_14m < 25 and sopr_proxy and sopr_proxy < 0.97:
             liq_pressure = "LONG_SQUEEZE"
-        elif rsi_14 > 70 and sopr_proxy and sopr_proxy > 1.03:
+        elif rsi_14m > 70 and sopr_proxy and sopr_proxy > 1.03:
             liq_pressure = "SHORT_SQUEEZE"
         else:
             liq_pressure = "BALANCED"
@@ -1749,14 +1769,14 @@ elif cascade_risk > 0.35:
     cc_penalty += 0.05
 
 # RSI extremes — extreme momentum = unpredictable
-if rsi_14 is not None:
-    if rsi_14 < 25:
+if rsi_14m is not None:
+    if rsi_14m < 25:
         cc_penalty += 0.08
-    elif rsi_14 < 35:
+    elif rsi_14m < 35:
         cc_penalty += 0.04
-    elif rsi_14 > 75:
+    elif rsi_14m > 75:
         cc_penalty += 0.08
-    elif rsi_14 > 65:
+    elif rsi_14m > 65:
         cc_penalty += 0.04
 
 # Liquidation squeeze — one-sided pressure = unreliable signal
@@ -1849,7 +1869,7 @@ if _m67_due and TIMEGAN_AVAILABLE:
 # M68: DRL Trading Signal
 _drl_market_state = {
     "stress": effective_sfc / 100.0 if effective_sfc else 0.5,
-    "rsi": rsi_14 or 50,
+    "rsi": rsi_14m or 50,
     "price": btc or 60000,
     "momentum": (chg or 0) / 100.0,
 }
@@ -1904,8 +1924,8 @@ out = {
     "factors": factors_raw,
     "ath": ath,
     "ath_date": ath_date,
-    "rsi_14": rsi_14,
-    "rsi_regime": "OVERSOLD" if rsi_14 is not None and rsi_14 < 30 else "OVERBOUGHT" if rsi_14 is not None and rsi_14 > 70 else "NEUTRAL",
+    "rsi_14": rsi_14m,
+    "rsi_regime": "OVERSOLD" if rsi_14m is not None and rsi_14m < 30 else "OVERBOUGHT" if rsi_14m is not None and rsi_14m > 70 else "NEUTRAL",
     "sopr_proxy": sopr_proxy,
     "sopr_signal": sopr_signal,
     "sopr_score": sopr_score,
@@ -2054,11 +2074,12 @@ out = {
     "kelly_half": round(max(0, (composite_confidence * 2.0 - (1 - composite_confidence)) / 4.0) * _kelly_override, 4),
     "kelly_quarter": round(max(0, (composite_confidence * 2.0 - (1 - composite_confidence)) / 8.0) * _kelly_override, 4),
     "kelly_override_reason": _kelly_override_reason,
-    # — Signal Timing (alert window estimation) —
+    # — Signal Timing (alert window estimation, monthly timeframe) —
     "signal_type": "STRESS_TRANSITION" if transition_risk > 0.60 else "STRESS" if effective_sfc and effective_sfc > 25 else "CALM",
     "signal_strength": round(min(effective_sfc / 50.0 if effective_sfc else 0, 1.0), 3),
     "timing_precision": "LOW" if composite_confidence < 0.3 else "MEDIUM" if composite_confidence < 0.6 else "HIGH",
-    "alert_window_hours": round(24 + 48 * (1 - composite_confidence), 1),  # wider window = lower confidence
+    "alert_window_days": round(7 + 30 * (1 - composite_confidence), 1),  # wider window = lower confidence (monthly TF)
+    "timeframe": "MONTHLY",
     "readiness_score": round(composite_confidence * (1.0 - min(effective_sfc/100 if effective_sfc else 0, 0.5)), 3),
     "shock_factor": shock_factor,
     "shock_event": shock_event,
@@ -2093,13 +2114,13 @@ out = {
 
 print(json.dumps(out, indent=2))
 btc_str = f"${btc:,.0f}" if btc is not None else "N/A"
-rsi_str = f"{rsi_14}" if rsi_14 is not None else "N/A"
+rsi_str = f"{rsi_14m}" if rsi_14m is not None else "N/A"
 sopr_str = f"{sopr_proxy}" if sopr_proxy is not None else "N/A"
 qlstm_str = f" QLSTM={qlstm_pred*100:.1f}" if qlstm_pred is not None else ""
 m65_str = f" CNN={_m65_stress:.2f}" if CNN_ATTENTION_AVAILABLE else ""
 m68_str = f" DRL={_m68_signal}" if DRL_AVAILABLE else ""
 m69_str = f" SYS={_m69_overall:.2f}" if GNN_AVAILABLE else ""
-print(f"\n✅ BTC={btc_str} | SFC={effective_sfc:.1f}% | Zone={zone} | RSI={rsi_str} | SOPR={sopr_str} | News={news_stress:.1f} | {regime} | Methods={total_active_methods}/32{qlstm_str}{m65_str}{m68_str}{m69_str}", file=sys.stderr)
+print(f"\n✅ BTC={btc_str} | SFC={effective_sfc:.1f}% | Zone={zone} | RSI-14M={rsi_str} | SOPR={sopr_str} | News={news_stress:.1f} | {regime} | TF=MONTHLY | Methods={total_active_methods}/32{qlstm_str}{m65_str}{m68_str}{m69_str}", file=sys.stderr)
 
 # Paper trading moved to pipeline script (sfc-pipeline.sh) to avoid
 # race condition: collect.py stdout > data.json is still buffered
