@@ -2105,6 +2105,9 @@ out = {
     "shock_event": shock_event,
     "shock_severity": shock_severity,
     "sec_events": sec_events,
+    # ── Q9 News Scoring System ──
+    "q9_available": Q9_AVAILABLE,
+    "q9_articles": _q9_data.get("article_count", 0) if Q9_AVAILABLE and _q9_data else 0,
     # ── Q5 Advanced Methods: M65-M69 ──
     "m65_cnn_attention": round(_m65_stress, 4),
     "m65_pattern_type": _m65_pattern,
@@ -2140,7 +2143,7 @@ qlstm_str = f" QLSTM={qlstm_pred*100:.1f}" if qlstm_pred is not None else ""
 m65_str = f" CNN={_m65_stress:.2f}" if CNN_ATTENTION_AVAILABLE else ""
 m68_str = f" DRL={_m68_signal}" if DRL_AVAILABLE else ""
 m69_str = f" SYS={_m69_overall:.2f}" if GNN_AVAILABLE else ""
-print(f"\n✅ BTC={btc_str} | SFC={effective_sfc:.1f}% | Zone={zone} | RSI-14M={rsi_str} | SOPR={sopr_str} | News={news_stress:.1f} | {regime} | TF=MONTHLY | Methods={total_active_methods}/32{qlstm_str}{m65_str}{m68_str}{m69_str}", file=sys.stderr)
+print(f"\n✅ BTC={btc_str} | SFC={effective_sfc:.1f}% | Zone={zone} | RSI-14M={rsi_str} | SOPR={sopr_str} | News={news_stress:.1f} | {regime} | TF=MONTHLY | Q9={'✓' if Q9_AVAILABLE else '✗'} | Methods={total_active_methods}/32{qlstm_str}{m65_str}{m68_str}{m69_str}", file=sys.stderr)
 
 # Paper trading moved to pipeline script (sfc-pipeline.sh) to avoid
 # race condition: collect.py stdout > data.json is still buffered
