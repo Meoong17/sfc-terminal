@@ -2621,7 +2621,7 @@ class PaperTrader {
     if (state) {
       // Load from server state
       this.capital = state.capital || capital;
-      this.initial = capital;
+      this.initial = state.initial_capital || capital;
       this.peakCapital = state.peak_capital || capital;
       this.positions = state.positions || [];
       this.trades = state.trades || [];
