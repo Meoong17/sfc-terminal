@@ -543,13 +543,17 @@ def _sigmoid_factor(val, center, k=0.15):
     '''
     return 6 / (1 + math.exp(-k * (val - center))) - 3
 
-def score_factors_from_market(btc, btc_24h, dom, dvol, fng, pc_oi, m2_yoy, dxy):
+def score_factors_from_market(btc, btc_24h, dom, dvol, fng, pc_oi, m2_yoy, dxy, glo_score=None):
     """Score 5 factors from market data using smooth sigmoid/logistic functions. Range -3 to +3"""
     factors = {"Lt": 0.0, "St": 0.0, "Rt": 0.0, "Ft": 0.0, "Sc": 0.0}
     
-    # Lt (Liquidity) — based on M2 and BTC momentum
+    # Lt (Liquidity) — based on M2, GLO, and BTC momentum
     if m2_yoy is not None:
         factors["Lt"] += _sigmoid_factor(m2_yoy, center=5.0, k=0.8)
+    if glo_score is not None:
+        # GLO maps: 0=contractive(bearish) -> -3, 100=expansive(bullish) -> +3
+        # Map GLO 0-100 to sigmoid center at 50
+        factors["Lt"] += _sigmoid_factor(glo_score, center=50.0, k=0.08)
     if btc_24h is not None:
         factors["Lt"] += _sigmoid_factor(btc_24h, center=0.0, k=0.15)
     
@@ -780,6 +784,10 @@ def _fred_prefetch():
         ("MBCURSL:1", "MBCURSL", 1),
         ("M2SL:30", "M2SL", 30),
         ("DTWEXBGS:30", "DTWEXBGS", 30),
+        # GLO --- Global Liquidity Index series
+        ("WALCL:13", "WALCL", 13),
+        ("ECBASSETSW:13", "ECBASSETSW", 13),
+        ("JPNASSETS:13", "JPNASSETS", 13),
     ]
     
     def _fetch_one(series, limit):
@@ -1072,6 +1080,108 @@ def calculate_m19_mutual_info(btc_rets, macro_rets):
     else: score = 0.15
     return score, {"mi_norm": round(mi_norm,3), "mi_raw": round(mi,3)}
 
+
+# ── M33: GLOBAL LIQUIDITY INDEX ──
+_GLO_CACHE = {"score": None, "details": None, "ts": 0}
+
+def calculate_m33_global_liquidity():
+    """M33: Global Liquidity Index — tracks aggregate central bank balance sheets.
+
+    Fetches WALCL (Fed), ECBASSETSW (ECB), JPNASSETS (BOJ) from FRED.
+    Computes YoY % change, normalizes to GLO score 0-100 (z-score weighted).
+    High liquidity expansion = low stress (bullish), contraction = high stress (bearish).
+
+    Returns:
+        score_0_1: 0.0-1.0 normalized stress score (high = liquidity contracting)
+        details: dict with raw values, changes, and z-score
+    """
+    global _GLO_CACHE
+    now = time.time()
+    
+    # Cache: 24h (macro data doesn't change often)
+    if _GLO_CACHE["score"] is not None and now - _GLO_CACHE["ts"] < 86400:
+        return _GLO_CACHE["score"], _GLO_CACHE["details"]
+    
+    # Fetch global central bank balance sheets
+    walcl = _fred("WALCL", 13)       # Fed total assets (13 obs = 1y)
+    ecb = _fred("ECBASSETSW", 13)    # ECB total assets
+    jpn = _fred("JPNASSETS", 13)     # BOJ total assets
+    
+    if not walcl or len(walcl) < 2:
+        _GLO_CACHE["score"] = 0.5
+        _GLO_CACHE["details"] = {"error": "insufficient FRED data"}
+        _GLO_CACHE["ts"] = now
+        return 0.5, _GLO_CACHE["details"]
+    
+    # Compute YoY % change for each
+    def yoy_chg(arr):
+        if not arr or len(arr) < 13: return None
+        return (arr[0] - arr[12]) / arr[12] * 100 if arr[12] != 0 else 0
+    
+    fed_yoy = yoy_chg(walcl)
+    ecb_yoy = yoy_chg(ecb) if ecb and len(ecb) >= 13 else None
+    jpn_yoy = yoy_chg(jpn) if jpn and len(jpn) >= 13 else None
+    
+    # Historical reference values for z-score normalization
+    # Fed: ~5.5% avg expansion historically; ECB: ~4%; BOJ: ~3%
+    # Contracting = negative or below-trend growth
+    fed_z = (fed_yoy - 5.5) / 3.0 if fed_yoy is not None else 0
+    ecb_z = (ecb_yoy - 4.0) / 3.0 if ecb_yoy is not None else 0
+    jpn_z = (jpn_yoy - 3.0) / 3.0 if jpn_yoy is not None else 0
+    
+    # Weight: Fed ~50%, ECB ~30%, BOJ ~20% (market impact weighting)
+    weights = []
+    z_vals = []
+    if fed_yoy is not None: weights.append(0.50); z_vals.append(fed_z)
+    if ecb_yoy is not None: weights.append(0.30); z_vals.append(ecb_z)
+    if jpn_yoy is not None: weights.append(0.20); z_vals.append(jpn_z)
+    
+    if not z_vals:
+        _GLO_CACHE["score"] = 0.5
+        _GLO_CACHE["details"] = {"error": "no central bank data available"}
+        _GLO_CACHE["ts"] = now
+        return 0.5, {"error": "no central bank data"}
+    
+    total_w = sum(weights)
+    glo_z = sum(w * z for w, z in zip(weights, z_vals)) / total_w
+    
+    # Normalize z-score to GLO score 0-100
+    # z=+2 (strong expansion) → GLO=90, z=-2 (contraction) → GLO=10
+    glo_score_raw = 50 + glo_z * 20
+    glo_score = max(0, min(100, glo_score_raw))
+    
+    # Map to SFC method score (0-1): high GLO = liquid = low stress
+    # GLO 0-100 → SFC score 0-1
+    # GLO>70 (liquid) → SFC score <0.25 (low stress)
+    # GLO<30 (contraction) → SFC score >0.75 (high stress)
+    if glo_score > 70:
+        sfc_score = 0.15  # very liquid -> minimal stress
+    elif glo_score > 55:
+        sfc_score = 0.25  # moderately liquid -> low stress
+    elif glo_score > 40:
+        sfc_score = 0.50  # neutral
+    elif glo_score > 25:
+        sfc_score = 0.70  # contracting -> elevated stress
+    else:
+        sfc_score = 0.85  # severe contraction -> high stress
+    
+    details = {
+        "fed_yoy": round(fed_yoy, 2) if fed_yoy is not None else None,
+        "ecb_yoy": round(ecb_yoy, 2) if ecb_yoy is not None else None,
+        "jpn_yoy": round(jpn_yoy, 2) if jpn_yoy is not None else None,
+        "fed_balance": round(walcl[0], 0) if walcl else None,
+        "ecb_balance": round(ecb[0], 0) if ecb else None,
+        "jpn_balance": round(jpn[0], 0) if jpn else None,
+        "glo_z_score": round(glo_z, 3),
+        "glo_score": round(glo_score, 1),
+        "glo_label": "EXPANSIVE" if glo_score > 55 else "NEUTRAL" if glo_score > 40 else "CONTRACTIVE",
+    }
+    
+    _GLO_CACHE["score"] = sfc_score
+    _GLO_CACHE["details"] = details
+    _GLO_CACHE["ts"] = now
+    return sfc_score, details
+
 # ============================================================
 # MONTHLY TIMEFRAME: Daily Market Snapshot Cache (30d rolling)
 # ============================================================
@@ -1288,6 +1398,18 @@ if qlstm_ok:
 else:
     print("[SFC] QLSTM unavailable", file=sys.stderr)
 
+# ── GLOBAL LIQUIDITY INDEX (M33) ──
+print("[SFC] Computing M33 Global Liquidity Index...", file=sys.stderr)
+m33_glo_score, m33_glo_detail = calculate_m33_global_liquidity()
+print(f"[SFC] GLO score={m33_glo_score:.3f} label={m33_glo_detail.get('glo_label','N/A')} fed_yoy={m33_glo_detail.get('fed_yoy','N/A')}%", file=sys.stderr)
+
+# Apply GLO to Lt factor (post-hoc adjustment)
+glo_val = m33_glo_detail.get("glo_score", 50)
+glo_adj = 6 / (1 + math.exp(-0.08 * (glo_val - 50))) - 3
+factors["Lt"] += glo_adj
+factors["Lt"] = max(-3.0, min(3.0, factors["Lt"]))
+print(f"[SFC] GLO Lt adjustment: {glo_adj:+.3f} (glo={glo_val:.1f}) Lt={factors['Lt']:.3f}", file=sys.stderr)
+
 # ── CAUSAL INFERENCE FILTER ──
 print("[SFC] Running causal inference filter...", file=sys.stderr)
 causal_filter = None
@@ -1338,6 +1460,8 @@ for i, name in enumerate(["m20_obi", "m21_trade_flow", "m22_spread", "m23_liquid
         method_scores_dict[name] = inst_results[key] if inst_results[key] is not None else 0.5
     else:
         method_scores_dict[name] = 0.5
+# M33 — Global Liquidity Index
+method_scores_dict["m33_glo"] = m33_glo_score if m33_glo_score is not None else 0.5
 
 # Apply causal filter to get weighted scores
 if causal_filter and causal_weights:
@@ -1549,8 +1673,8 @@ ml_metrics = evaluate_accuracy()
 print(f"[SFC] ML Ensemble: {ml_msg} | Accuracy: {ml_metrics.get('message', 'N/A')}", file=sys.stderr)
 
 # Count total active methods
-total_active_methods = 6 + new_active + inst_active_count + (1 if qlstm_ok else 0)
-print(f"[SFC] Total active methods: {total_active_methods}/32 (M1-M6+M7-M19+M20-M31+M32_Q)", file=sys.stderr)
+total_active_methods = 6 + new_active + inst_active_count + (1 if qlstm_ok else 0) + (1 if m33_glo_score is not None else 0)
+print(f"[SFC] Total active methods: {total_active_methods}/33 (M1-M6+M7-M19+M20-M31+M32_Q+M33_GLO)", file=sys.stderr)
 
 # Compute effective SFC
 liq_mod = 0.0
@@ -2045,6 +2169,9 @@ out = {
     # ProAdapt online learning
     "m32_proadapt_weight": round(_PROADAPT_W, 4),
     "m32_proadapt_final": round(_PROADAPT_FINAL, 4) if _PROADAPT_FINAL is not None else None,
+    # M33 — Global Liquidity Index
+    "m33_glo_score": round(m33_glo_score, 3) if m33_glo_score is not None else None,
+    "m33_glo_detail": m33_glo_detail if m33_glo_detail else None,
     # XAI feature importance
     "xai_top_features": _XAI_FEATURES,
     # ML ensemble
@@ -2143,7 +2270,7 @@ qlstm_str = f" QLSTM={qlstm_pred*100:.1f}" if qlstm_pred is not None else ""
 m65_str = f" CNN={_m65_stress:.2f}" if CNN_ATTENTION_AVAILABLE else ""
 m68_str = f" DRL={_m68_signal}" if DRL_AVAILABLE else ""
 m69_str = f" SYS={_m69_overall:.2f}" if GNN_AVAILABLE else ""
-print(f"\n✅ BTC={btc_str} | SFC={effective_sfc:.1f}% | Zone={zone} | RSI-14M={rsi_str} | SOPR={sopr_str} | News={news_stress:.1f} | {regime} | TF=MONTHLY | Q9={'✓' if Q9_AVAILABLE else '✗'} | Methods={total_active_methods}/32{qlstm_str}{m65_str}{m68_str}{m69_str}", file=sys.stderr)
+print(f"\n✅ BTC={btc_str} | SFC={effective_sfc:.1f}% | Zone={zone} | RSI-14M={rsi_str} | SOPR={sopr_str} | News={news_stress:.1f} | {regime} | TF=MONTHLY | Q9={'✓' if Q9_AVAILABLE else '✗'} | Methods={total_active_methods}/33{qlstm_str}{m65_str}{m68_str}{m69_str}", file=sys.stderr)
 
 # Paper trading moved to pipeline script (sfc-pipeline.sh) to avoid
 # race condition: collect.py stdout > data.json is still buffered
