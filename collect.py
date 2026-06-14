@@ -1560,7 +1560,7 @@ if dvol is not None:
         dvol_conf = -0.10  # extreme vol → chaos
     elif dvol > 80:
         dvol_conf = -0.06  # high vol → uncertain
-    elif dvol < 40:
+    elif dvol < 50:
         dvol_conf = 0.05   # low vol → calm, confident
     else:
         dvol_conf = 0.0
