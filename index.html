@@ -3225,6 +3225,17 @@ async function bootSFC() {
   // Init paper trader from server state BEFORE render
   await initPaperTrading();
 
+  // PRIORITY 1: Render from embedded data INSTANTLY (no network wait)
+  if (typeof __EMBEDDED_DATA !== 'undefined' && __EMBEDDED_DATA) {
+    currentData = __EMBEDDED_DATA;
+    render(__EMBEDDED_DATA);
+  } else if (window.__EMBEDDED_DATA) {
+    currentData = window.__EMBEDDED_DATA;
+    render(window.__EMBEDDED_DATA);
+  }
+
+  // PRIORITY 2: Try /snapshot in background for SSE connection
+  // (embedded data already rendered, so user sees dashboard immediately)
   let initial = null;
   try {
     const r = await fetch('/snapshot');
@@ -3233,22 +3244,14 @@ async function bootSFC() {
 
   if (initial && (initial.sfc || initial.btc)) {
     _sseAvailable = true;  // SSE server detected
-    // SSE server: snapshot returns {btc: ..., sfc: ...}
-    // Merge into a flat data object that render() expects
     const merged = Object.assign({}, initial.sfc || {}, {
       btc: initial.btc?.btc ?? initial.sfc?.btc,
       btc_24h: initial.btc?.change_pct ?? initial.sfc?.btc_24h,
     });
     currentData = merged;
     render(merged);
-  } else if (typeof __EMBEDDED_DATA !== 'undefined' && __EMBEDDED_DATA) {
-    currentData = __EMBEDDED_DATA;
-    render(__EMBEDDED_DATA);
-  } else if (window.__EMBEDDED_DATA) {
-    currentData = window.__EMBEDDED_DATA;
-    render(window.__EMBEDDED_DATA);
-  } else {
-    // Fallback: direct fetch of data.json
+  } else if (!currentData) {
+    // No embedded data AND no snapshot — fallback fetch data.json
     await fetchLiveData();
   }
 
