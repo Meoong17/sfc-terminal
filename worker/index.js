@@ -178,13 +178,13 @@ export default {
 <body>
 <div class="login-card">
     <h1>SFC TERMINAL</h1>
-    <p>Masukkan username untuk memulai paper trading pribadi.<br>Data Anda disimpan secara privat di Cloudflare KV.</p>
-    <input type="text" id="username" placeholder="Contoh: alice, bob, trader1" autocomplete="off" autofocus>
-    <button onclick="login()">Mulai Paper Trading \u2192</button>
-    <div class="note">\u26a1 Tidak perlu password. Gunakan username yang mudah diingat.</div>
+    <p>Enter a username to start private paper trading.</p>
+    <input type="text" id="username" placeholder="e.g. alice, bob, trader1" autocomplete="off" autofocus>
+    <button onclick="login()">Start Paper Trading \u2192</button>
+    <div class="note">\u26a1 No password required. Pick a memorable username.</div>
 </div>
 <script>
-function login(){var u=document.getElementById('username').value.trim();if(!u)return alert('Masukkan username');localStorage.setItem('sfc_username',u);window.location.href='/?user='+encodeURIComponent(u)}
+function login(){var u=document.getElementById('username').value.trim();if(!u)return alert('Enter a username');localStorage.setItem('sfc_username',u);window.location.href='/?user='+encodeURIComponent(u)}
 document.getElementById('username').addEventListener('keydown',function(e){if(e.key==='Enter')login()});
 <\/script>
 </body>
