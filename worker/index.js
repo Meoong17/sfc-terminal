@@ -14,7 +14,7 @@ async function fetchAny(urls, path, accept) {
     try {
       const resp = await fetch(base + path, {
         headers: { 'Accept': accept || '*/*' },
-        signal: AbortSignal.timeout(5000),
+        signal: AbortSignal.timeout(2000),
       });
       if (resp.ok) return resp;
     } catch (_) {}
@@ -275,15 +275,22 @@ document.getElementById('username').addEventListener('keydown',function(e){if(e.
       });
     }
 
-    // /snapshot — initial data
+    // /snapshot — initial data (cached 30s for faster repeat loads)
     if (path === '/snapshot') {
+      const cacheKey = new Request(url.toString());
+      const cache = caches.default;
+      const cached = await cache.match(cacheKey);
+      if (cached) return cached;
+
       const resp = await fetchAny(urls, '/snapshot', 'application/json');
       if (!resp) return new Response('Backend unreachable', { status: 502 });
       const data = await resp.json();
-      return new Response(JSON.stringify(data), {
+      const response = new Response(JSON.stringify(data), {
         status: 200,
-        headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache', ...corsHeaders },
+        headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=30', ...corsHeaders },
       });
+      ctx.waitUntil(cache.put(cacheKey, response.clone()));
+      return response;
     }
 
     // /paper_history.json — paper trading track record
