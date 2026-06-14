@@ -2882,32 +2882,41 @@ async function initPaperTrading() {
   // Multi-user mode: load from KV
   if (currentUser) {
     try {
-      const kvState = await loadUserState();
-      if (kvState && kvState.capital) {
-        // If loaded from KV, paperTrader was already created by loadUserState
-        // Just patch for auto-save
-        if (paperTrader) {
-          const origExecute = paperTrader.execute;
-          const origCloseAll = paperTrader.closeAll;
-          if (!origExecute._patched) {
-            paperTrader.execute = function(decision, price) {
-              const result = origExecute.call(this, decision, price);
-              saveUserState().catch(() => {});
-              return result;
-            };
-            paperTrader.execute._patched = true;
-            paperTrader.closeAll = function(price, reason) {
-              const result = origCloseAll.call(this, price, reason);
-              saveUserState().catch(() => {});
-              return result;
-            };
-            paperTrader.closeAll._patched = true;
-          }
-          loadConfigToForm(paperTrader.userConfig || {});
-          return;
-        }
+      const res = await fetch('/user/' + encodeURIComponent(currentUser) + '/state', { cache: 'no-cache' });
+      if (res.ok) {
+        const kvState = await res.json();
+        // Create PaperTrader FROM KV state — preserves user's own trades/positions
+        paperTrader = new PaperTrader(PAPER_INITIAL_CAPITAL, {
+          capital: kvState.capital,
+          peak_capital: kvState.peak_capital,
+          positions: kvState.positions,
+          trades: kvState.trades,
+          equity_history: kvState.equity_history,
+          daily_snapshots: kvState.daily_snapshots,
+        });
+        paperTrader.userConfig = kvState.config || {};
+
+        // Patch for auto-save
+        const origExecute = paperTrader.execute;
+        const origCloseAll = paperTrader.closeAll;
+        paperTrader.execute = function(decision, price) {
+          const result = origExecute.call(this, decision, price);
+          saveUserState().catch(() => {});
+          return result;
+        };
+        paperTrader.closeAll = function(price, reason) {
+          const result = origCloseAll.call(this, price, reason);
+          saveUserState().catch(() => {});
+          return result;
+        };
+
+        loadConfigToForm(paperTrader.userConfig || {});
+        addPaperLog('👤 Multi-user: loaded state for ' + currentUser);
+        return;
       }
-    } catch (e) {}
+    } catch (e) {
+      console.warn('KV load failed, falling back', e);
+    }
   }
 
   // Fallback: server-side paper_trades.json (single-user VPS mode)
