@@ -392,15 +392,12 @@ def get_dom():
 
 def get_dvol():
     try:
-        r = requests.get("https://www.deribit.com/api/v2/public/get_book_summary_by_currency?currency=BTC&kind=option", timeout=10)
-        opts = r.json().get("result", [])
-        ivs = [(o.get("mark_iv", 0), o.get("open_interest", 0)) for o in opts if o.get("mark_iv")]
-        if not ivs:
-            return None
-        oi = sum(x[1] for x in ivs)
-        if oi == 0:
-            return None
-        return round(sum(x[0] * x[1] for x in ivs) / oi, 2)
+        r = requests.get("https://www.deribit.com/api/v2/public/get_index_price?index_name=btcdvol_usdc", timeout=10)
+        data = r.json()
+        dvol = data.get("result", {}).get("index_price")
+        if dvol is not None:
+            return round(dvol, 2)
+        return None
     except:
         return None
 
