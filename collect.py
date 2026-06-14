@@ -257,6 +257,14 @@ except ImportError:
     def get_news_stress_v2(*a, **k): return 0.0, [], 0.0, [], {}
     def detect_black_swan_v2(*a, **k): return 0.0, None, "NONE"
 
+# Import Q9 news scoring system (hybrid VADER+TextBlob, free)
+try:
+    from news_processor import get_news_impact as get_q9_news_impact
+    Q9_AVAILABLE = True
+except ImportError:
+    Q9_AVAILABLE = False
+    def get_q9_news_impact(): return {"news_stress": 0.0, "sentiment_avg": 0.0, "article_count": 0}
+
 # ============================================================
 # 1. LIVE DATA COLLECTION
 # ============================================================
@@ -1415,6 +1423,18 @@ if qlstm_ok and qlstm_pred is not None:
 print("[SFC] Aggregating news...", file=sys.stderr)
 cp_key = os.getenv("CRYPTOPANIC_KEY", "")
 news_stress, news_headlines, news_sentiment, articles_scored, news_stats = get_news_stress_v2(cp_key, max_workers=6)
+
+# ── Q9 News Scoring (hybrid VADER+TextBlob, free sources) ──
+_q9_data = get_q9_news_impact()
+if _q9_data.get("article_count", 0) > 0:
+    _q9_stress = _q9_data["news_stress"]
+    _q9_sentiment = _q9_data["sentiment_avg"]
+    # Blend: use Q9 if it has data, otherwise keep existing
+    if _q9_stress > 0:
+        news_stress = _q9_stress
+    if _q9_sentiment != 0:
+        news_sentiment = _q9_sentiment
+    print(f"[Q9] News stress={_q9_stress}% sentiment={_q9_sentiment} articles={_q9_data['article_count']}", file=sys.stderr)
 
 # Black swan detection
 shock_factor, shock_event, shock_severity = detect_black_swan_v2(articles_scored)
