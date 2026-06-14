@@ -3170,10 +3170,10 @@ async function bootSFC() {
     await fetchLiveData();
   }
 
-  // Ensure config panel visible after any render path
+  // Ensure config panel visible and values set after any render path
   setTimeout(function() {
-    if (currentUser && paperTrader && document.getElementById('paperConfigPanel')) {
-      document.getElementById('paperConfigPanel').style.display = 'block';
+    if (currentUser && paperTrader) {
+      loadConfigToForm(paperTrader.userConfig || {});
     }
   }, 200);
   setTimeout(startNewsSlide, 100);
