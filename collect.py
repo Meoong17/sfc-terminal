@@ -1064,6 +1064,111 @@ def calculate_m19_mutual_info(btc_rets, macro_rets):
     else: score = 0.15
     return score, {"mi_norm": round(mi_norm,3), "mi_raw": round(mi,3)}
 
+# ============================================================
+# MONTHLY TIMEFRAME: Daily Market Snapshot Cache (30d rolling)
+# ============================================================
+MARKET_CACHE_FILE = os.path.join(os.path.dirname(__file__), '.daily_market_cache.json')
+
+def _store_market_snapshot(btc, btc_24h, dom, dvol, fng, pc_oi, m2_yoy, dxy):
+    """Store daily market snapshot for 30d rolling averages. Dedup by date."""
+    cache = []
+    if os.path.exists(MARKET_CACHE_FILE):
+        try:
+            with open(MARKET_CACHE_FILE) as f:
+                cache = json.load(f)
+        except: cache = []
+    
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    entry = {
+        "date": today,
+        "ts": time.time(),
+        "btc_24h": btc_24h,
+        "dom": dom,
+        "dvol": dvol,
+        "fng": fng,
+        "pc_oi": pc_oi,
+        "m2_yoy": m2_yoy,
+        "dxy": dxy,
+    }
+    # Replace today's entry if exists, else append
+    for i, e in enumerate(cache):
+        if e.get("date") == today:
+            cache[i] = entry
+            break
+    else:
+        cache.append(entry)
+    
+    # Keep last 60 days
+    if len(cache) > 60:
+        cache = cache[-60:]
+    
+    with open(MARKET_CACHE_FILE, 'w') as f:
+        json.dump(cache, f, indent=2)
+    
+    return cache
+
+def _get_30d_rolling(key, cache, default=None):
+    """Compute 30-day SMA from daily cache. Needs at least 7 days to start."""
+    if not cache or len(cache) < 7:
+        return default
+    recent = cache[-30:] if len(cache) >= 30 else cache
+    vals = [e.get(key) for e in recent if e.get(key) is not None]
+    if not vals or len(vals) < 7:
+        return default
+    return sum(vals) / len(vals)
+
+def get_btc_ohlcv_monthly(months=36):
+    """Fetch BTC monthly candles from Binance (1M interval)."""
+    try:
+        r = requests.get(
+            f"https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1M&limit={months}",
+            timeout=10
+        )
+        if r.status_code != 200:
+            # Fallback: fetch daily and aggregate
+            r2 = requests.get(
+                f"https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1d&limit={months*30}",
+                timeout=10
+            )
+            if r2.status_code != 200:
+                return []
+            daily = r2.json()
+            return _aggregate_daily_to_monthly(daily)
+        klines = r.json()
+        return [{"time": k[0], "close": float(k[4]), "volume": float(k[5])} for k in klines]
+    except:
+        return []
+
+def _aggregate_daily_to_monthly(daily_klines):
+    """Aggregate daily klines into monthly candles (close=last close, vol=sum)."""
+    monthly = {}
+    for k in daily_klines:
+        ts = k[0] / 1000
+        d = datetime.fromtimestamp(ts, tz=timezone.utc)
+        month_key = d.strftime("%Y-%m")
+        close = float(k[4])
+        volume = float(k[5])
+        if month_key in monthly:
+            monthly[month_key]["time"] = k[0]
+            monthly[month_key]["close"] = close
+            monthly[month_key]["volume"] += volume
+        else:
+            monthly[month_key] = {"time": k[0], "close": close, "volume": volume}
+    result = sorted(monthly.values(), key=lambda x: x["time"])
+    return result[-months:] if len(result) >= months else result
+
+def _binance_monthly_klines(months=36):
+    """Fetch BTC monthly klines from Binance as fallback."""
+    try:
+        r = requests.get(
+            f"https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1M&limit={months}",
+            timeout=10
+        )
+        if r.status_code != 200: return []
+        klines = r.json()
+        return [{"time": k[0], "close": float(k[4]), "volume": float(k[5])} for k in klines]
+    except: return []
+
 print("[SFC] Starting parallel data collection...", file=sys.stderr)
 
 # ── PARALLEL API DATA COLLECTION ──
@@ -1085,7 +1190,7 @@ with ThreadPoolExecutor(max_workers=8) as ex:
     ex.submit(_fetch_and_store, "dxy", get_dxy)
     ex.submit(_fetch_and_store, "pc", get_put_call_ratio)
     ex.submit(_fetch_and_store, "ath", get_ath)
-    ex.submit(_fetch_and_store, "ohlcv", get_btc_ohlcv_daily, 30)
+    ex.submit(_fetch_and_store, "ohlcv", get_btc_ohlcv_monthly, 36)
 
 # ── PARALLEL FRED PREFETCH ──
 # Fetch ALL FRED data in one batch before M7-M19 need them
