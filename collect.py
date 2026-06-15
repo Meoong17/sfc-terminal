@@ -9,6 +9,7 @@ import json, os, sys, subprocess, math, requests, time
 import numpy as np
 from datetime import datetime, timezone
 from dotenv import load_dotenv
+from onchain_fetch import fetch_all_onchain
 
 load_dotenv()
 
