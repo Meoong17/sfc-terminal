@@ -593,19 +593,19 @@ def score_factors_from_market(btc, btc_24h, dom, dvol, fng, pc_oi, m2_yoy, dxy, 
         # Whale pressure → Rt (risk): high score = bullish (supply leaving, whales accumulating)
         whale_adj = (onchain_whale - 50) / 50 * 2.0  # scale -2 to +2
         factors["Rt"] += whale_adj
-        print(f"[OnChain] Whale pressure={onchain_whale:.1f} → Rt adj={whale_adj:+.3f}", file=sys.__stdout__)
+        print(f"[OnChain] Whale pressure={onchain_whale:.1f} → Rt adj={whale_adj:+.3f}", file=sys.stderr)
     
     if onchain_value is not None:
         # On-chain value → Lt (long-term): high score = undervalued (MVRV low, Puell low)
         value_adj = (onchain_value - 50) / 50 * 2.0  # scale -2 to +2
         factors["Lt"] += value_adj
-        print(f"[OnChain] On-chain value={onchain_value:.1f} → Lt adj={value_adj:+.3f}", file=sys.__stdout__)
+        print(f"[OnChain] On-chain value={onchain_value:.1f} → Lt adj={value_adj:+.3f}", file=sys.stderr)
     
     if onchain_buy is not None:
         # Buying power → Ft (funding): high score = strong buying power
         buy_adj = (onchain_buy - 50) / 50 * 1.5  # scale -1.5 to +1.5 (lighter touch)
         factors["Ft"] += buy_adj
-        print(f"[OnChain] Buying power={onchain_buy:.1f} → Ft adj={buy_adj:+.3f}", file=sys.__stdout__)
+        print(f"[OnChain] Buying power={onchain_buy:.1f} → Ft adj={buy_adj:+.3f}", file=sys.stderr)
     
     # Clamp all factors to [-3, 3]
     for k in factors:
