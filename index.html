@@ -3298,9 +3298,11 @@ async function bootSFC() {
 
   if (initial && (initial.sfc || initial.btc)) {
     _sseAvailable = true;  // SSE server detected
-    const merged = Object.assign({}, initial.sfc || {}, {
-      btc: initial.btc?.btc ?? initial.sfc?.btc,
-      btc_24h: initial.btc?.change_pct ?? initial.sfc?.btc_24h,
+    // MERGE snapshot data ON TOP of existing embedded data
+    // IMPORTANT: don't replace — snapshot has fewer fields than __EMBEDDED_DATA
+    const merged = Object.assign({}, currentData || {}, initial.sfc || {}, {
+      btc: initial.btc?.btc ?? initial.sfc?.btc ?? currentData?.btc,
+      btc_24h: initial.btc?.change_pct ?? initial.sfc?.btc_24h ?? currentData?.btc_24h,
     });
     currentData = merged;
     render(merged);
