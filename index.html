@@ -3274,10 +3274,9 @@ loadHistory();
 let _sseAvailable = false;
 
 async function bootSFC() {
-  // Init paper trader from server state BEFORE render
-  await initPaperTrading();
-
   // PRIORITY 1: Render from embedded data INSTANTLY (no network wait)
+  // IMPORTANT: MUST run BEFORE await initPaperTrading() — if KV fetch hangs,
+  // the dashboard is already rendered and user isn't staring at a frozen page.
   if (typeof __EMBEDDED_DATA !== 'undefined' && __EMBEDDED_DATA) {
     currentData = __EMBEDDED_DATA;
     render(__EMBEDDED_DATA);
@@ -3285,6 +3284,9 @@ async function bootSFC() {
     currentData = window.__EMBEDDED_DATA;
     render(window.__EMBEDDED_DATA);
   }
+
+  // Now init paper trader in background — may be slow/fail, but dashboard already visible
+  await initPaperTrading();
 
   // PRIORITY 2: Try /snapshot in background for SSE connection
   // (embedded data already rendered, so user sees dashboard immediately)
