@@ -733,11 +733,11 @@ def detect_regime(dvol, sfc_pct, news_stress, sentiment):
         p_capitulation += min(abs(sentiment), 1.0) * 0.3
     p_stress = 0.0
     if dvol:
-        p_stress += min(max(dvol - 50, 0) / 50.0, 1.0) * 0.3
+        p_stress += min(max(dvol - 50, 0) / 50.0, 1.0) * 0.45
     if sfc_pct:
-        p_stress += min(sfc_pct / 30.0, 1.0) * 0.3
+        p_stress += min(sfc_pct / 30.0, 1.0) * 0.40
     if news_stress:
-        p_stress += min(news_stress / 20.0, 1.0) * 0.4
+        p_stress += min(news_stress / 20.0, 1.0) * 0.15
     p_normal = max(0, 1.0 - p_capitulation - p_stress)
     p_capitulation = min(p_capitulation, 1.0)
     p_stress = min(p_stress, 1.0 - p_capitulation)
@@ -1720,7 +1720,7 @@ liq_mod = 0.0
 if m2_yoy is not None:
     liq_mod = round((7.0 - m2_yoy) * 0.8, 1)
     liq_mod = max(-5.0, min(10.0, liq_mod))
-effective_sfc = min(sfc_pct + news_stress + liq_mod, 100.0) if sfc_pct is not None else None
+effective_sfc = min(sfc_pct + liq_mod, 100.0) if sfc_pct is not None else None
 effective_sfc = max(effective_sfc, 0.0) if effective_sfc else None
 
 # Floor (dynamic ATH) — uses pre-boost SFC because drawdown is a real market metric
