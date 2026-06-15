@@ -1956,6 +1956,58 @@ function render(d) {
       </div>
     </div>
 
+    <!-- Q10 ON-CHAIN PANEL (ErcinDedeoglu/crypto-market-data) -->
+    <div class="card span-full mb-16" style="display:${d.q10_available?'block':'none'}">
+      <div class="card-head">
+        <div class="card-title">
+          <div class="card-icon">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <rect x="1" y="1" width="4" height="4" rx="1" stroke="#00ff9d" stroke-width="1.2"/>
+              <rect x="7" y="1" width="4" height="4" rx="1" stroke="#4a9eff" stroke-width="1.2"/>
+              <rect x="1" y="7" width="4" height="4" rx="1" stroke="#f0b429" stroke-width="1.2"/>
+              <rect x="7" y="7" width="4" height="4" rx="1" stroke="#9d7af8" stroke-width="1.2"/>
+            </svg>
+          </div>
+          Q10 On-Chain Intelligence
+        </div>
+        <div class="card-badge">500-2000/mo value · free</div>
+      </div>
+      <div class="card-body">
+        <div class="stat-3 mb-12">
+          <div class="stat-box">
+            <div class="stat-label">Whale Pressure</div>
+            <div class="stat-val" style="color:${(d.q10_whale_pressure||50)>=65?'var(--green)':(d.q10_whale_pressure||50)>=40?'var(--amber)':'var(--red)'}">${fmtNum(d.q10_whale_pressure,1)}</div>
+            <div class="stat-note">${(d.q10_whale_pressure||50)>=65?'Supply leaving exchanges':(d.q10_whale_pressure||50)>=40?'Neutral inflow/outflow':'Whales depositing to sell'}</div>
+            <div class="prog-track mt-4"><div class="prog-fill ${(d.q10_whale_pressure||50)>=65?'pf-green':(d.q10_whale_pressure||50)>=40?'pf-amber':'pf-red'}" style="width:${(d.q10_whale_pressure||50)}%"></div></div>
+            <div style="font-size:8px;color:var(--text-3);margin-top:4px;line-height:1.4">
+              ${d.q10_details?.exchange_netflow?.status==='ok'?`Netflow: ${d.q10_details.exchange_netflow.value>0?'+':''}${fmtNum(d.q10_details.exchange_netflow.value,1)} BTC · `:''}
+              ${d.q10_details?.whale_ratio?.status==='ok'?`Whale: ${(d.q10_details.whale_ratio.value*100).toFixed(0)}%`:''}
+            </div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-label">On-Chain Value</div>
+            <div class="stat-val" style="color:${(d.q10_onchain_value||50)>=70?'var(--green)':(d.q10_onchain_value||50)>=40?'var(--amber)':'var(--red)'}">${fmtNum(d.q10_onchain_value,1)}</div>
+            <div class="stat-note">${(d.q10_onchain_value||50)>=70?'Undervalued zone':(d.q10_onchain_value||50)>=40?'Fair value':'Overvalued zone'}</div>
+            <div class="prog-track mt-4"><div class="prog-fill ${(d.q10_onchain_value||50)>=70?'pf-green':(d.q10_onchain_value||50)>=40?'pf-amber':'pf-red'}" style="width:${(d.q10_onchain_value||50)}%"></div></div>
+            <div style="font-size:8px;color:var(--text-3);margin-top:4px;line-height:1.4">
+              ${d.q10_details?.mvrv_ratio?.status==='ok'?`MVRV: ${fmtNum(d.q10_details.mvrv_ratio.value,2)} · `:''}
+              ${d.q10_details?.puell_multiple?.status==='ok'?`Puell: ${fmtNum(d.q10_details.puell_multiple.value,2)}`:''}
+            </div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-label">Buying Power</div>
+            <div class="stat-val" style="color:${(d.q10_buying_power||50)>=65?'var(--green)':(d.q10_buying_power||50)>=40?'var(--amber)':'var(--red)'}">${fmtNum(d.q10_buying_power,1)}</div>
+            <div class="stat-note">${(d.q10_buying_power||50)>=65?'Strong buying power ready':(d.q10_buying_power||50)>=40?'Neutral':'Weak buying pressure'}</div>
+            <div class="prog-track mt-4"><div class="prog-fill ${(d.q10_buying_power||50)>=65?'pf-green':(d.q10_buying_power||50)>=40?'pf-amber':'pf-red'}" style="width:${(d.q10_buying_power||50)}%"></div></div>
+            <div style="font-size:8px;color:var(--text-3);margin-top:4px;line-height:1.4">
+              ${d.q10_details?.stablecoin_reserve?.status==='ok'?`Stable: $${(d.q10_details.stablecoin_reserve.value/1e9).toFixed(1)}B · `:''}
+              ${d.q10_details?.taker_buy_sell?.status==='ok'?`Taker B/S: ${fmtNum(d.q10_details.taker_buy_sell.value,2)}`:''}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- KELLY + MACRO row -->
     <div class="card span-full mb-16">
       <div class="card-head">

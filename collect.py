@@ -544,8 +544,10 @@ def _sigmoid_factor(val, center, k=0.15):
     '''
     return 6 / (1 + math.exp(-k * (val - center))) - 3
 
-def score_factors_from_market(btc, btc_24h, dom, dvol, fng, pc_oi, m2_yoy, dxy, glo_score=None):
-    """Score 5 factors from market data using smooth sigmoid/logistic functions. Range -3 to +3"""
+def score_factors_from_market(btc, btc_24h, dom, dvol, fng, pc_oi, m2_yoy, dxy, glo_score=None,
+                                onchain_whale=None, onchain_value=None, onchain_buy=None):
+    """Score 5 factors from market data using smooth sigmoid/logistic functions. Range -3 to +3
+    onchain_whale/onchain_value/onchain_buy: 0-100 scores from on-chain data (Q10)"""
     factors = {"Lt": 0.0, "St": 0.0, "Rt": 0.0, "Ft": 0.0, "Sc": 0.0}
     
     # Lt (Liquidity) — based on M2, GLO, and BTC momentum
@@ -583,6 +585,27 @@ def score_factors_from_market(btc, btc_24h, dom, dvol, fng, pc_oi, m2_yoy, dxy, 
     # High dominance amplifies external risk
     if dom is not None and dom > 65:
         factors["Sc"] -= 0.5
+    
+    # ── ON-CHAIN ADJUSTMENTS (Q10 Integration) ──
+    # Map 0-100 on-chain scores to -3 to +3 factor adjustments
+    # score=50 → adj=0 (neutral), score=100 → adj=+3, score=0 → adj=-3
+    if onchain_whale is not None:
+        # Whale pressure → Rt (risk): high score = bullish (supply leaving, whales accumulating)
+        whale_adj = (onchain_whale - 50) / 50 * 2.0  # scale -2 to +2
+        factors["Rt"] += whale_adj
+        print(f"[OnChain] Whale pressure={onchain_whale:.1f} → Rt adj={whale_adj:+.3f}", file=sys.__stdout__)
+    
+    if onchain_value is not None:
+        # On-chain value → Lt (long-term): high score = undervalued (MVRV low, Puell low)
+        value_adj = (onchain_value - 50) / 50 * 2.0  # scale -2 to +2
+        factors["Lt"] += value_adj
+        print(f"[OnChain] On-chain value={onchain_value:.1f} → Lt adj={value_adj:+.3f}", file=sys.__stdout__)
+    
+    if onchain_buy is not None:
+        # Buying power → Ft (funding): high score = strong buying power
+        buy_adj = (onchain_buy - 50) / 50 * 1.5  # scale -1.5 to +1.5 (lighter touch)
+        factors["Ft"] += buy_adj
+        print(f"[OnChain] Buying power={onchain_buy:.1f} → Ft adj={buy_adj:+.3f}", file=sys.__stdout__)
     
     # Clamp all factors to [-3, 3]
     for k in factors:
@@ -1351,8 +1374,23 @@ _factors_m2 = _m2_30d if _m2_30d is not None else m2_yoy
 _factors_dxy = _dxy_30d if _dxy_30d is not None else dxy
 print(f"[SFC] 30d rolling averages: BTC24h={_factors_btc_24h} DOM={_factors_dom} DVOL={_factors_dvol} FnG={_factors_fng} M2={_factors_m2}", file=sys.stderr)
 
-# Score factors from market data (using 30d rolling averages)
-factors = score_factors_from_market(btc, _factors_btc_24h, _factors_dom, _factors_dvol, _factors_fng, _factors_pc, _factors_m2, _factors_dxy)
+# ── ON-CHAIN DATA (Q10 Integration — ErcinDedeoglu/crypto-market-data) ──
+print("[SFC] Fetching on-chain data (Q10)...", file=sys.stderr)
+onchain_scores = {}
+whale_pressure = onchain_value = buying_power = None
+try:
+    onchain_scores = fetch_all_onchain()
+    whale_pressure = onchain_scores["whale_pressure"]
+    onchain_value = onchain_scores["onchain_value"]
+    buying_power = onchain_scores["buying_power"]
+    print(f"[SFC] On-chain: Whale={whale_pressure} OnValue={onchain_value} BuyPower={buying_power}", file=sys.stderr)
+except Exception as e:
+    print(f"[SFC] On-chain fetch failed: {e}", file=sys.stderr)
+    whale_pressure = onchain_value = buying_power = None
+
+# Score factors from market data (using 30d rolling averages + on-chain)
+factors = score_factors_from_market(btc, _factors_btc_24h, _factors_dom, _factors_dvol, _factors_fng, _factors_pc, _factors_m2, _factors_dxy,
+                                     onchain_whale=whale_pressure, onchain_value=onchain_value, onchain_buy=buying_power)
 
 # Calculate SFC ensemble
 sfc_pct, zone, factors_raw, norm_factors, m1_klr, m2_logit, m3_bayes, m4_ewc, m5_qreg, m6_regime, method_agreement = calculate_sfc_ensemble(factors)
@@ -2190,6 +2228,12 @@ out = {
     "causal_methods_active": len(causal_active_scores) if causal_filter else None,
     "causal_excluded": ", ".join(causal_excluded) if causal_excluded else None,
     "causal_excluded_count": len(causal_excluded) if causal_excluded else 0,
+    # ── Q10 On-Chain Data (ErcinDedeoglu/crypto-market-data) ──
+    "q10_whale_pressure": whale_pressure,
+    "q10_onchain_value": onchain_value,
+    "q10_buying_power": buying_power,
+    "q10_available": whale_pressure is not None and onchain_value is not None and buying_power is not None,
+    "q10_details": onchain_scores.get("details", {}) if whale_pressure is not None else {},
     # Advanced modules: Regime Detection (P2), Uncertainty (P4), Alt Data (P6)
     "adv_regime": adv_regime.get('regime', 'NORMAL') if adv_regime else 'NORMAL',
     "adv_crisis_prob": round(adv_regime.get('crisis_probability', 0), 3) if adv_regime else 0,
