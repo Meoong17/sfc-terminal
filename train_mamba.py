@@ -30,14 +30,19 @@ SFC_DIR = os.path.dirname(os.path.abspath(__file__))
 SEQ_LEN = 30          # Number of time steps per sample
 INPUT_DIM = 39        # Auto-detected from feature vector
 BATCH_SIZE = 32
-EPOCHS = 50
-LEARNING_RATE = 0.001
+EPOCHS = 100          # More epochs with early stopping
+LEARNING_RATE = 0.002  # Slightly higher initial LR
 VAL_SPLIT = 0.15       # 15% for validation
 TEST_SPLIT = 0.10      # 10% for testing
 MODEL_DIR = os.path.join(SFC_DIR, "models")
 os.makedirs(MODEL_DIR, exist_ok=True)
 MODEL_PATH = os.path.join(MODEL_DIR, "mamba_weights.pth")
+ENSEMBLE_DIR = os.path.join(MODEL_DIR, "ensemble")
+os.makedirs(ENSEMBLE_DIR, exist_ok=True)
 LOG_FILE = os.path.join(SFC_DIR, "mamba_train.log")
+N_ENSEMBLE = 3         # Number of ensemble models
+AUGMENT_NOISE = 0.01   # Gaussian noise std for data augmentation
+HORIZONS = [1, 3, 6]   # Multi-horizon prediction targets
 
 device = torch.device('cpu')
 print(f"[Train] Using device: {device}")
@@ -124,26 +129,38 @@ def build_dataset(snapshots):
     return features, targets
 
 
-def create_sequences(features, targets, seq_len=30):
+def create_sequences(features, targets, seq_len=30, horizons=None):
     """
-    Create sliding-window sequences.
-    Each sample: sequence of seq_len feature vectors → next target value.
+    Create sliding-window sequences with multi-horizon targets.
+    Each sample: sequence of seq_len feature vectors → target at multiple future steps.
     
     Returns:
         X: (n_samples, seq_len, n_features)
-        y: (n_samples,)
+        y: (n_samples, n_horizons) — targets at 1, 3, 6 steps ahead
     """
-    n = len(features)
-    X, y = [], []
+    if horizons is None:
+        horizons = [1, 3, 6]
     
-    for i in range(n - seq_len):
+    n = len(features)
+    max_horizon = max(horizons)
+    X, y_list = [], []
+    
+    for i in range(n - seq_len - max_horizon):
         X.append(features[i:i + seq_len])
-        y.append(targets[i + seq_len])  # predict NEXT step
+        # Multi-horizon targets
+        y_row = []
+        for h in horizons:
+            target_idx = i + seq_len + h - 1  # -1 because h=1 means next step
+            if target_idx < n:
+                y_row.append(targets[target_idx])
+            else:
+                y_row.append(targets[-1])  # pad with last value
+        y_list.append(y_row)
     
     X = np.array(X, dtype=np.float32)
-    y = np.array(y, dtype=np.float32)
+    y = np.array(y_list, dtype=np.float32)
     
-    print(f"[Train] Sequences: X={X.shape}, y={y.shape}")
+    print(f"[Train] Sequences: X={X.shape}, y={y.shape} (horizons={horizons})")
     return X, y
 
 
@@ -151,35 +168,45 @@ def create_sequences(features, targets, seq_len=30):
 # 3. PYTORCH DATASET
 # ================================================================
 class SFCDataset(Dataset):
-    def __init__(self, X, y):
+    def __init__(self, X, y, augment=False, noise_std=0.01):
         self.X = torch.tensor(X, dtype=torch.float32)
-        self.y = torch.tensor(y, dtype=torch.float32).unsqueeze(1)  # (n, 1)
+        self.y = torch.tensor(y, dtype=torch.float32)  # (n, n_horizons)
+        self.augment = augment
+        self.noise_std = noise_std
     
     def __len__(self):
         return len(self.X)
     
     def __getitem__(self, idx):
-        return self.X[idx], self.y[idx]
+        x = self.X[idx]
+        if self.augment and self.noise_std > 0:
+            # Add gaussian noise for regularization
+            noise = torch.randn_like(x) * self.noise_std
+            x = x + noise
+        return x, self.y[idx]
 
 
 # ================================================================
 # 4. TRAINING LOOP
 # ================================================================
 def train_model(model, train_loader, val_loader, epochs, lr):
-    """Train Mamba model with Adam optimizer and MSELoss."""
+    """Train Mamba model with multi-horizon loss and progressive scheduler."""
     optimizer = optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-5)
-    scheduler = optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer, mode='min', factor=0.5, patience=5, min_lr=1e-6
+    scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(
+        optimizer, T_0=10, T_mult=2, eta_min=1e-6
     )
     criterion = nn.MSELoss()
+    # Horizon weights: predict nearer future with higher weight
+    horizon_weights = torch.tensor([0.5, 0.3, 0.2], dtype=torch.float32)
     
     best_val_loss = float('inf')
     best_epoch = -1
-    patience = 10
+    patience = 15
     patience_counter = 0
     
     print(f"\n[Train] Starting training for {epochs} epochs...")
     print(f"[Train] Train samples: {len(train_loader.dataset)}, Val samples: {len(val_loader.dataset)}")
+    print(f"[Train] Horizon weights: {horizon_weights.tolist()}")
     
     for epoch in range(epochs):
         # ── Training ──
@@ -190,8 +217,12 @@ def train_model(model, train_loader, val_loader, epochs, lr):
         for batch_X, batch_y in train_loader:
             optimizer.zero_grad()
             output = model(batch_X)
-            pred = output['combined']
-            loss = criterion(pred, batch_y)
+            
+            # Multi-horizon loss: weighted sum across horizons
+            pred = output['combined']  # (batch, 1)
+            # For multi-horizon, we need to expand pred to match batch_y shape
+            loss = criterion(pred.expand(-1, batch_y.shape[1]), batch_y)
+            
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
             optimizer.step()
@@ -203,28 +234,35 @@ def train_model(model, train_loader, val_loader, epochs, lr):
         model.eval()
         val_loss = 0.0
         val_mae = 0.0
+        horizon_errors = [0.0] * batch_y.shape[1] if batch_y.shape[1] > 1 else [0.0]
+        
         with torch.no_grad():
             for batch_X, batch_y in val_loader:
                 output = model(batch_X)
                 pred = output['combined']
-                loss = criterion(pred, batch_y)
+                loss = criterion(pred.expand(-1, batch_y.shape[1]), batch_y)
                 val_loss += loss.item() * len(batch_X)
-                val_mae += torch.abs(pred - batch_y).sum().item()
+                
+                # Per-horizon MAE
+                for h in range(batch_y.shape[1]):
+                    horizon_errors[h] += torch.abs(pred.squeeze() - batch_y[:, h]).sum().item()
         
         val_loss /= len(val_loader.dataset)
-        val_mae /= len(val_loader.dataset)
+        val_mae = sum(horizon_errors) / (len(val_loader.dataset) * len(horizon_errors))
         
-        # LR scheduler
-        scheduler.step(val_loss)
+        # LR scheduler step
+        scheduler.step()
         current_lr = optimizer.param_groups[0]['lr']
         
         elapsed = time.time() - start_time
         
         # Print progress
         if (epoch + 1) % 5 == 0 or epoch == 0:
+            horizon_str = ' | '.join([f'H{h}={e/len(val_loader.dataset)*100:.2f}%' 
+                                       for h, e in zip([1,3,6], horizon_errors)])
             print(f"[Train] Epoch {epoch+1:3d}/{epochs} | "
                   f"train_loss={train_loss:.6f} | val_loss={val_loss:.6f} | "
-                  f"val_mae={val_mae:.4f} | lr={current_lr:.2e} | {elapsed:.1f}s")
+                  f"{horizon_str} | lr={current_lr:.2e} | {elapsed:.1f}s")
         
         # Save best model
         if val_loss < best_val_loss:
@@ -248,27 +286,39 @@ def train_model(model, train_loader, val_loader, epochs, lr):
 # 5. EVALUATION
 # ================================================================
 def evaluate_model(model, test_loader, label="Test"):
-    """Evaluate model on a dataset."""
+    """Evaluate model on a dataset (supports multi-horizon targets)."""
     model.eval()
     total_loss = 0.0
-    total_mae = 0.0
     predictions = []
     actuals = []
+    horizon_errors_list = []
     
     criterion = nn.MSELoss()
+    n_horizons = None
     
     with torch.no_grad():
         for batch_X, batch_y in test_loader:
             output = model(batch_X)
-            pred = output['combined']
-            loss = criterion(pred, batch_y)
+            pred = output['combined']  # (batch, 1)
+            
+            if n_horizons is None:
+                n_horizons = batch_y.shape[1]
+            
+            # Loss on first horizon (same-step prediction)
+            loss = criterion(pred, batch_y[:, 0:1])
             total_loss += loss.item() * len(batch_X)
-            total_mae += torch.abs(pred - batch_y).sum().item()
+            
             predictions.extend(pred.squeeze().cpu().numpy())
-            actuals.extend(batch_y.squeeze().cpu().numpy())
+            actuals.extend(batch_y[:, 0].cpu().numpy())  # first horizon
+            
+            # Per-horizon errors
+            for h in range(n_horizons):
+                h_err = torch.abs(pred.squeeze() - batch_y[:, h])
+                if len(horizon_errors_list) <= h:
+                    horizon_errors_list.append([])
+                horizon_errors_list[h].extend(h_err.cpu().numpy())
     
     mse = total_loss / len(test_loader.dataset)
-    mae = total_mae / len(test_loader.dataset)
     rmse = math.sqrt(mse)
     
     predictions = np.array(predictions)
@@ -279,15 +329,23 @@ def evaluate_model(model, test_loader, label="Test"):
     ss_tot = ((actuals - actuals.mean()) ** 2).sum()
     r2 = 1 - ss_res / ss_tot if ss_tot > 0 else 0
     
+    # Per-horizon MAE
+    horizon_summary = ""
+    if n_horizons and n_horizons > 1:
+        horizon_parts = []
+        for h in range(n_horizons):
+            h_mae = np.mean(horizon_errors_list[h])
+            horizon_parts.append(f"H{h+1}={h_mae*100:.2f}%")
+        horizon_summary = " | " + " ".join(horizon_parts)
+    
     print(f"\n[Train] {label} Evaluation:")
     print(f"  MSE:  {mse:.6f}")
     print(f"  RMSE: {rmse:.6f} ({rmse*100:.2f}%)")
-    print(f"  MAE:  {mae:.4f} ({mae*100:.2f}%)")
-    print(f"  R²:   {r2:.4f}")
+    print(f"  R²:   {r2:.4f}{horizon_summary}")
     print(f"  Pred range: [{predictions.min():.4f}, {predictions.max():.4f}]")
     print(f"  Actual range: [{actuals.min():.4f}, {actuals.max():.4f}]")
     
-    return {'mse': mse, 'rmse': rmse, 'mae': mae, 'r2': r2, 'preds': predictions, 'actuals': actuals}
+    return {'mse': mse, 'rmse': rmse, 'r2': r2, 'preds': predictions, 'actuals': actuals}
 
 
 # ================================================================
@@ -308,7 +366,7 @@ if __name__ == '__main__':
     features, targets = build_dataset(snapshots)
     
     # 3. Create sequences
-    X, y = create_sequences(features, targets, SEQ_LEN)
+    X, y = create_sequences(features, targets, SEQ_LEN, HORIZONS)
     
     # 4. Train/val/test split (chronological — test is newest)
     n_total = len(X)
@@ -327,10 +385,10 @@ if __name__ == '__main__':
     print(f"  Val:   mean={y_val.mean():.4f}, std={y_val.std():.4f}")
     print(f"  Test:  mean={y_test.mean():.4f}, std={y_test.std():.4f}")
     
-    # 5. Create datasets
-    train_dataset = SFCDataset(X_train, y_train)
-    val_dataset = SFCDataset(X_val, y_val)
-    test_dataset = SFCDataset(X_test, y_test)
+    # 5. Create datasets (with augmentation for training)
+    train_dataset = SFCDataset(X_train, y_train, augment=True, noise_std=AUGMENT_NOISE)
+    val_dataset = SFCDataset(X_val, y_val, augment=False)
+    test_dataset = SFCDataset(X_test, y_test, augment=False)
     
     train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
     val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False)
