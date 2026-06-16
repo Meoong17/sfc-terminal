@@ -87,6 +87,7 @@ export default {
     // Debug endpoint — echo cookies and session
     if (path === '/__cookie_check') {
       const cookie = request.headers.get('Cookie') || '(none)';
+      const sessionUser = getCookie(request, 'sfc_session');
       return new Response(JSON.stringify({ cookie, sessionUser, all: Object.fromEntries(request.headers) }), {
         headers: { 'Content-Type': 'application/json', ...corsHeaders },
       });
