@@ -46,6 +46,21 @@ function defaultUserState(username) {
   };
 }
 
+// Cookie helpers
+function getCookie(request, name) {
+  const cookie = request.headers.get('Cookie') || '';
+  const match = cookie.match(new RegExp('(?:^|;\\s*)' + name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '=([^;]*)'));
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
+function setCookie(name, value, maxAgeDays = 30) {
+  return `${name}=${encodeURIComponent(value)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAgeDays * 86400}`;
+}
+
+function clearCookie(name) {
+  return `${name}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`;
+}
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
@@ -63,6 +78,15 @@ export default {
     // CORS preflight
     if (method === 'OPTIONS') {
       return new Response(null, { headers: corsHeaders });
+    }
+
+    // ── SESSION AUTH GUARD ──────────────────────────────────
+    // Protected routes require sfc_session cookie
+    const sessionUser = getCookie(request, 'sfc_session');
+    const isPageRequest = (path === '/' || path === '' || path === '/index.html');
+
+    if (isPageRequest && method === 'GET' && !sessionUser) {
+      return Response.redirect(url.origin + '/login', 302);
     }
 
     // ========== MULTI-USER KV ENDPOINTS ==========
@@ -154,39 +178,103 @@ export default {
       });
     }
 
-    // GET /login or /login.html — serve login page directly from worker
+    // ── AUTH ENDPOINTS ──────────────────────────────────────
+
+    // POST /api/login — validate username, set session cookie, redirect
+    if (path === '/api/login' && method === 'POST') {
+      let body;
+      try {
+        body = await request.json();
+      } catch (_) {
+        body = {};
+      }
+      const username = (body.username || '').trim().toLowerCase();
+      if (!username || username.length < 1 || username.length > 32 || !/^[a-z0-9_-]+$/.test(username)) {
+        return new Response(JSON.stringify({ error: 'Invalid username. Use letters, numbers, hyphens and underscores.' }), {
+          status: 400,
+          headers: { 'Content-Type': 'application/json', ...corsHeaders },
+        });
+      }
+      const redirectTo = url.searchParams.get('redirect') || '/';
+      return new Response(JSON.stringify({ status: 'ok', username, redirect: redirectTo }), {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json',
+          'Set-Cookie': setCookie('sfc_session', username),
+          ...corsHeaders,
+        },
+      });
+    }
+
+    // GET /logout — clear session cookie
+    if (path === '/logout') {
+      return new Response(null, {
+        status: 302,
+        headers: {
+          'Location': '/login',
+          'Set-Cookie': clearCookie('sfc_session'),
+          ...corsHeaders,
+        },
+      });
+    }
+
+    // GET /login or /login.html — serve login page
     if ((path === '/login' || path === '/login.html') && method === 'GET') {
       const loginHtml = `<!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SFC Terminal | Paper Trading Login</title>
+    <title>SFC Terminal | Login</title>
     <style>
         *{margin:0;padding:0;box-sizing:border-box}
         body{background:#07080d;font-family:'Space Grotesk',system-ui,-apple-system,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px}
         .login-card{background:#0e111a;border-radius:28px;padding:40px;width:100%;max-width:440px;border:1px solid rgba(255,255,255,0.08);box-shadow:0 20px 40px rgba(0,0,0,0.5)}
         .login-card h1{font-size:28px;font-weight:700;background:linear-gradient(135deg,#fff,#7864ff);-webkit-background-clip:text;background-clip:text;color:transparent;margin-bottom:8px}
         .login-card p{color:#8892a8;font-size:14px;margin-bottom:32px;line-height:1.5}
-        input{width:100%;padding:14px 18px;background:#1a1f2e;border:1px solid #2a3347;border-radius:16px;color:#edf1f7;font-size:16px;margin-bottom:24px;outline:none}
+        input{width:100%;padding:14px 18px;background:#1a1f2e;border:1px solid #2a3347;border-radius:16px;color:#edf1f7;font-size:16px;margin-bottom:8px;outline:none}
         input:focus{border-color:#7864ff;box-shadow:0 0 0 2px rgba(120,100,255,0.2)}
         button{width:100%;padding:14px;background:#7864ff;border:none;border-radius:16px;color:white;font-weight:600;font-size:16px;cursor:pointer}
         button:hover{background:#5d4ae0}
+        button:disabled{opacity:0.5;cursor:not-allowed}
         .note{font-size:12px;color:#5a6478;text-align:center;margin-top:24px}
+        .error{color:#ff4060;font-size:13px;margin-bottom:16px;display:none}
     </style>
 </head>
 <body>
 <div class="login-card">
     <h1>SFC TERMINAL</h1>
-    <p>Enter a username to start private paper trading.</p>
-    <input type="text" id="username" placeholder="e.g. alice, bob, trader1" autocomplete="off" autofocus>
-    <button onclick="login()">Start Paper Trading \u2192</button>
-    <div class="note">\u26a1 No password required. Pick a memorable username.</div>
+    <p>Enter a username to access your private paper trading dashboard.</p>
+    <div class="error" id="error"></div>
+    <input type="text" id="username" placeholder="e.g. trader1, alice, bob" autocomplete="off" autocapitalize="off" autofocus>
+    <button id="loginBtn" onclick="login()">Start Trading →</button>
+    <div class="note">⚡ Just a username — no password needed.</div>
 </div>
 <script>
-function login(){var u=document.getElementById('username').value.trim();if(!u)return alert('Enter a username');localStorage.setItem('sfc_username',u);window.location.href='/?user='+encodeURIComponent(u)}
+async function login() {
+  var u = document.getElementById('username').value.trim().toLowerCase();
+  var btn = document.getElementById('loginBtn');
+  var err = document.getElementById('error');
+  err.style.display = 'none';
+  if (!u) { err.textContent = 'Enter a username'; err.style.display = 'block'; return; }
+  if (!/^[a-z0-9_-]+$/.test(u)) { err.textContent = 'Use letters, numbers, hyphens and underscores only'; err.style.display = 'block'; return; }
+  btn.disabled = true;
+  btn.textContent = 'Logging in...';
+  try {
+    var res = await fetch('/api/login', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({username:u}) });
+    var data = await res.json();
+    if (!res.ok) { err.textContent = data.error; err.style.display = 'block'; btn.disabled = false; btn.textContent = 'Start Trading →'; return; }
+    localStorage.setItem('sfc_username', u);
+    window.location.href = '/?user=' + encodeURIComponent(u);
+  } catch(e) {
+    err.textContent = 'Connection error. Try again.';
+    err.style.display = 'block';
+    btn.disabled = false;
+    btn.textContent = 'Start Trading →';
+  }
+}
 document.getElementById('username').addEventListener('keydown',function(e){if(e.key==='Enter')login()});
-<\/script>
+</script>
 </body>
 </html>`;
       return new Response(loginHtml, {

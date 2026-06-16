@@ -1159,10 +1159,6 @@ var __EMBEDDED_DATA = {"ts": "2026-06-16T07:46:21.059014+00:00", "btc": 66314.01
 // ========== MULTI-USER SUPPORT (Q8) ==========
 const urlParams = new URLSearchParams(window.location.search);
 let currentUser = urlParams.get('user') || localStorage.getItem('sfc_username');
-if (!currentUser && !window.__EMBEDDED_DATA) {
-  // Only redirect to login if not in embedded/static mode
-  window.location.href = '/login.html';
-}
 if (currentUser) {
   localStorage.setItem('sfc_username', currentUser);
 }
