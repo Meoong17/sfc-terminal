@@ -1,39 +1,1159 @@
 <!DOCTYPE html>
-<html>
+<!-- b=1 -->
+<html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SFC Terminal | Login</title>
-    <style>
-        *{margin:0;padding:0;box-sizing:border-box}
-        body{background:#07080d;font-family:'Space Grotesk',system-ui,-apple-system,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px}
-        .login-card{background:#0e111a;border-radius:28px;padding:40px;width:100%;max-width:440px;border:1px solid rgba(255,255,255,0.08);box-shadow:0 20px 40px rgba(0,0,0,0.5)}
-        .login-card h1{font-size:28px;font-weight:700;background:linear-gradient(135deg,#fff,#7864ff);-webkit-background-clip:text;background-clip:text;color:transparent;margin-bottom:8px}
-        .login-card p{color:#8892a8;font-size:14px;margin-bottom:32px;line-height:1.5}
-        input{width:100%;padding:14px 18px;background:#1a1f2e;border:1px solid #2a3347;border-radius:16px;color:#edf1f7;font-size:16px;margin-bottom:8px;outline:none}
-        input:focus{border-color:#7864ff;box-shadow:0 0 0 2px rgba(120,100,255,0.2)}
-        button{width:100%;padding:14px;background:#7864ff;border:none;border-radius:16px;color:white;font-weight:600;font-size:16px;cursor:pointer}
-        button:hover{background:#5d4ae0}
-        button:disabled{opacity:0.5;cursor:not-allowed}
-        .note{font-size:12px;color:#5a6478;text-align:center;margin-top:24px}
-        .error{color:#ff4060;font-size:13px;margin-bottom:16px;display:none}
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net 'unsafe-inline'; style-src 'self' https://fonts.googleapis.com 'unsafe-inline'; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.binance.com https://sfc-terminal.meoong17.workers.dev;">
+<title>SFC Terminal | Quantitative Stress Intelligence</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+<style>
+/* ══════════════════════════════════════════════════════════════
+   SFC TERMINAL v4 — Redesigned Design System
+   Dark-mode, Linear-inspired precision with crypto-accent purple
+══════════════════════════════════════════════════════════════ */
+
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --bg-void:      #07080d;
+  --bg-base:      #0b0d15;
+  --bg-card:      #0e111a;
+  --bg-raise:     #131723;
+  --bg-float:     #1a1f2e;
+  --bg-hover:     #1f2436;
+
+  --border-0:    rgba(255,255,255,0.03);
+  --border-1:    rgba(255,255,255,0.06);
+  --border-2:    rgba(255,255,255,0.09);
+  --border-3:    rgba(255,255,255,0.14);
+
+  --text-1: #edf1f7;
+  --text-2: #8892a8;
+  --text-3: #49536b;
+  --text-4: #2a3347;
+
+  --purple:   #7864ff;
+  --purple2:  #5d4ae0;
+  --purple-dim: rgba(120,100,255,0.12);
+  --purple-glow: rgba(120,100,255,0.2);
+  --purple-border: rgba(120,100,255,0.3);
+
+  --cyan:     #00d4ff;
+  --cyan-dim:  rgba(0,212,255,0.1);
+  --green:    #00f5a0;
+  --green-dim: rgba(0,245,160,0.1);
+  --red:      #ff4060;
+  --red-dim:   rgba(255,64,96,0.1);
+  --amber:    #f0b429;
+  --amber-dim: rgba(240,180,41,0.1);
+  --blue:     #4a9eff;
+  --blue-dim:  rgba(74,158,255,0.1);
+
+  --grad-purple:  linear-gradient(135deg,#7864ff,#5d4ae0);
+  --grad-cyan:    linear-gradient(135deg,#00d4ff,#0099e6);
+  --grad-green:   linear-gradient(135deg,#00f5a0,#00c87b);
+  --grad-red:     linear-gradient(135deg,#ff4060,#cc1a35);
+  --grad-amber:   linear-gradient(135deg,#f0b429,#d48a00);
+  --border-red: #ff4060;
+  --border-green: #00f5a0;
+
+  --glow-purple: 0 0 30px rgba(120,100,255,0.15);
+  --glow-cyan:   0 0 30px rgba(0,212,255,0.12);
+  --glow-green:  0 0 30px rgba(0,245,160,0.12);
+  --glow-red:    0 0 30px rgba(255,64,96,0.12);
+
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 14px;
+  --r-xl: 18px;
+
+  --nav-h: 52px;
+  --band-h: 36px;
+}
+
+html { height: 100%; }
+
+body {
+  background: var(--bg-void);
+  color: var(--text-1);
+  font-family: 'Space Grotesk', sans-serif;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100%;
+  overflow-x: hidden;
+}
+
+/* Subtle grid background */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px);
+  background-size: 48px 48px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+#app { position: relative; z-index: 1; }
+
+::-webkit-scrollbar { width: 3px; height: 3px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--text-4); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-3); }
+
+/* ══════════════════════════════════════════
+   LOADING SCREEN
+══════════════════════════════════════════ */
+.loading-screen {
+  position: fixed;
+  inset: 0;
+  background: var(--bg-void);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  z-index: 999;
+}
+.loading-logo {
+  width: 56px; height: 56px;
+  border-radius: var(--r-md);
+  background: var(--grad-purple);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 700;
+  font-size: 18px;
+  color: #fff;
+  box-shadow: var(--glow-purple);
+}
+.loading-spinner {
+  width: 28px; height: 28px;
+  border: 2px solid var(--border-2);
+  border-top-color: var(--purple);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+.loading-text {
+  font-size: 12px;
+  color: var(--text-3);
+  letter-spacing: 0.08em;
+  font-weight: 500;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ══════════════════════════════════════════
+   NAV
+══════════════════════════════════════════ */
+.shell { display: flex; flex-direction: column; min-height: 100vh; }
+
+.nav {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  height: var(--nav-h);
+  background: rgba(7,8,13,0.88);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--border-1);
+}
+
+.nav-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.nav-logo {
+  width: 30px; height: 30px;
+  border-radius: var(--r-sm);
+  background: var(--grad-purple);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 700;
+  font-size: 10px;
+  color: #fff;
+  box-shadow: var(--glow-purple);
+}
+.nav-wordmark { display: flex; flex-direction: column; }
+.nav-title {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+.nav-title span { color: var(--purple); }
+.nav-sub {
+  font-size: 8px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  margin-top: 1px;
+}
+
+.nav-center {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  background: rgba(255,255,255,0.03);
+  padding: 2px;
+  border-radius: 8px;
+}
+.nav-tab {
+  padding: 5px 12px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-2);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.nav-tab:hover { color: var(--text-1); background: rgba(255,255,255,0.04); }
+.nav-tab.active { color: #fff; background: var(--purple-dim); }
+
+.nav-right {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.nav-meta { display: flex; flex-direction: column; align-items: flex-end; }
+.nav-meta-label {
+  font-size: 8px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+.nav-meta-val {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-1);
+}
+.nav-pill {
+  padding: 4px 12px;
+  border-radius: 100px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.pill-buy   { background: var(--green-dim); color: var(--green); border: 1px solid rgba(0,245,160,0.25); }
+.pill-watch { background: var(--amber-dim); color: var(--amber); border: 1px solid rgba(240,180,41,0.2); }
+.pill-cash  { background: var(--red-dim);   color: var(--red);   border: 1px solid var(--border-red); }
+
+/* ══════════════════════════════════════════
+   STATUS BAND
+══════════════════════════════════════════ */
+.status-band {
+  display: flex;
+  gap: 6px;
+  padding: 6px 24px;
+  height: var(--band-h);
+  background: var(--bg-base);
+  border-bottom: 1px solid var(--border-1);
+  overflow-x: auto;
+  scrollbar-width: none;
+  align-items: center;
+}
+.status-band::-webkit-scrollbar { display: none; }
+.s-chip {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 100px;
+  border: 1px solid var(--border-1);
+  background: var(--bg-card);
+  font-size: 9px;
+  font-weight: 500;
+  color: var(--text-2);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.s-dot {
+  width: 4px; height: 4px;
+  border-radius: 50%;
+}
+.dot-g { background: var(--green); box-shadow: 0 0 5px rgba(0,245,160,0.5); }
+.dot-r { background: var(--red);   box-shadow: 0 0 5px rgba(255,64,96,0.5); }
+.dot-a { background: var(--amber); box-shadow: 0 0 5px rgba(240,180,41,0.5); }
+.dot-b { background: var(--blue);  box-shadow: 0 0 5px rgba(74,158,255,0.5); }
+.dot-c { background: var(--cyan);  box-shadow: 0 0 5px rgba(0,212,255,0.5); }
+.dot-p { background: var(--purple);box-shadow: 0 0 5px rgba(120,100,255,0.5); }
+
+/* ══════════════════════════════════════════
+   MAIN CONTENT
+══════════════════════════════════════════ */
+.main {
+  padding: 20px 24px;
+  max-width: 1440px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+/* Section heading bar */
+.section-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.section-head-line {
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, var(--border-2), transparent);
+}
+.section-head-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  white-space: nowrap;
+}
+
+/* ══════════════════════════════════════════
+   KPI ROW
+══════════════════════════════════════════ */
+.kpi-row {
+  display: grid;
+  grid-template-columns: 2.2fr 1fr 1fr 1fr 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.kpi {
+  background: var(--bg-card);
+  border: 1px solid var(--border-1);
+  border-radius: var(--r-lg);
+  padding: 14px 16px;
+  position: relative;
+  overflow: hidden;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.kpi:hover {
+  border-color: var(--border-2);
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.02);
+}
+
+.kpi-hero {
+  border-color: var(--purple-border);
+  background: linear-gradient(135deg, rgba(120,100,255,0.06) 0%, var(--bg-card) 100%);
+}
+.kpi-hero:hover {
+  border-color: rgba(120,100,255,0.4);
+  box-shadow: var(--glow-purple);
+}
+
+/* Gradient top accent for all KPIs */
+.kpi::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 1px; right: 1px;
+  height: 2px;
+  border-radius: var(--r-lg) var(--r-lg) 0 0;
+  opacity: 0.6;
+}
+.kpi-hero::before { background: var(--grad-purple); }
+
+.kpi-label {
+  font-size: 8px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  margin-bottom: 6px;
+}
+.kpi-num {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  margin-bottom: 3px;
+}
+.kpi-hero .kpi-num { font-size: 32px; }
+.kpi-aux {
+  font-size: 9px;
+  font-weight: 500;
+  color: var(--text-2);
+}
+.kpi-badge {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: 100px;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin-top: 3px;
+}
+.kb-g { background: var(--green-dim); color: var(--green); }
+.kb-r { background: var(--red-dim); color: var(--red); }
+.kb-a { background: var(--amber-dim); color: var(--amber); }
+
+.chg-p { color: var(--green); }
+.chg-n { color: var(--red); }
+.chg-z { color: var(--text-2); }
+
+/* ══════════════════════════════════════════
+   GRID LAYOUTS
+══════════════════════════════════════════ */
+.grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+.grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.grid-4 {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.span-full { grid-column: 1 / -1; }
+
+/* ══════════════════════════════════════════
+   CARD
+══════════════════════════════════════════ */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-1);
+  border-radius: var(--r-xl);
+  overflow: hidden;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  position: relative;
+}
+.card:hover {
+  border-color: var(--border-2);
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.015);
+}
+
+/* Gradient top accent bar for all cards */
+.card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 1px; right: 1px;
+  height: 1.5px;
+  border-radius: var(--r-xl) var(--r-xl) 0 0;
+  background: linear-gradient(90deg, transparent, rgba(120,100,255,0.2), transparent);
+  opacity: 0.4;
+  z-index: 1;
+}
+
+.card-head {
+  padding: 12px 18px 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--border-1);
+}
+.card-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-2);
+}
+.card-icon {
+  width: 20px; height: 20px;
+  border-radius: 5px;
+  background: var(--bg-raise);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.card-icon svg { display: block; }
+.card-badge {
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--text-3);
+  font-family: 'JetBrains Mono', monospace;
+}
+.card-body { padding: 18px; }
+.card-body-sm { padding: 12px 18px; }
+
+/* ══════════════════════════════════════════
+   SFC STRESS HERO (Arc Gauge)
+══════════════════════════════════════════ */
+.sfc-hero-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 14px 0 18px;
+}
+.sfc-arc-container {
+  position: relative;
+  width: 170px;
+  height: 95px;
+  margin-bottom: 6px;
+}
+.sfc-arc-container svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.sfc-big-num {
+  position: absolute;
+  bottom: -2px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 44px;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  text-align: center;
+  white-space: nowrap;
+}
+.sfc-desc {
+  font-size: 9px;
+  color: var(--text-3);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-top: 2px;
+}
+.sfc-zone-pill {
+  display: inline-block;
+  padding: 3px 14px;
+  border-radius: 100px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-top: 8px;
+}
+.zone-normal   { background: var(--green-dim); color: var(--green); border: 1px solid rgba(0,245,160,0.2); }
+.zone-elevated { background: var(--amber-dim); color: var(--amber); border: 1px solid rgba(240,180,41,0.2); }
+.zone-critical { background: var(--red-dim);   color: var(--red);   border: 1px solid rgba(255,64,96,0.2); }
+
+/* Progress bar */
+.prog-track {
+  height: 3px;
+  background: var(--bg-raise);
+  border-radius: 3px;
+  overflow: hidden;
+  margin: 6px 0;
+}
+.prog-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.6s ease;
+}
+.pf-green  { background: var(--grad-green); }
+.pf-red    { background: var(--grad-red); }
+.pf-amber  { background: var(--grad-amber); }
+.pf-cyan   { background: var(--grad-cyan); }
+.pf-purple { background: var(--grad-purple); }
+
+/* ══════════════════════════════════════════
+   METHOD ENSEMBLE GRID
+══════════════════════════════════════════ */
+.method-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 5px;
+  margin-bottom: 12px;
+}
+.method-cell {
+  background: var(--bg-raise);
+  border-radius: var(--r-sm);
+  padding: 7px 5px;
+  text-align: center;
+  border: 1px solid var(--border-1);
+  transition: border-color 0.15s;
+}
+.method-cell:hover { border-color: var(--border-2); }
+.method-cell-name {
+  font-size: 7px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  margin-bottom: 3px;
+}
+.method-cell-val {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+/* ══════════════════════════════════════════
+   CONSENSUS
+══════════════════════════════════════════ */
+.consensus-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0 0;
+  border-top: 1px solid var(--border-1);
+  margin-top: 6px;
+}
+.consensus-ring {
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.consensus-info { flex: 1; }
+.consensus-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-1);
+  margin-bottom: 1px;
+}
+.consensus-sub {
+  font-size: 8px;
+  color: var(--text-3);
+  letter-spacing: 0.04em;
+}
+
+/* ══════════════════════════════════════════
+   CHART
+══════════════════════════════════════════ */
+.chart-shell {
+  position: relative;
+  border-radius: var(--r-md);
+  padding: 3px;
+  background: linear-gradient(135deg, rgba(120,100,255,0.04) 0%, transparent 60%);
+  overflow: hidden;
+}
+.chart-shell canvas {
+  display: block;
+  width: 100% !important;
+  max-height: 220px;
+}
+
+/* ══════════════════════════════════════════
+   INFO TABLE ROWS
+══════════════════════════════════════════ */
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border-1);
+  font-size: 11px;
+}
+.info-row:last-child { border-bottom: none; }
+.info-k {
+  font-size: 10px;
+  color: var(--text-3);
+  font-weight: 500;
+}
+.info-v {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 600;
+  font-size: 11px;
+}
+
+/* ══════════════════════════════════════════
+   GAUGE RINGS
+══════════════════════════════════════════ */
+.gauge-wrap {
+  position: relative;
+  width: 80px;
+  height: 80px;
+  margin: 0 auto 4px;
+}
+.gauge-wrap svg { width: 100%; height: 100%; }
+.gauge-center-val {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 700;
+  font-size: 16px;
+}
+.metric-label {
+  font-size: 8px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  text-align: center;
+  margin-bottom: 6px;
+}
+.sopr-num {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 22px;
+  font-weight: 700;
+  text-align: center;
+  margin: 6px 0 3px;
+}
+.dual-cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.metric-center { text-align: center; padding: 4px; }
+
+/* ══════════════════════════════════════════
+   SIGNAL BLOCK
+══════════════════════════════════════════ */
+.signal-pill {
+  display: inline-block;
+  padding: 6px 20px;
+  border-radius: 100px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+.sp-buy   { background: var(--green-dim); color: var(--green); border: 1px solid rgba(0,245,160,0.25); }
+.sp-watch { background: var(--amber-dim); color: var(--amber); border: 1px solid rgba(240,180,41,0.2); }
+.sp-cash  { background: var(--red-dim);   color: var(--red);   border: 1px solid rgba(255,64,96,0.2); }
+
+
+/* ── NEWS TICKER ── */
+.news-wrap {
+  margin-bottom: 14px;
+  position: relative;
+}
+.news-viewport {
+  height: 52px;
+  overflow: hidden;
+  background: var(--bg-card);
+  border: 1px solid var(--border-1);
+  border-radius: var(--r-lg);
+  position: relative;
+}
+.news-viewport::after {
+  content: '';
+  position: absolute;
+  right: 0; top: 0; bottom: 0;
+  width: 60px;
+  background: linear-gradient(90deg, transparent 0%, var(--bg-card) 100%);
+  pointer-events: none;
+  z-index: 1;
+}
+.news-track { position: relative; height: 100%; }
+.news-item {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  font-size: 10px;
+  color: var(--text-2);
+  opacity: 0;
+  transform: translateY(100%);
+  transition: transform 0.4s cubic-bezier(0.4,0,0.2,1), opacity 0.4s ease;
+  will-change: transform, opacity;
+  line-height: 1.5;
+}
+.news-item::before {
+  content: '';
+  width: 3px; height: 3px;
+  border-radius: 50%;
+  background: var(--purple);
+  flex-shrink: 0;
+  margin-right: 8px;
+}
+.news-item.active  { opacity: 1; transform: translateY(0); }
+.news-item.exit    { opacity: 0; transform: translateY(-100%); }
+.news-dots {
+  display: flex;
+  justify-content: center;
+  gap: 3px;
+  margin-top: 4px;
+}
+.news-dot {
+  height: 2px;
+  width: 10px;
+  border-radius: 2px;
+  background: var(--text-4);
+  cursor: pointer;
+  transition: background 0.2s, width 0.2s;
+}
+.news-dot.active { background: var(--purple); width: 18px; }
+
+/* ══════════════════════════════════════════
+   KELLY / BACKTEST PANELS
+══════════════════════════════════════════ */
+.stat-3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.stat-box {
+  background: var(--bg-raise);
+  border-radius: var(--r-md);
+  padding: 10px 8px;
+  text-align: center;
+  border: 1px solid var(--border-1);
+}
+.stat-label {
+  font-size: 8px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  margin-bottom: 4px;
+}
+.stat-val {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1;
+}
+.stat-note {
+  font-size: 8px;
+  color: var(--text-3);
+  margin-top: 3px;
+}
+
+.stat-4 {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+/* ══════════════════════════════════════════
+   XAI FEATURES
+══════════════════════════════════════════ */
+.xai-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border-1);
+}
+.xai-bar-row:last-child { border-bottom: none; }
+.xai-name {
+  font-size: 10px;
+  font-weight: 600;
+  width: 100px;
+  flex-shrink: 0;
+  color: var(--text-1);
+}
+.xai-track {
+  flex: 1;
+  height: 5px;
+  background: var(--bg-raise);
+  border-radius: 5px;
+  overflow: hidden;
+}
+.xai-fill { height: 100%; border-radius: 5px; }
+.xai-pct {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: 700;
+  width: 32px;
+  text-align: right;
+  flex-shrink: 0;
+}
+.xai-dir {
+  font-size: 10px;
+  width: 16px;
+  text-align: center;
+  flex-shrink: 0;
+}
+.xai-note {
+  padding: 6px 10px;
+  background: rgba(120,100,255,0.04);
+  border-left: 2px solid var(--purple);
+  border-radius: 0 var(--r-sm) var(--r-sm) 0;
+  font-size: 9px;
+  color: var(--text-2);
+  line-height: 1.6;
+  margin-top: 10px;
+}
+
+/* ══════════════════════════════════════════
+   PAPER TRADING
+══════════════════════════════════════════ */
+.paper-stats {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+  padding: 12px 18px;
+}
+.paper-stat {
+  background: var(--bg-raise);
+  border-radius: var(--r-md);
+  padding: 8px 6px;
+  text-align: center;
+  border: 1px solid var(--border-1);
+}
+.paper-stat-label {
+  font-size: 7px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  margin-bottom: 3px;
+}
+.paper-stat-val {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 16px;
+  font-weight: 700;
+}
+.paper-log {
+  background: rgba(0,0,0,0.3);
+  border-radius: var(--r-md);
+  margin: 0 18px 10px;
+  padding: 8px 10px;
+  height: 100px;
+  overflow-y: auto;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  line-height: 1.6;
+  color: var(--text-2);
+  border: 1px solid var(--border-1);
+}
+.paper-log div {
+  padding: 1px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.015);
+}
+.paper-controls {
+  display: flex;
+  gap: 6px;
+  padding: 0 18px 12px;
+}
+.paper-btn {
+  padding: 5px 12px;
+  border-radius: var(--r-sm);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: 'Space Grotesk', sans-serif;
+  border: none;
+}
+.pb-green {
+  background: var(--green-dim);
+  border: 1px solid rgba(0,245,160,0.2);
+  color: var(--green);
+}
+.pb-green:hover { background: var(--green); color: #07080d; }
+.pb-red {
+  background: var(--red-dim);
+  border: 1px solid rgba(255,64,96,0.2);
+  color: var(--red);
+}
+.pb-red:hover { background: var(--red); color: #07080d; }
+
+.paper-collapse {
+  cursor: pointer;
+  padding: 2px 0;
+  font-size: 8px;
+  color: var(--text-3);
+  text-align: center;
+  user-select: none;
+}
+.paper-collapse:hover { color: var(--text-2); }
+
+/* ══════════════════════════════════════════
+   HELP PANEL
+══════════════════════════════════════════ */
+.help-panel {
+  margin-top: 12px;
+  background: var(--bg-base);
+  border: 1px solid var(--border-1);
+  border-radius: var(--r-xl);
+  padding: 18px;
+}
+.help-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin-top: 14px;
+}
+.help-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-1);
+  border-radius: var(--r-lg);
+  padding: 12px;
+}
+.help-card-full { grid-column: 1 / -1; }
+.help-card-title {
+  font-size: 10px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+.help-body {
+  font-size: 9px;
+  color: var(--text-2);
+  line-height: 1.6;
+}
+.help-body ul, .help-body ol { margin: 3px 0; padding-left: 12px; }
+.help-body li { margin-bottom: 1px; }
+.help-body code {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8px;
+  background: var(--purple-dim);
+  padding: 1px 4px;
+  border-radius: 2px;
+  color: var(--purple);
+}
+.help-body strong { color: var(--text-1); font-weight: 600; }
+
+/* ══════════════════════════════════════════
+   SECURITY CHIPS
+══════════════════════════════════════════ */
+.sec-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 100px;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+.sc-critical { background: rgba(255,64,96,0.12); color: var(--red); border: 1px solid rgba(255,64,96,0.2); }
+.sc-high     { background: var(--amber-dim); color: var(--amber); border: 1px solid rgba(240,180,41,0.2); }
+.sc-safe     { background: var(--green-dim); color: var(--green); border: 1px solid rgba(0,245,160,0.2); }
+.sec-event-text {
+  margin-top: 6px;
+  padding: 6px 10px;
+  background: rgba(255,64,96,0.03);
+  border-left: 2px solid var(--red);
+  border-radius: 0 var(--r-sm) var(--r-sm) 0;
+  font-size: 9px;
+  color: var(--text-2);
+  line-height: 1.6;
+}
+
+/* ══════════════════════════════════════════
+   FOOTER
+══════════════════════════════════════════ */
+.footer {
+  padding: 14px 24px;
+  border-top: 1px solid var(--border-1);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 9px;
+  color: var(--text-3);
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.footer-links { display: flex; gap: 12px; }
+.footer-link {
+  cursor: pointer;
+  transition: color 0.2s;
+  font-weight: 500;
+}
+.footer-link:hover { color: var(--text-2); }
+
+/* ══════════════════════════════════════════
+   CALIBRATION NOTE
+══════════════════════════════════════════ */
+.calib-note {
+  padding: 6px 8px;
+  background: var(--amber-dim);
+  border-left: 2px solid var(--amber);
+  border-radius: 0 var(--r-sm) var(--r-sm) 0;
+  font-size: 8px;
+  color: var(--text-2);
+  margin-top: 8px;
+}
+
+/* ══════════════════════════════════════════
+   MISC UTILITIES
+══════════════════════════════════════════ */
+.mb-4  { margin-bottom: 4px; }
+.mb-8  { margin-bottom: 8px; }
+.mb-12 { margin-bottom: 12px; }
+.mb-16 { margin-bottom: 16px; }
+.mt-4  { margin-top: 4px; }
+.mt-8  { margin-top: 8px; }
+.mt-12 { margin-top: 12px; }
+.text-center { text-align: center; }
+.mono { font-family: 'JetBrains Mono', monospace; }
+.text-sm { font-size: 9px; color: var(--text-3); }
+.text-xs { font-size: 8px; color: var(--text-3); }
+
+/* ══════════════════════════════════════════
+   RESPONSIVE
+══════════════════════════════════════════ */
+@media (max-width: 1400px) {
+  .kpi-row { grid-template-columns: 2fr 1fr 1fr 1fr; }
+}
+@media (max-width: 1100px) {
+  .kpi-row { grid-template-columns: repeat(3, 1fr); }
+  .grid-2 { grid-template-columns: 1fr; }
+  .grid-3 { grid-template-columns: 1fr 1fr; }
+  .grid-4 { grid-template-columns: repeat(2, 1fr); }
+  .help-grid { grid-template-columns: repeat(2, 1fr); }
+  .stat-4 { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 768px) {
+  .nav-center { display: none; }
+  .main { padding: 12px; }
+  .status-band { padding: 6px 12px; }
+  .kpi-row { grid-template-columns: repeat(2, 1fr); }
+  .kpi-hero .kpi-num { font-size: 24px; }
+  .kpi-num { font-size: 18px; }
+  .kpi-hero { grid-column: 1 / -1; }
+  .grid-3 { grid-template-columns: 1fr; }
+  .grid-4 { grid-template-columns: 1fr; }
+  .paper-stats { grid-template-columns: repeat(4, 1fr); }
+  .help-grid { grid-template-columns: 1fr; }
+  .dual-cols { grid-template-columns: 1fr; }
+  .stat-3 { grid-template-columns: 1fr 1fr; }
+  .sfc-big-num { font-size: 36px; }
+  .stat-4 { grid-template-columns: repeat(2, 1fr); }
+  .chart-shell canvas { height: 160px !important; }
+}
+@media (max-width: 480px) {
+  .kpi-hero .kpi-num { font-size: 18px; }
+  .kpi-num { font-size: 15px; }
+  .kpi-row { gap: 6px; }
+  .kpi { padding: 10px; }
+}
+</style>
 </head>
 <body>
-<div class="login-card">
-    <h1>SFC TERMINAL</h1>
-    <p>Enter your username to access the dashboard.</p>
-    <div class="error" id="error"></div>
-    <form method="POST" action="/api/login" id="loginForm">
-        <input type="text" name="username" id="username" placeholder="Your username" autocomplete="off" autocapitalize="off" autofocus required>
-        <button type="submit" id="loginBtn">Start Trading →</button>
-    </form>
-    <div class="note">⚠ Just a username — no password.</div>
-    <div class="note" style="margin-top:4px;font-size:11px;color:#3a4460">Tip: use the same username as before to restore paper trading data.</div>
+
+<div id="app">
+  <div class="loading-screen">
+    <div class="loading-logo">SFC</div>
+    <div class="loading-spinner"></div>
+    <div class="loading-text">Initializing SFC Terminal...</div>
+  </div>
 </div>
+
 <script>
 /* __EMBEDDED_DATA_PLACEHOLDER__ */
-var __EMBEDDED_DATA = {"ts": "2026-06-16T16:34:43.116572+00:00", "btc": 65750.0, "btc_24h": -2.166, "btc_mcap": 1316263611023.317, "fng": 24, "fng_cls": "Fear", "dom": 58.5, "dvol": 37.55, "sfc_base": 12.748164366872425, "sfc_effective": 39.54816436687243, "news_stress": -6.3, "news_headlines": ["\ud83d\udd34[Ft][FT] Russian warship accused of firing warning shots towards yacht in Channel", "\ud83d\udd34[Rt][Decrypt] South Korea Charges 23 Over Crypto Laundering Tied to $11M Cambodian Scam R", "\ud83d\udd34[Lt][Investing.co] ECB will be proactive against high inflation even after Iran deal, Lane say", "\ud83d\udd34[Rt][BeInCrypto] SanDisk RSI Hits Record 99, Fueling AI Bubble Fears Across Markets", "\u26aa[Rt][BitcoinMag] Binance Reportedly Faces European Union Exit as MiCA License Bid Nears Reje", "\u26aa[Rt][BitcoinMag] BlackRock Launches New Bitcoin ETF Combining BTC Exposure With Covered Call", "\u26aa[Rt][CoinTelegrap] Binance says it considers EU license compliant amid reports of potential re", "\u26aa[Rt][CoinTelegrap] Ripple targets Africa\u2019s remittance market with Flutterwave investment"], "news_sentiment": 0.206, "news_stats": {"total_articles": 68, "sources_hit": 15, "stress_raw": -6.25, "stress_capped": -6.3}, "m2_yoy": 4.72, "liq_mod": 1.8, "liq_total_24h": 946641929.8599999, "liq_long_vol": 288750084.08, "liq_short_vol": 657891845.78, "zone": "ELEVATED", "floor_buffer": 5740, "floor_total": 60010, "regime": "NORMAL", "regime_prob": 0.655, "transition_risk": 0.345, "dxy": 99.6, "pc_oi": 0.63, "pc_vol": 0.98, "dv_sfc": 0.087, "phi": 1.0, "state": "DISSIPATIVE SLIDE", "signal": "STAY IN CASH / GOLD", "factors": {"Lt": -2.068515149436106, "St": -0.497442682013971, "Rt": -1.9176641997315547, "Ft": 2.1149110771316444, "Sc": 0.1199360409334922}, "ath": 126080, "ath_date": "2025-10-06T18:57:42.558Z", "rsi_14": 45.26, "rsi_regime": "NEUTRAL", "sopr_proxy": 0.8382, "sopr_signal": "EXTREME_CAPITULATION", "sopr_score": 0.95, "cascade_risk": 0.384, "liq_density": 0.473, "liq_pressure": "BALANCED", "composite_confidence": 0.376, "confidence_components": {"method_agree": 0.851, "low_stress_boost": 0.0484, "rsi": 0.03, "sopr": -0.05, "dvol": 0.05, "squeeze_penalty": 0.0, "cascade_penalty": -0.05, "fear_penalty": -0.0, "news_penalty": -0.0, "vol_penalty": 0.0, "transition_penalty": 0.0}, "m1_klr": 10.7, "m2_logit": 6.4, "m3_bayes": 4.0, "m4_ewc": 7.2, "m5_qreg": 6.5, "m6_regime_score": 1.0, "method_agreement": 0.851, "m7_fisher": 0.35, "m7_detail": {"real_rate": 0.63, "fed_rate": 3.63, "cpi_yoy": 3.0}, "m8_yield": 0.45, "m8_detail": {"slope": 0.39, "spread": 2.7}, "m9_liquidity": null, "m9_detail": null, "m10_garch": 0.85, "m10_detail": {"garch_vol": 0.1182, "persistence": 0.99}, "m11_var": 0.85, "m11_detail": {"var_95": -0.1573, "es_95": -0.1761}, "m12_jump": 0.85, "m12_detail": {"jump_risk": 0.1057, "gap_count": 33}, "m13_funding": null, "m13_detail": null, "m14_skew": 0.1, "m14_detail": {"skew": 0.0, "put_iv": 50.71, "call_iv": 50.71}, "m15_concentration": 0.1, "m15_detail": {"hhi": 0.0051, "top3_share": 0.049}, "m16_regime_ml": 0.45, "m16_detail": {"p_crisis": 0.45, "recent_mean": 0.0237, "recent_std": 0.1397}, "m17_granger": 0.1, "m17_detail": {"corr": 0.143, "lag_corr": -0.199}, "m18_entropy": 0.55, "m18_detail": {"entropy_norm": 0.831, "entropy_raw": 1.912}, "m19_mutual_info": 0.15, "m19_detail": {"mi_norm": 0.099, "mi_raw": 0.109}, "new_methods_active": 11, "new_methods_avg": 0.215, "inst_methods_active": 12, "inst_methods_avg": 0.391, "total_methods_active": 31, "m20_obi": 0.75, "m20_detail": {"obi_change": "SELL_SURGE", "obi_delta": -0.8546, "obi": -0.9594, "obi_norm": 0.0203, "bid_vol": 0.18, "ask_vol": 8.87}, "m21_trade_flow": 0.3, "m21_detail": {"large_sell_notional": 0, "large_buy_notional": 0, "large_ratio": 0, "large_sell_ratio": 0.5, "large_share": 0}, "m22_spread": 0.1, "m22_detail": {"spread_bps": 0.0015, "range_bps": 290.08, "bid": 65744.0, "ask": 65744.01, "mid": 65744.01, "spread_change": "STABLE", "spread_delta": 0.0}, "m23_liquidity": 0.8, "m23_detail": {"slippage_pct": 2.501, "levels_used_buy": 31, "levels_used_sell": 999, "mid_price": 65742.01, "liq_change": "STABLE", "slippage_delta": -0.002}, "m24_cape": 0.1, "m24_detail": {"cape": 0.7106, "current_price": 65686.97, "sma_1y_realized": 92444.51}, "m25_minsky": 0.35, "m25_detail": {"funding_rate": 4.7e-05, "funding_8h": 8.15e-06, "accel": 2.8e-05, "oi_futures": 2208455280, "minsky_stage": "DISPLACEMENT"}, "m26_kahneman": 0.245, "m26_detail": {"loss_aversion": 0.35, "anchoring": 0.15, "fear": 0.2, "realized_price": 69529.8, "ath": 126080.0, "pl_pct": -5.44}, "m27_taleb": 0.502, "m27_detail": {"dvol": 52.46, "skewness": -0.0983, "max_drawdown": 0.2591, "vol_7d_ann": 0.2893, "vol_90d_ann": 0.5246, "term": "3M>1W", "tail_danger": "ELEVATED"}, "m28_summers": 0.2, "m28_detail": {"real_rate": 0.63, "gdp_growth": 2.57, "fed_rate": 3.63, "regime": "NORMAL"}, "m29_debt": 0.85, "m29_detail": {"debt_gdp_ratio": 1.226, "crisis_risk": "HIGH"}, "m30_rajan": 0.15, "m30_detail": {"fsi_score": 0.15, "components": {"credit_growth": 4.72, "asset_vol": 50.71, "yield_curve": 0.39, "hy_spread": 2.7, "top3_concentration": 0.049, "fng": 23}, "stability": "NORMAL"}, "m31_altman": 0.15, "m31_detail": {"z_score": 6.623, "x1_liquidity": 0.0, "x2_network": 4.0, "x3_efficiency": 0.849, "x4_oi_ratio": 0.765, "x5_turnover": 4.385, "zone": "SAFE"}, "micro_change_flags": {"obi": "SELL_SURGE"}, "micro_trend_score": 0.333, "micro_deteriorating": true, "m32_qlstm": 0.175, "m32_active": true, "m32_adjustment_pp": 0.25, "m32_garch_residual": -15.2221, "m32_garch_volatility": 2.3882, "m32_hybrid_pred": 2.2753, "m32_proadapt_weight": 0.5, "m32_proadapt_final": 2.2753, "m33_glo_score": 0.85, "m33_glo_detail": {"fed_yoy": 1.04, "ecb_yoy": -0.32, "jpn_yoy": -9.44, "fed_balance": 6725397.0, "ecb_balance": 6135633.0, "jpn_balance": 6643630.0, "glo_z_score": -2.004, "glo_score": 9.9, "glo_label": "CONTRACTIVE"}, "xai_top_features": [{"idx": 1, "name": "M2_Logit", "importance": -7.389892578125, "direction": "negative", "corr": -0.5905906305233276, "importance_pct": 34.0}, {"idx": 4, "name": "M5_QReg", "importance": -5.23504638671875, "direction": "negative", "corr": -0.5954398479240423, "importance_pct": 24.1}, {"idx": 0, "name": "M1_KLR", "importance": -4.655649185180664, "direction": "negative", "corr": -0.49906969891962255, "importance_pct": 21.4}, {"idx": 3, "name": "M4_EWC", "importance": -3.1389503479003906, "direction": "positive", "corr": 0.5861280686154572, "importance_pct": 14.4}, {"idx": 21, "name": "M22_Spread", "importance": -1.3076896667480469, "direction": "positive", "corr": 0.5696845780752109, "importance_pct": 6.0}], "ml_ensemble_score": 0.221, "ml_ensemble_confidence": 0.8, "ml_ensemble_msg": "WeightedAvg=0.221", "ml_accuracy": 1.0, "ml_total_labeled": 1683, "ml_correct": 1683, "m1_m6_weight_pct": 84.1, "m7_m19_weight_pct": 10.0, "m20_m31_weight_pct": 5.9, "causal_methods_active": 29, "causal_excluded": "m3_bayes, m9_liquidity, m13_funding", "causal_excluded_count": 3, "q10_whale_pressure": 60.4, "q10_onchain_value": 87.9, "q10_buying_power": 52.8, "q10_available": true, "q10_details": {"exchange_netflow": {"score": 47.9, "value": -54.498119, "date": "2026-06-16", "status": "ok"}, "whale_ratio": {"score": 66.0, "value": 0.54790955, "date": "2026-06-15", "status": "ok"}, "mvrv_ratio": {"score": 90.7, "value": 1.23897041, "date": "2026-06-15", "status": "ok"}, "puell_multiple": {"score": 83.3, "value": 0.7029799078921694, "date": "2026-06-14", "status": "ok"}, "stablecoin_reserve": {"score": 27.7, "value": 63254112152.89019, "date": "2026-06-16", "status": "ok"}, "taker_buy_sell": {"score": 90.4, "value": 1.07554291, "date": "2026-06-16", "status": "ok"}, "miners_position": {"score": 89.9, "value": -1.317264367804473, "date": "2026-06-14", "status": "ok"}, "funding_rates": {"score": 56.4, "value": 0.00016066166666666665, "date": "2026-06-16", "status": "ok"}, "exchange_supply_ratio": {"score": 78.9, "value": 0.13389779, "date": "2026-06-15", "status": "ok"}, "whale_pressure_score": 60.4, "onchain_value_score": 87.9, "buying_power_score": 52.8}, "adv_regime": "CRISIS", "adv_crisis_prob": 0.958, "adv_regime_stability": 0.042, "adv_regime_boost": 25, "adv_uncertainty": 0.0, "adv_confidence": "HIGH_CONFIDENCE_CALM", "adv_trends_recession": 0.77, "adv_trends_crash": 0.77, "adv_reddit_sentiment": 0.0, "adv_reddit_label": "NEUTRAL", "adv_cg_dd_ath": -1.0, "bt_sharpe": 1.94, "bt_sharpe_low": 1.55, "bt_sharpe_high": 2.33, "bt_max_dd": 0.0939, "bt_win_rate": 0.95, "bt_win_rate_low": 0.939, "bt_win_rate_high": 0.959, "bt_return": 0.5, "bt_periods": 1683, "bt_stability": 0.817, "bt_calibration_note": "Limited stress events in training window \u2014 metrics are upper-bound estimates", "bt_label": "WALK-FORWARD VALIDATED", "kelly_p_win": 0.376, "kelly_b_payoff": 2.0, "kelly_fraction": 0.064, "kelly_half": 0.032, "kelly_quarter": 0.016, "kelly_override_reason": null, "signal_type": "STRESS", "signal_strength": 0.791, "timing_precision": "MEDIUM", "alert_window_days": 25.7, "timeframe": "MONTHLY", "readiness_score": 0.227, "shock_factor": 0.0, "shock_event": null, "shock_severity": "NONE", "sec_events": 2, "q9_available": true, "q9_articles": 0, "m65_cnn_attention": 0.4967, "m65_pattern_type": "LOW_STRESS - normal market noise", "m65_available": true, "m66_ga_features": null, "m66_ga_count": 0, "m66_available": true, "m67_augmented_shape": null, "m67_available": true, "m68_drl_signal": "HOLD", "m68_available": true, "m69_systemic_risk": 0.5599, "m69_btc_systemic_risk": 1.0, "m69_market_regime": "STRESS", "m69_correlation_breakdown": false, "m69_available": true, "m70_shap_ok": true, "m70_shap_top_1": "M20_OBI", "m70_shap_top_1_pct": 13.9, "m70_shap_top_3": "M20_OBI, M8_MonteCarlo, M68_DRL_Signal", "m71_lime_ok": true, "m71_lime_top_1": "M20_OBI", "m71_lime_top_1_pct": 24.1, "m71_lime_top_3": "M20_OBI, M6_Regime, M1_KLR"};
+var __EMBEDDED_DATA = {"ts": "2026-06-16T16:40:41.816468+00:00", "btc": 65860.01, "btc_24h": -1.955, "btc_mcap": 1317808905265.2014, "fng": 24, "fng_cls": "Fear", "dom": 58.5, "dvol": 37.51, "sfc_base": 12.71811819066554, "sfc_effective": 39.51811819066554, "news_stress": -6.3, "news_headlines": ["\ud83d\udd34[Ft][FT] Russian warship accused of firing warning shots towards yacht in Channel", "\ud83d\udd34[Rt][Decrypt] South Korea Charges 23 Over Crypto Laundering Tied to $11M Cambodian Scam R", "\ud83d\udd34[Lt][Investing.co] ECB will be proactive against high inflation even after Iran deal, Lane say", "\ud83d\udd34[Rt][BeInCrypto] SanDisk RSI Hits Record 99, Fueling AI Bubble Fears Across Markets", "\u26aa[Rt][BitcoinMag] Binance Reportedly Faces European Union Exit as MiCA License Bid Nears Reje", "\u26aa[Rt][BitcoinMag] BlackRock Launches New Bitcoin ETF Combining BTC Exposure With Covered Call", "\u26aa[Rt][CoinTelegrap] Binance says it considers EU license compliant amid reports of potential re", "\u26aa[Rt][CoinTelegrap] Ripple targets Africa\u2019s remittance market with Flutterwave investment"], "news_sentiment": 0.209, "news_stats": {"total_articles": 67, "sources_hit": 15, "stress_raw": -6.25, "stress_capped": -6.3}, "m2_yoy": 4.72, "liq_mod": 1.8, "liq_total_24h": 946641929.8599999, "liq_long_vol": 288750084.08, "liq_short_vol": 657891845.78, "zone": "ELEVATED", "floor_buffer": 5737, "floor_total": 60123, "regime": "NORMAL", "regime_prob": 0.656, "transition_risk": 0.344, "dxy": 99.6, "pc_oi": 0.63, "pc_vol": 0.99, "dv_sfc": 0.087, "phi": 1.0, "state": "DISSIPATIVE SLIDE", "signal": "STAY IN CASH / GOLD", "factors": {"Lt": -2.022157028921936, "St": -0.5077622317703074, "Rt": -1.9176641997315547, "Ft": 2.1168596533210544, "Sc": 0.1199360409334922}, "ath": 126080, "ath_date": "2025-10-06T18:57:42.558Z", "rsi_14": 45.31, "rsi_regime": "NEUTRAL", "sopr_proxy": 0.8395, "sopr_signal": "EXTREME_CAPITULATION", "sopr_score": 0.95, "cascade_risk": 0.384, "liq_density": 0.473, "liq_pressure": "BALANCED", "composite_confidence": 0.376, "confidence_components": {"method_agree": 0.851, "low_stress_boost": 0.0484, "rsi": 0.03, "sopr": -0.05, "dvol": 0.05, "squeeze_penalty": 0.0, "cascade_penalty": -0.05, "fear_penalty": -0.0, "news_penalty": -0.0, "vol_penalty": 0.0, "transition_penalty": 0.0}, "m1_klr": 10.7, "m2_logit": 6.4, "m3_bayes": 4.0, "m4_ewc": 7.3, "m5_qreg": 6.4, "m6_regime_score": 1.0, "method_agreement": 0.851, "m7_fisher": 0.35, "m7_detail": {"real_rate": 0.63, "fed_rate": 3.63, "cpi_yoy": 3.0}, "m8_yield": 0.45, "m8_detail": {"slope": 0.39, "spread": 2.7}, "m9_liquidity": null, "m9_detail": null, "m10_garch": 0.85, "m10_detail": {"garch_vol": 0.1182, "persistence": 0.99}, "m11_var": 0.85, "m11_detail": {"var_95": -0.1573, "es_95": -0.1761}, "m12_jump": 0.85, "m12_detail": {"jump_risk": 0.1057, "gap_count": 33}, "m13_funding": null, "m13_detail": null, "m14_skew": 0.1, "m14_detail": {"skew": 0.0, "put_iv": 50.71, "call_iv": 50.71}, "m15_concentration": 0.1, "m15_detail": {"hhi": 0.0051, "top3_share": 0.049}, "m16_regime_ml": 0.45, "m16_detail": {"p_crisis": 0.45, "recent_mean": 0.0238, "recent_std": 0.1396}, "m17_granger": 0.1, "m17_detail": {"corr": 0.143, "lag_corr": -0.199}, "m18_entropy": 0.55, "m18_detail": {"entropy_norm": 0.831, "entropy_raw": 1.912}, "m19_mutual_info": 0.15, "m19_detail": {"mi_norm": 0.099, "mi_raw": 0.109}, "new_methods_active": 11, "new_methods_avg": 0.215, "inst_methods_active": 12, "inst_methods_avg": 0.391, "total_methods_active": 31, "m20_obi": 0.55, "m20_detail": {"obi_change": "BUY_SURGE", "obi_delta": 0.3004, "obi": -0.3586, "obi_norm": 0.3207, "bid_vol": 2.51, "ask_vol": 5.33}, "m21_trade_flow": 0.3, "m21_detail": {"large_sell_notional": 0, "large_buy_notional": 0, "large_ratio": 0, "large_sell_ratio": 0.5, "large_share": 0}, "m22_spread": 0.1, "m22_detail": {"spread_bps": 0.0015, "range_bps": 287.14, "bid": 65858.03, "ask": 65858.04, "mid": 65858.03, "spread_change": "STABLE", "spread_delta": 0.0}, "m23_liquidity": 0.8, "m23_detail": {"slippage_pct": 2.506, "levels_used_buy": 999, "levels_used_sell": 100, "mid_price": 65858.04, "liq_change": "STABLE", "slippage_delta": 0.005}, "m24_cape": 0.1, "m24_detail": {"cape": 0.7113, "current_price": 65752.43, "sma_1y_realized": 92444.68}, "m25_minsky": 0.35, "m25_detail": {"funding_rate": 3e-05, "funding_8h": 8.38e-06, "accel": 1.1e-05, "oi_futures": 2208472610, "minsky_stage": "DISPLACEMENT"}, "m26_kahneman": 0.245, "m26_detail": {"loss_aversion": 0.35, "anchoring": 0.15, "fear": 0.2, "realized_price": 69531.98, "ath": 126080.0, "pl_pct": -5.28}, "m27_taleb": 0.502, "m27_detail": {"dvol": 52.46, "skewness": -0.0998, "max_drawdown": 0.2591, "vol_7d_ann": 0.2843, "vol_90d_ann": 0.5246, "term": "3M>1W", "tail_danger": "ELEVATED"}, "m28_summers": 0.2, "m28_detail": {"real_rate": 0.63, "gdp_growth": 2.57, "fed_rate": 3.63, "regime": "NORMAL"}, "m29_debt": 0.85, "m29_detail": {"debt_gdp_ratio": 1.226, "crisis_risk": "HIGH"}, "m30_rajan": 0.15, "m30_detail": {"fsi_score": 0.15, "components": {"credit_growth": 4.72, "asset_vol": 50.7, "yield_curve": 0.39, "hy_spread": 2.7, "top3_concentration": 0.049, "fng": 23}, "stability": "NORMAL"}, "m31_altman": 0.15, "m31_detail": {"z_score": 6.559, "x1_liquidity": 0.0, "x2_network": 4.0, "x3_efficiency": 0.85, "x4_oi_ratio": 0.791, "x5_turnover": 4.238, "zone": "SAFE"}, "micro_change_flags": {}, "micro_trend_score": null, "micro_deteriorating": null, "m32_qlstm": 0.1684, "m32_active": true, "m32_adjustment_pp": 0.2167, "m32_garch_residual": -15.2194, "m32_garch_volatility": 2.9721, "m32_hybrid_pred": 1.6167, "m32_proadapt_weight": 0.5, "m32_proadapt_final": 1.6167, "m33_glo_score": 0.85, "m33_glo_detail": {"fed_yoy": 1.04, "ecb_yoy": -0.32, "jpn_yoy": -9.44, "fed_balance": 6725397.0, "ecb_balance": 6135633.0, "jpn_balance": 6643630.0, "glo_z_score": -2.004, "glo_score": 9.9, "glo_label": "CONTRACTIVE"}, "xai_top_features": [{"idx": 1, "name": "M2_Logit", "importance": -7.316108703613281, "direction": "negative", "corr": -0.5899407533912401, "importance_pct": 34.6}, {"idx": 4, "name": "M5_QReg", "importance": -4.728916168212891, "direction": "negative", "corr": -0.5442502626240755, "importance_pct": 22.4}, {"idx": 0, "name": "M1_KLR", "importance": -4.394868850708008, "direction": "negative", "corr": -0.49429521237888707, "importance_pct": 20.8}, {"idx": 3, "name": "M4_EWC", "importance": -3.7069950103759766, "direction": "positive", "corr": 0.6811397515874443, "importance_pct": 17.6}, {"idx": 25, "name": "M26_Kahneman", "importance": -0.9716320037841797, "direction": "negative", "corr": -0.6018288702202672, "importance_pct": 4.6}], "ml_ensemble_score": 0.218, "ml_ensemble_confidence": 0.8, "ml_ensemble_msg": "WeightedAvg=0.218", "ml_accuracy": 1.0, "ml_total_labeled": 1684, "ml_correct": 1684, "m1_m6_weight_pct": 84.1, "m7_m19_weight_pct": 10.0, "m20_m31_weight_pct": 5.9, "causal_methods_active": 29, "causal_excluded": "m3_bayes, m9_liquidity, m13_funding", "causal_excluded_count": 3, "q10_whale_pressure": 60.4, "q10_onchain_value": 87.9, "q10_buying_power": 52.8, "q10_available": true, "q10_details": {"exchange_netflow": {"score": 47.9, "value": -54.498119, "date": "2026-06-16", "status": "ok"}, "whale_ratio": {"score": 66.0, "value": 0.54790955, "date": "2026-06-15", "status": "ok"}, "mvrv_ratio": {"score": 90.7, "value": 1.23897041, "date": "2026-06-15", "status": "ok"}, "puell_multiple": {"score": 83.3, "value": 0.7029799078921694, "date": "2026-06-14", "status": "ok"}, "stablecoin_reserve": {"score": 27.7, "value": 63254112152.89019, "date": "2026-06-16", "status": "ok"}, "taker_buy_sell": {"score": 90.4, "value": 1.07554291, "date": "2026-06-16", "status": "ok"}, "miners_position": {"score": 89.9, "value": -1.317264367804473, "date": "2026-06-14", "status": "ok"}, "funding_rates": {"score": 56.4, "value": 0.00016066166666666665, "date": "2026-06-16", "status": "ok"}, "exchange_supply_ratio": {"score": 78.9, "value": 0.13389779, "date": "2026-06-15", "status": "ok"}, "whale_pressure_score": 60.4, "onchain_value_score": 87.9, "buying_power_score": 52.8}, "adv_regime": "CRISIS", "adv_crisis_prob": 0.968, "adv_regime_stability": 0.032, "adv_regime_boost": 25, "adv_uncertainty": 0.0, "adv_confidence": "HIGH_CONFIDENCE_CALM", "adv_trends_recession": 0.77, "adv_trends_crash": 0.77, "adv_reddit_sentiment": 0.0, "adv_reddit_label": "NEUTRAL", "adv_cg_dd_ath": -1.0, "bt_sharpe": 1.94, "bt_sharpe_low": 1.55, "bt_sharpe_high": 2.33, "bt_max_dd": 0.0938, "bt_win_rate": 0.95, "bt_win_rate_low": 0.939, "bt_win_rate_high": 0.959, "bt_return": 0.5, "bt_periods": 1684, "bt_stability": 0.817, "bt_calibration_note": "Limited stress events in training window \u2014 metrics are upper-bound estimates", "bt_label": "WALK-FORWARD VALIDATED", "kelly_p_win": 0.376, "kelly_b_payoff": 2.0, "kelly_fraction": 0.064, "kelly_half": 0.032, "kelly_quarter": 0.016, "kelly_override_reason": null, "signal_type": "STRESS", "signal_strength": 0.79, "timing_precision": "MEDIUM", "alert_window_days": 25.7, "timeframe": "MONTHLY", "readiness_score": 0.227, "shock_factor": 0.0, "shock_event": null, "shock_severity": "NONE", "sec_events": 2, "q9_available": true, "q9_articles": 0, "m65_cnn_attention": 0.48, "m65_pattern_type": "LOW_STRESS - normal market noise", "m65_available": true, "m66_ga_features": null, "m66_ga_count": 0, "m66_available": true, "m67_augmented_shape": null, "m67_available": true, "m68_drl_signal": "HOLD", "m68_available": true, "m69_systemic_risk": 0.5599, "m69_btc_systemic_risk": 1.0, "m69_market_regime": "STRESS", "m69_correlation_breakdown": false, "m69_available": true, "m70_shap_ok": true, "m70_shap_top_1": "M7_Fisher", "m70_shap_top_1_pct": 14.1, "m70_shap_top_3": "M7_Fisher, M4_EWC, M23_LiquidityDepth", "m71_lime_ok": true, "m71_lime_top_1": "M20_OBI", "m71_lime_top_1_pct": 24.1, "m71_lime_top_3": "M20_OBI, M6_Regime, M1_KLR"};
 
 /* ── UTILITIES ── */
 // ========== MULTI-USER SUPPORT (Q8) ==========
@@ -922,7 +2042,7 @@ function render(d) {
           </div>
         </div>
         <div class="stat-3 mb-12">
-          <div class="info-row"><span class="info-k">Alert Window</span><span class="info-v">~${Math.round(d.alert_window_days||0)}d</span></div>
+          <div class="info-row"><span class="info-k">Alert Window</span><span class="info-v">~${d.alert_window_hours||48}h</span></div>
           <div class="info-row"><span class="info-k">Timing Precision</span><span class="info-v" style="color:${d.timing_precision==='HIGH'?'var(--green)':'var(--amber)'}">${d.timing_precision||'LOW'}</span></div>
           <div class="info-row"><span class="info-k">Signal Type</span><span class="info-v" style="color:${d.fng<15||(d.cascade_risk||0)>0.5?'var(--red)':'var(--green)'}">${d.fng<15?(d.fng_cls||'EXTREME FEAR'):(d.cascade_risk||0)>0.5?'CASCADE RISK':'NORMAL'}</span></div>
         </div>
@@ -1969,9 +3089,260 @@ function processSignalFromSFC(d) {
     addPaperLog('⏳ Waiting for first trade signal from SFC...');
     return;
   }
-  // Also save to localStorage for the frontend
-  localStorage.setItem('sfc_username', u);
-});
+
+  // 5s debounce — avoid double-processing when BTC+SFC arrive near-simultaneously
+  const now = Date.now();
+  if (now - paperTrader._lastSignalTs < 5000) return;
+  paperTrader._lastSignalTs = now;
+
+  // Evaluate signal (mirrors paper_trader.py evaluate_signal)
+  const decision = paperTrader.evaluateSignal(d);
+
+  // Execute trade decision (mirrors paper_trader.py execute)
+  const tradesBefore = paperTrader.trades.length;
+  paperTrader.execute(decision);
+
+  // Log any trades that happened
+  if (paperTrader.trades.length > tradesBefore) {
+    const lastTrade = paperTrader.trades[paperTrader.trades.length - 1];
+    if (lastTrade.type === 'OPEN') {
+      addPaperLog(`🟢 [OPEN] LONG $${fmtNum(decision.size,0)} at $${fmtNum(decision.btc_price,0)} — ${decision.reason}`);
+    } else if (lastTrade.type === 'CLOSE') {
+      if (lastTrade.reason && lastTrade.reason.startsWith('Trailing Stop')) {
+        addPaperLog(`🔴 [TRAILING STOP] $${fmtNum(decision.btc_price,0)} — ${lastTrade.reason}`);
+      } else {
+        addPaperLog(`🔴 [CLOSE] All at $${fmtNum(decision.btc_price,0)} — ${decision.reason}`);
+      }
+    }
+    // Auto-save to KV after any trade
+    if (currentUser) saveUserState().catch(() => {});
+  } else if (decision.action === 'HOLD' && paperTrader.positions.length === 0 && Math.random() < 0.05) {
+    addPaperLog(`👀 Watching — ${decision.reason}`);
+  }
+
+  updatePaperDisplay();
+}
+
+function updatePaperDisplay(perf) {
+  if (!paperTrader) return;
+  if (!perf) perf = paperTrader.getPerformance();
+  const el = id => document.getElementById(id);
+  if (!el('paperEquity')) return;
+
+  el('paperEquity').textContent = '$' + fmtNum(perf.equity, 2);
+  el('paperEquity').style.color = perf.total_return >= 0 ? 'var(--green)' : 'var(--red)';
+  el('paperReturn').textContent = perf.total_return_pct.toFixed(2) + '%';
+  el('paperReturn').style.color = perf.total_return >= 0 ? 'var(--green)' : 'var(--red)';
+  el('paperSharpe').textContent = perf.sharpe.toFixed(2);
+  el('paperSharpe').style.color = perf.sharpe > 1.5 ? 'var(--green)' : perf.sharpe > 0.5 ? 'var(--amber)' : 'var(--red)';
+  el('paperWinRate').textContent = perf.win_rate_pct.toFixed(0) + '%';
+  el('paperWinRate').style.color = perf.win_rate_pct > 60 ? 'var(--green)' : 'var(--amber)';
+  el('paperDD').textContent = perf.max_dd_pct.toFixed(1) + '%';
+  el('paperDD').style.color = perf.max_dd_pct < 10 ? 'var(--green)' : perf.max_dd_pct < 20 ? 'var(--amber)' : 'var(--red)';
+  if (el('paperPnL')) {
+    const pnl = perf.unrealized_pnl || 0;
+    el('paperPnL').textContent = (pnl >= 0 ? '+' : '') + '$' + pnl.toFixed(2);
+    el('paperPnL').style.color = pnl >= 0 ? 'var(--green)' : 'var(--red)';
+  }
+  el('paperTradeCount').textContent = perf.total_trades;
+
+  const ps = document.getElementById('paperStatus');
+  if (ps) ps.textContent = perf.open_positions > 0 ? '● IN MARKET' : '● CASH';
+  if (el('paperLastUpdate')) el('paperLastUpdate').textContent = new Date().toLocaleTimeString();
+
+  // Track record text from server-backed state
+  const dailyKeys = Object.keys(paperTrader.dailySnapshots).sort();
+  let recordHtml = '<span style="color:var(--text-2)">Server-backed paper trader</span>';
+  if (dailyKeys.length >= 1) {
+    const first = paperTrader.dailySnapshots[dailyKeys[0]];
+    const last = paperTrader.dailySnapshots[dailyKeys[dailyKeys.length - 1]];
+    recordHtml += '<br><span style="color:var(--text-2)">' + dailyKeys.length + ' day' + (dailyKeys.length !== 1 ? 's' : '') + ' tracked &middot; ';
+    recordHtml += 'Start: $' + fmtNum(first.equity, 2) + ' &middot; ';
+    recordHtml += 'Latest: $' + fmtNum(last.equity, 2) + '</span>';
+  } else if (paperTrader.equityHistory.length > 0) {
+    const first = paperTrader.equityHistory[0];
+    const last = paperTrader.equityHistory[paperTrader.equityHistory.length - 1];
+    recordHtml += '<br><span style="color:var(--text-2)">' + paperTrader.equityHistory.length + ' tick' + (paperTrader.equityHistory.length !== 1 ? 's' : '') + ' tracked &middot; ';
+    recordHtml += 'Start: $' + fmtNum(first.equity, 2) + ' &middot; ';
+    recordHtml += 'Latest: $' + fmtNum(last.equity, 2) + '</span>';
+  } else {
+    recordHtml += '<br><span style="color:var(--text-2)">Initialized &middot; Capital: $' + fmtNum(paperTrader.capital, 2) + '</span>';
+  }
+  if (el('paperTrackRecord')) el('paperTrackRecord').innerHTML = recordHtml;
+}
+
+function addPaperLog(msg) {
+  const log = document.getElementById('paperLog');
+  if (!log) return;
+  const div = document.createElement('div');
+  div.textContent = msg;
+  log.appendChild(div);
+  log.scrollTop = log.scrollHeight;
+  while (log.children.length > 100) log.removeChild(log.firstChild);
+}
+
+function resetPaperTrading() {
+  paperTrader = new PaperTrader(PAPER_INITIAL_CAPITAL);
+  const log = document.getElementById('paperLog');
+  if (log) log.innerHTML = '<div>🟢 Paper trading reset to $' + PAPER_INITIAL_CAPITAL.toLocaleString() + ' capital</div>';
+  updatePaperDisplay();
+  // Reset KV state for multi-user
+  if (currentUser) {
+    paperTrader.userConfig = {};
+    saveUserState().catch(() => {});
+    addPaperLog('💾 KV state reset saved');
+  }
+}
+
+function exportPaperTrades() {
+  if (!paperTrader || paperTrader.trades.length === 0) { addPaperLog('⚠ No trades to export'); return; }
+  const blob = new Blob([JSON.stringify(paperTrader.trades, null, 2)], {type: 'application/json'});
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url;
+  a.download = 'sfc_paper_trades_' + new Date().toISOString().slice(0,10) + '.json';
+  a.click();
+  URL.revokeObjectURL(url);
+  addPaperLog('📥 Exported ' + paperTrader.trades.length + ' trades');
+}
+
+function manualBuy() {
+  if (!paperTrader) { addPaperLog('⚠ Paper trader not initialized'); return; }
+  if (paperTrader.positions.length > 0) { addPaperLog('⚠ Already have an open position. Close it first or wait.'); return; }
+
+  const price = currentData?.btc;
+  if (!price || price <= 0) { addPaperLog('⚠ No BTC price available'); return; }
+
+  // Get buy amount: user input or from config's max_allocation_pct
+  const amountInput = document.getElementById('manualBuyAmount');
+  let size = 0;
+  if (amountInput?.value && parseFloat(amountInput.value) > 0) {
+    size = parseFloat(amountInput.value);
+  } else {
+    const allocPct = (paperTrader.userConfig?.max_allocation_pct || 25) / 100;
+    size = Math.round(paperTrader.capital * allocPct * 100) / 100;
+  }
+
+  // Cap at available capital
+  size = Math.min(size, paperTrader.capital);
+  if (size < 10) { addPaperLog('⚠ Insufficient capital (min $10)'); return; }
+
+  const decision = {
+    reason: 'Manual Buy',
+    btc_price: price,
+    sfc_pct: currentData?.sfc_effective || 0,
+    confidence: currentData?.composite_confidence || 0,
+  };
+
+  paperTrader._openPosition(size, price, decision);
+  paperTrader._updatePnL(price);
+  paperTrader._dailySnapshot();
+
+  addPaperLog(`🟢 [MANUAL BUY] LONG $${fmtNum(size,0)} at $${fmtNum(price,0)}`);
+  updatePaperDisplay();
+
+  // Clear the input
+  if (amountInput) amountInput.value = '';
+
+  // Save to KV
+  if (currentUser) saveUserState().catch(() => {});
+}
+
+function manualCloseAll() {
+  if (!paperTrader) { addPaperLog('⚠ Paper trader not initialized'); return; }
+  if (paperTrader.positions.length === 0) { addPaperLog('⚠ No open positions to close'); return; }
+
+  const price = currentData?.btc;
+  if (!price || price <= 0) { addPaperLog('⚠ No BTC price available'); return; }
+
+  paperTrader._closeAllPositions(price, 'Manual Close');
+  paperTrader._updatePnL(price);
+  paperTrader._dailySnapshot();
+
+  addPaperLog(`🔴 [MANUAL CLOSE] All at $${fmtNum(price,0)}`);
+  updatePaperDisplay();
+
+  // Save to KV
+  if (currentUser) saveUserState().catch(() => {});
+}
+
+/* ── INIT ── */
+loadHistory();
+
+// Load initial data from SSE snapshot — full render ONCE
+let _sseAvailable = false;
+
+async function bootSFC() {
+  // PRIORITY 1: Render from embedded data INSTANTLY (no network wait)
+  // IMPORTANT: MUST run BEFORE await initPaperTrading() — if KV fetch hangs,
+  // the dashboard is already rendered and user isn't staring at a frozen page.
+  if (typeof __EMBEDDED_DATA !== 'undefined' && __EMBEDDED_DATA) {
+    currentData = __EMBEDDED_DATA;
+    render(__EMBEDDED_DATA);
+  } else if (window.__EMBEDDED_DATA) {
+    currentData = window.__EMBEDDED_DATA;
+    render(window.__EMBEDDED_DATA);
+  }
+
+  // Now init paper trader in background — may be slow/fail, but dashboard already visible
+  await initPaperTrading();
+
+  // PRIORITY 2: Try /snapshot in background for SSE connection
+  // (embedded data already rendered, so user sees dashboard immediately)
+  let initial = null;
+  try {
+    const r = await fetch('/snapshot');
+    if (r.ok) initial = await r.json();
+  } catch (e) { /* snapshot not available */ }
+
+  if (initial && (initial.sfc || initial.btc)) {
+    _sseAvailable = true;  // SSE server detected
+    // MERGE snapshot data ON TOP of existing embedded data
+    // IMPORTANT: don't replace — snapshot has fewer fields than __EMBEDDED_DATA
+    const merged = Object.assign({}, currentData || {}, initial.sfc || {}, {
+      btc: initial.btc?.btc ?? initial.sfc?.btc ?? currentData?.btc,
+      btc_24h: initial.btc?.change_pct ?? initial.sfc?.btc_24h ?? currentData?.btc_24h,
+    });
+    currentData = merged;
+    render(merged);
+  } else if (!currentData) {
+    // No embedded data AND no snapshot — fallback fetch data.json
+    await fetchLiveData();
+  }
+
+  // Ensure config panel visible and values set after any render path
+  setTimeout(function() {
+    if (currentUser && paperTrader) {
+      loadConfigToForm(paperTrader.userConfig || {});
+      updatePaperDisplay();
+    }
+  }, 200);
+  setTimeout(startNewsSlide, 100);
+  setTimeout(restoreScrollPos, 200);
+  // Start SSE only if server was detected (/snapshot responded)
+  if (_sseAvailable) {
+    startSSE();
+  } else {
+    // No SSE server — fall back to polling data.json every 30s
+    setInterval(fetchLiveData, 30000);
+  }
+}
+bootSFC();
+
+// SSE handles real-time updates when available.
+// On static (GitHub Pages / Workers), polling data.json every 30s is used instead.
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(e => console.log('SW failed:', e));
+  // When a new SW takes over, force a reload to pick up fresh index.html —
+  // otherwise the page is stuck on the old cached HTML until next manual refresh.
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (navigator.serviceWorker.controller) {
+      console.log('[SW] New controller — reloading');
+      window.location.reload();
+    }
+  });
+}
 </script>
 </body>
 </html>
