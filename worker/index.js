@@ -82,12 +82,7 @@ export default {
 
     // ── SESSION AUTH GUARD ──────────────────────────────────
     // Protected routes require sfc_session cookie
-    const sessionUser = getCookie(request, 'sfc_session');
-    const isPageRequest = (path === '/' || path === '' || path === '/index.html');
-
-    if (isPageRequest && method === 'GET' && !sessionUser) {
-      return Response.redirect(url.origin + '/login', 302);
-    }
+    // (checked inline inside each handler for consistency)
 
     // Debug endpoint — echo cookies and session
     if (path === '/__cookie_check') {
@@ -443,8 +438,13 @@ document.getElementById('loginForm').addEventListener('submit', function(e) {
       });
     }
 
-    // / — index.html
+    // — index.html
     if (path === '/' || path === '') {
+      const sessionUser = getCookie(request, 'sfc_session');
+      if (!sessionUser) {
+        return Response.redirect(url.origin + '/login', 302);
+      }
+
       const resp = await fetchAny(urls, '/', 'text/html');
       if (!resp) return new Response('Backend unreachable', { status: 502 });
       const html = await resp.text();
