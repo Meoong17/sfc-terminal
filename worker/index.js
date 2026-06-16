@@ -54,11 +54,11 @@ function getCookie(request, name) {
 }
 
 function setCookie(name, value, maxAgeDays = 30) {
-  return `${name}=${encodeURIComponent(value)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAgeDays * 86400}`;
+  return `${name}=${encodeURIComponent(value)}; Path=/; SameSite=Lax; Max-Age=${maxAgeDays * 86400}`;
 }
 
 function clearCookie(name) {
-  return `${name}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`;
+  return `${name}=; Path=/; SameSite=Lax; Max-Age=0`;
 }
 
 export default {
@@ -87,6 +87,14 @@ export default {
 
     if (isPageRequest && method === 'GET' && !sessionUser) {
       return Response.redirect(url.origin + '/login', 302);
+    }
+
+    // Debug endpoint — echo cookies and session
+    if (path === '/__cookie_check') {
+      const cookie = request.headers.get('Cookie') || '(none)';
+      return new Response(JSON.stringify({ cookie, sessionUser, all: Object.fromEntries(request.headers) }), {
+        headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      });
     }
 
     // ========== MULTI-USER KV ENDPOINTS ==========
@@ -203,13 +211,17 @@ export default {
           headers: { 'Content-Type': 'application/json', ...corsHeaders },
         });
       }
-      // Set cookie and redirect (form POST) or return JSON (fetch)
+      // Set cookie via 200 + JS redirect (most reliable for cookie setting)
       if (contentType.includes('x-www-form-urlencoded')) {
-        return new Response(null, {
-          status: 302,
+        const redirectHtml = `<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Redirecting...</title></head>
+<body><script>window.location.href='/?user='+encodeURIComponent(${JSON.stringify(username)})</script></body></html>`;
+        return new Response(redirectHtml, {
+          status: 200,
           headers: {
-            'Location': '/',
+            'Content-Type': 'text/html; charset=utf-8',
             'Set-Cookie': setCookie('sfc_session', username),
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
             ...corsHeaders,
           },
         });
