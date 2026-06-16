@@ -11,3 +11,6 @@ id = "384c3b360c92484a84eb3e1ecad18a4d"
 
 [env.production]
 name = "sfc-terminal"
+[[env.production.kv_namespaces]]
+binding = "SFC_USER_STATE"
+id = "384c3b360c92484a84eb3e1ecad18a4d"
