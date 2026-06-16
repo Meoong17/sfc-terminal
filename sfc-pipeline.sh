@@ -63,18 +63,25 @@ $PYTHON paper_trader.py 2>>sfc-pipeline.log || log "⚠ Paper trader skipped (no
 
 
 # ── Inject data into HTML ──
-# Restore real dashboard from git (find last commit with id="app" = real dashboard, not login page)
-log "Restoring clean index.html from git..."
-GOOD_HASH=$(git log --all --format='%H' -- index.html 2>/dev/null | while read h; do
-  if git show "$h:index.html" 2>/dev/null | grep -q 'id="app"'; then
-    echo "$h" && break
-  fi
-done)
-if [ -n "$GOOD_HASH" ]; then
-  git show "$GOOD_HASH:index.html" > index.html 2>/dev/null
-  log "Restored from ${GOOD_HASH:0:7} ($(wc -c < index.html) bytes, #app present)"
+# Restore real dashboard from .bak (always clean — worker serves login page separately)
+log "Restoring clean index.html from .bak..."
+if [ -f "index.html.bak" ] && [ "$(wc -c < index.html.bak)" -gt 50000 ]; then
+  cp index.html.bak index.html
+  log "Restored from .bak ($(wc -c < index.html) bytes)"
 else
-  log "⚠ No good index.html found in git history — using current file"
+  log "⚠ No valid .bak found — trying to restore from git history"
+  GOOD_HASH=$(git log --all --format='%H' -- index.html 2>/dev/null | while read h; do
+    SIZE=$(git show "$h:index.html" 2>/dev/null | wc -c)
+    if [ "$SIZE" -gt 50000 ] 2>/dev/null; then
+      echo "$h" && break
+    fi
+  done)
+  if [ -n "$GOOD_HASH" ]; then
+    git show "$GOOD_HASH:index.html" > index.html 2>/dev/null
+    log "Restored from git ${GOOD_HASH:0:7} ($(wc -c < index.html) bytes)"
+  else
+    log "⚠ No good index.html found — using current file"
+  fi
 fi
 log "Injecting data into index.html..."
 $PYTHON inject_data.py data.json index.html index.html 2>>sfc-pipeline.log || \
