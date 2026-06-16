@@ -30,12 +30,12 @@
 </div>
 <script>
 async function login() {
-  var u = document.getElementById('username').value.trim().toLowerCase();
+  var u = document.getElementById('username').value.trim();
   var btn = document.getElementById('loginBtn');
   var err = document.getElementById('error');
   err.style.display = 'none';
   if (!u) { err.textContent = 'Enter a username'; err.style.display = 'block'; return; }
-  if (!/^[a-z0-9_-]+$/.test(u)) { err.textContent = 'Use letters, numbers, hyphens and underscores only'; err.style.display = 'block'; return; }
+  if (!/^[a-zA-Z0-9_-]+$/.test(u)) { err.textContent = 'Use letters, numbers, hyphens and underscores only'; err.style.display = 'block'; return; }
   btn.disabled = true;
   btn.textContent = 'Logging in...';
   try {
