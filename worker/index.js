@@ -24,8 +24,9 @@ async function fetchAny(urls, path, accept) {
 
 // Default state for new users
 function defaultUserState(username) {
+  const normalized = (username || '').toLowerCase();
   return {
-    user_id: username,
+    user_id: normalized || username,
     capital: 50000,
     initial_capital: 50000,
     peak_capital: 50000,
@@ -211,6 +212,8 @@ export default {
           headers: { 'Content-Type': 'application/json', ...corsHeaders },
         });
       }
+      const normalized = username.toLowerCase();
+      const sessionUser = normalized;
       // Set cookie via 200 + JS redirect (most reliable for cookie setting)
       if (contentType.includes('x-www-form-urlencoded')) {
         const redirectHtml = `<!DOCTYPE html>
