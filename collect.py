@@ -545,9 +545,11 @@ def _sigmoid_factor(val, center, k=0.15):
     return 6 / (1 + math.exp(-k * (val - center))) - 3
 
 def score_factors_from_market(btc, btc_24h, dom, dvol, fng, pc_oi, m2_yoy, dxy, glo_score=None,
-                                onchain_whale=None, onchain_value=None, onchain_buy=None):
+                                onchain_whale=None, onchain_value=None, onchain_buy=None,
+                                onchain_market_structure=None):
     """Score 5 factors from market data using smooth sigmoid/logistic functions. Range -3 to +3
-    onchain_whale/onchain_value/onchain_buy: 0-100 scores from on-chain data (Q10)"""
+    onchain_whale/onchain_value/onchain_buy: 0-100 scores from on-chain data (Q10)
+    onchain_market_structure: 0-100 score from derivatives data (Q10+)"""
     factors = {"Lt": 0.0, "St": 0.0, "Rt": 0.0, "Ft": 0.0, "Sc": 0.0}
     
     # Lt (Liquidity) — based on M2, GLO, and BTC momentum
@@ -606,6 +608,12 @@ def score_factors_from_market(btc, btc_24h, dom, dvol, fng, pc_oi, m2_yoy, dxy, 
         buy_adj = (onchain_buy - 50) / 50 * 1.5  # scale -1.5 to +1.5 (lighter touch)
         factors["Ft"] += buy_adj
         print(f"[OnChain] Buying power={onchain_buy:.1f} → Ft adj={buy_adj:+.3f}", file=sys.stderr)
+
+    if onchain_market_structure is not None:
+        # Market structure → St (short-term): high score = healthy (low OI, controlled liqs)
+        ms_adj = (onchain_market_structure - 50) / 50 * 1.5  # scale -1.5 to +1.5
+        factors["St"] += ms_adj
+        print(f"[OnChain] Market structure={onchain_market_structure:.1f} → St adj={ms_adj:+.3f}", file=sys.stderr)
     
     # Clamp all factors to [-3, 3]
     for k in factors:
@@ -1375,22 +1383,24 @@ _factors_dxy = _dxy_30d if _dxy_30d is not None else dxy
 print(f"[SFC] 30d rolling averages: BTC24h={_factors_btc_24h} DOM={_factors_dom} DVOL={_factors_dvol} FnG={_factors_fng} M2={_factors_m2}", file=sys.stderr)
 
 # ── ON-CHAIN DATA (Q10 Integration — ErcinDedeoglu/crypto-market-data) ──
-print("[SFC] Fetching on-chain data (Q10)...", file=sys.stderr)
+print("[SFC] Fetching on-chain data (Q10+)...", file=sys.stderr)
 onchain_scores = {}
-whale_pressure = onchain_value = buying_power = None
+whale_pressure = onchain_value = buying_power = market_structure = None
 try:
     onchain_scores = fetch_all_onchain()
     whale_pressure = onchain_scores["whale_pressure"]
     onchain_value = onchain_scores["onchain_value"]
     buying_power = onchain_scores["buying_power"]
-    print(f"[SFC] On-chain: Whale={whale_pressure} OnValue={onchain_value} BuyPower={buying_power}", file=sys.stderr)
+    market_structure = onchain_scores.get("market_structure")
+    print(f"[SFC] Q10: Whale={whale_pressure} OnValue={onchain_value} BuyPower={buying_power} MktStruct={market_structure}", file=sys.stderr)
 except Exception as e:
     print(f"[SFC] On-chain fetch failed: {e}", file=sys.stderr)
-    whale_pressure = onchain_value = buying_power = None
+    whale_pressure = onchain_value = buying_power = market_structure = None
 
 # Score factors from market data (using 30d rolling averages + on-chain)
 factors = score_factors_from_market(btc, _factors_btc_24h, _factors_dom, _factors_dvol, _factors_fng, _factors_pc, _factors_m2, _factors_dxy,
-                                     onchain_whale=whale_pressure, onchain_value=onchain_value, onchain_buy=buying_power)
+                                     onchain_whale=whale_pressure, onchain_value=onchain_value, onchain_buy=buying_power,
+                                     onchain_market_structure=market_structure)
 
 # Calculate SFC ensemble
 sfc_pct, zone, factors_raw, norm_factors, m1_klr, m2_logit, m3_bayes, m4_ewc, m5_qreg, m6_regime, method_agreement = calculate_sfc_ensemble(factors)
@@ -2232,6 +2242,7 @@ out = {
     "q10_whale_pressure": whale_pressure,
     "q10_onchain_value": onchain_value,
     "q10_buying_power": buying_power,
+    "q10_market_structure": market_structure,
     "q10_available": whale_pressure is not None and onchain_value is not None and buying_power is not None,
     "q10_details": onchain_scores.get("details", {}) if whale_pressure is not None else {},
     # Advanced modules: Regime Detection (P2), Uncertainty (P4), Alt Data (P6)
