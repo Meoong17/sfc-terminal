@@ -183,20 +183,38 @@ export default {
     // POST /api/login — validate username, set session cookie, redirect
     if (path === '/api/login' && method === 'POST') {
       let body;
-      try {
-        body = await request.json();
-      } catch (_) {
-        body = {};
+      const contentType = request.headers.get('Content-Type') || '';
+      if (contentType.includes('application/json')) {
+        try { body = await request.json(); } catch (_) { body = {}; }
+      } else {
+        try {
+          const formData = await request.formData();
+          body = { username: formData.get('username') || '' };
+        } catch (_) { body = {}; }
       }
       const username = (body.username || '').trim();
       if (!username || username.length < 1 || username.length > 32 || !/^[a-zA-Z0-9_-]+$/.test(username)) {
+        // For form posts, redirect back with error
+        if (contentType.includes('x-www-form-urlencoded')) {
+          return Response.redirect(url.origin + '/login?error=Invalid+username', 302);
+        }
         return new Response(JSON.stringify({ error: 'Invalid username. Use letters, numbers, hyphens and underscores.' }), {
           status: 400,
           headers: { 'Content-Type': 'application/json', ...corsHeaders },
         });
       }
-      const redirectTo = url.searchParams.get('redirect') || '/';
-      return new Response(JSON.stringify({ status: 'ok', username, redirect: redirectTo }), {
+      // Set cookie and redirect (form POST) or return JSON (fetch)
+      if (contentType.includes('x-www-form-urlencoded')) {
+        return new Response(null, {
+          status: 302,
+          headers: {
+            'Location': '/',
+            'Set-Cookie': setCookie('sfc_session', username),
+            ...corsHeaders,
+          },
+        });
+      }
+      return new Response(JSON.stringify({ status: 'ok', username }), {
         status: 200,
         headers: {
           'Content-Type': 'application/json',
@@ -220,6 +238,7 @@ export default {
 
     // GET /login or /login.html — serve login page
     if ((path === '/login' || path === '/login.html') && method === 'GET') {
+      const errorMsg = url.searchParams.get('error') || '';
       const loginHtml = `<!DOCTYPE html>
 <html>
 <head>
@@ -238,48 +257,40 @@ export default {
         button:hover{background:#5d4ae0}
         button:disabled{opacity:0.5;cursor:not-allowed}
         .note{font-size:12px;color:#5a6478;text-align:center;margin-top:24px}
-        .error{color:#ff4060;font-size:13px;margin-bottom:16px;display:none}
+        .error{color:#ff4060;font-size:13px;margin-bottom:16px;display:${errorMsg ? 'block' : 'none'}}
     </style>
 </head>
 <body>
 <div class="login-card">
     <h1>SFC TERMINAL</h1>
-    <p>Enter a username to access your private paper trading dashboard.</p>
-    <div class="error" id="error"></div>
-    <input type="text" id="username" placeholder="e.g. trader1, alice, bob" autocomplete="off" autocapitalize="off" autofocus>
-    <button id="loginBtn" onclick="login()">Start Trading →</button>
-    <div class="note">⚡ Just a username — no password needed.</div>
+    <p>Enter your username to access the dashboard.</p>
+    <div class="error" id="error">${errorMsg}</div>
+    <form method="POST" action="/api/login" id="loginForm">
+        <input type="text" name="username" id="username" placeholder="Your username" autocomplete="off" autocapitalize="off" autofocus required>
+        <button type="submit" id="loginBtn">Start Trading →</button>
+    </form>
+    <div class="note">⚠ Just a username — no password.</div>
+    <div class="note" style="margin-top:4px;font-size:11px;color:#3a4460">Tip: use the same username as before to restore paper trading data.</div>
 </div>
 <script>
-async function login() {
+document.getElementById('loginForm').addEventListener('submit', function(e) {
   var u = document.getElementById('username').value.trim();
-  var btn = document.getElementById('loginBtn');
   var err = document.getElementById('error');
-  err.style.display = 'none';
-  if (!u) { err.textContent = 'Enter a username'; err.style.display = 'block'; return; }
-  if (!/^[a-zA-Z0-9_-]+$/.test(u)) { err.textContent = 'Use letters, numbers, hyphens and underscores only'; err.style.display = 'block'; return; }
-  btn.disabled = true;
-  btn.textContent = 'Logging in...';
-  try {
-    var res = await fetch('/api/login', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({username:u}) });
-    var data = await res.json();
-    if (!res.ok) { err.textContent = data.error; err.style.display = 'block'; btn.disabled = false; btn.textContent = 'Start Trading →'; return; }
-    localStorage.setItem('sfc_username', u);
-    window.location.href = '/?user=' + encodeURIComponent(u);
-  } catch(e) {
-    err.textContent = 'Connection error. Try again.';
+  if (!u || !/^[a-zA-Z0-9_-]+$/.test(u)) {
+    e.preventDefault();
+    err.textContent = !u ? 'Enter a username' : 'Letters, numbers, hyphens, underscores only';
     err.style.display = 'block';
-    btn.disabled = false;
-    btn.textContent = 'Start Trading →';
+    return;
   }
-}
-document.getElementById('username').addEventListener('keydown',function(e){if(e.key==='Enter')login()});
+  // Also save to localStorage for the frontend
+  localStorage.setItem('sfc_username', u);
+});
 </script>
 </body>
 </html>`;
       return new Response(loginHtml, {
         status: 200,
-        headers: { 'Content-Type': 'text/html; charset=utf-8', ...corsHeaders },
+        headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache, no-store, must-revalidate', ...corsHeaders },
       });
     }
 
