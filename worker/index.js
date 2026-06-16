@@ -99,7 +99,8 @@ export default {
     const userStateMatch = path.match(/^\/user\/([^\/]+)\/state$/);
     if (userStateMatch && method === 'GET') {
       const username = decodeURIComponent(userStateMatch[1]);
-      const key = `user:${username}:state`;
+      const normalized = username.toLowerCase();
+      const key = `user:${normalized}:state`;
       let raw = await env.SFC_USER_STATE.get(key);
       if (!raw) {
         // Create default state for new user
@@ -115,7 +116,8 @@ export default {
     // POST /user/:username/state — save full user state
     if (userStateMatch && method === 'POST') {
       const username = decodeURIComponent(userStateMatch[1]);
-      const key = `user:${username}:state`;
+      const normalized = username.toLowerCase();
+      const key = `user:${normalized}:state`;
       let newState;
       try {
         newState = await request.json();
@@ -141,7 +143,8 @@ export default {
     const userConfigMatch = path.match(/^\/user\/([^\/]+)\/config$/);
     if (userConfigMatch && method === 'POST') {
       const username = decodeURIComponent(userConfigMatch[1]);
-      const key = `user:${username}:state`;
+      const normalized = username.toLowerCase();
+      const key = `user:${normalized}:state`;
       let existing = await env.SFC_USER_STATE.get(key);
       if (!existing) {
         return new Response('User not found', { status: 404, headers: corsHeaders });
@@ -160,7 +163,8 @@ export default {
     const userStatusMatch = path.match(/^\/user\/([^\/]+)\/status$/);
     if (userStatusMatch && method === 'GET') {
       const username = decodeURIComponent(userStatusMatch[1]);
-      const key = `user:${username}:state`;
+      const normalized = username.toLowerCase();
+      const key = `user:${normalized}:state`;
       let raw = await env.SFC_USER_STATE.get(key);
       if (!raw) {
         return new Response(JSON.stringify({ exists: false, username }), {
