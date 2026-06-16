@@ -188,8 +188,8 @@ export default {
       } catch (_) {
         body = {};
       }
-      const username = (body.username || '').trim().toLowerCase();
-      if (!username || username.length < 1 || username.length > 32 || !/^[a-z0-9_-]+$/.test(username)) {
+      const username = (body.username || '').trim();
+      if (!username || username.length < 1 || username.length > 32 || !/^[a-zA-Z0-9_-]+$/.test(username)) {
         return new Response(JSON.stringify({ error: 'Invalid username. Use letters, numbers, hyphens and underscores.' }), {
           status: 400,
           headers: { 'Content-Type': 'application/json', ...corsHeaders },
@@ -252,12 +252,12 @@ export default {
 </div>
 <script>
 async function login() {
-  var u = document.getElementById('username').value.trim().toLowerCase();
+  var u = document.getElementById('username').value.trim();
   var btn = document.getElementById('loginBtn');
   var err = document.getElementById('error');
   err.style.display = 'none';
   if (!u) { err.textContent = 'Enter a username'; err.style.display = 'block'; return; }
-  if (!/^[a-z0-9_-]+$/.test(u)) { err.textContent = 'Use letters, numbers, hyphens and underscores only'; err.style.display = 'block'; return; }
+  if (!/^[a-zA-Z0-9_-]+$/.test(u)) { err.textContent = 'Use letters, numbers, hyphens and underscores only'; err.style.display = 'block'; return; }
   btn.disabled = true;
   btn.textContent = 'Logging in...';
   try {
