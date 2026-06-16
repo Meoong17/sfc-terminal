@@ -55,11 +55,11 @@ function getCookie(request, name) {
 }
 
 function setCookie(name, value, maxAgeDays = 30) {
-  return `${name}=${encodeURIComponent(value)}; Path=/; SameSite=Lax; Max-Age=${maxAgeDays * 86400}`;
+  return `${name}=${encodeURIComponent(value)}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${maxAgeDays * 86400}`;
 }
 
 function clearCookie(name) {
-  return `${name}=; Path=/; SameSite=Lax; Max-Age=0`;
+  return `${name}=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0`;
 }
 
 export default {
@@ -330,7 +330,17 @@ document.getElementById('loginForm').addEventListener('submit', function(e) {
             const resp = await fetchAny(urls, '/snapshot', 'application/json');
             if (resp) {
               failCount = 0;
-              const data = await resp.json();
+              let data;
+              try {
+                data = await resp.json();
+              } catch (_) {
+                // JSON parse error — skip this poll cycle
+                await writer.write(encoder.encode(
+                  'event: heartbeat\ndata: {"ts":"' + new Date().toISOString() + '"}\n\n'
+                ));
+                await new Promise(r => setTimeout(r, 1000));
+                continue;
+              }
               const now = new Date().toISOString();
 
               if (data.btc && data.btc.btc != null) {

@@ -2042,7 +2042,7 @@ function render(d) {
           </div>
         </div>
         <div class="stat-3 mb-12">
-          <div class="info-row"><span class="info-k">Alert Window</span><span class="info-v">~${d.alert_window_hours||48}h</span></div>
+          <div class="info-row"><span class="info-k">Alert Window</span><span class="info-v">~${Math.round(d.alert_window_days||0)}d</span></div>
           <div class="info-row"><span class="info-k">Timing Precision</span><span class="info-v" style="color:${d.timing_precision==='HIGH'?'var(--green)':'var(--amber)'}">${d.timing_precision||'LOW'}</span></div>
           <div class="info-row"><span class="info-k">Signal Type</span><span class="info-v" style="color:${d.fng<15||(d.cascade_risk||0)>0.5?'var(--red)':'var(--green)'}">${d.fng<15?(d.fng_cls||'EXTREME FEAR'):(d.cascade_risk||0)>0.5?'CASCADE RISK':'NORMAL'}</span></div>
         </div>

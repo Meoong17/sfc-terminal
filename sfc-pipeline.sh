@@ -102,7 +102,7 @@ else
     if git pull --rebase --autostash -X theirs origin main 2>&1; then
         # ⚠ Git pull may override index.html with remote's corrupted version.
         # Re-check and restore from .bak if needed.
-        if [ -f "index.html.bak" ] && [ "$(wc -c < index.html)" -lt 50000 ] || grep -q 'loginForm' index.html 2>/dev/null; then
+        if [ -f "index.html.bak" ] && ( [ "$(wc -c < index.html)" -lt 50000 ] || grep -q 'loginForm' index.html 2>/dev/null ); then
           log "⚠ index.html was corrupted during pull — restoring from .bak"
           cp index.html.bak index.html
           log "Restored ($(wc -c < index.html) bytes)"

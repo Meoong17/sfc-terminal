@@ -62,13 +62,18 @@ class PaperTrader:
 
     # ── signal processing ──
 
+    @staticmethod
+    def _safe_float(v, default=0.0):
+        try: return float(v)
+        except (TypeError, ValueError): return default
+
     def evaluate_signal(self, data: dict) -> dict:
         """Evaluate SFC data and return trading decision."""
-        sfc = data.get("sfc_effective", 0) / 100.0
-        conf = data.get("composite_confidence", 0.3)
-        kelly = data.get("kelly_fraction", 0)
-        fng = data.get("fng", 50)
-        cascade = data.get("cascade_risk", 0)
+        sfc = PaperTrader._safe_float(data.get("sfc_effective", 0), 0) / 100.0
+        conf = PaperTrader._safe_float(data.get("composite_confidence", 0.3), 0.3)
+        kelly = PaperTrader._safe_float(data.get("kelly_fraction", 0), 0)
+        fng = PaperTrader._safe_float(data.get("fng", 50), 50)
+        cascade = PaperTrader._safe_float(data.get("cascade_risk", 0), 0)
         regime = data.get("regime", "NORMAL")
         zone = data.get("zone", "NORMAL")
         btc = data.get("btc", 0)
@@ -296,7 +301,7 @@ def main():
         print("[PaperTrader] data.json is empty — skipping this cycle")
         return
     btc = data.get("btc", 0)
-    if not btc:
+    if btc is None or btc == 0:
         print("[PaperTrader] No BTC price in data")
         return
 
