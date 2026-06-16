@@ -1593,6 +1593,59 @@ if qlstm_ok and qlstm_pred is not None:
           f"adapt={_PROADAPT_FINAL:.1f} adj={qlstm_adjustment:+.2f}pp "
           f"→ {sfc_pct:.1f}%", file=sys.stderr)
 
+# ── MAMBA INFERENCE & ENSEMBLE ADJUSTMENT (M32 Enhanced — State-Space Model) ──
+# Mamba runs HERE (after all variables computed) so feature vector is complete
+mamba_pred = None
+mamba_ok = False
+mamba_result = None
+mamba_adjustment = 0
+try:
+    # Build data dict from ALL available variables for feature extraction
+    _mamba_data = {
+        "btc": btc, "btc_24h": chg, "btc_mcap": mcap,
+        "dom": dom, "dvol": dvol,
+        "rsi_14": rsi_14m, "pc_oi": pc_oi, "pc_vol": pc_vol,
+        "fng": fng, "fng_cls": fcls,
+        "zone": zone, "regime": regime if "regime" in dir() else "NORMAL",
+        "sfc_base": sfc_pct, "sfc_effective": sfc_pct,
+        "m2_yoy": m2_yoy, "dxy": dxy,
+        "method_agreement": method_agreement,
+        "composite_confidence": composite_confidence if "composite_confidence" in dir() else None,
+        "m1_klr": m1_klr, "m2_logit": m2_logit, "m4_ewc": m4_ewc, "m5_qreg": m5_qreg,
+        "m3_bayes": m3_bayes if "m3_bayes" in dir() else None,
+        "factors": factors,
+        "sopr_proxy": sopr_proxy if "sopr_proxy" in dir() else None,
+        "cascade_risk": cascade_risk if "cascade_risk" in dir() else None,
+        "liq_density": liq_density if "liq_density" in dir() else None,
+        "liq_mod": liq_mod if "liq_mod" in dir() else None,
+        "regime_prob": regime_prob if "regime_prob" in dir() else None,
+        "transition_risk": transition_risk if "transition_risk" in dir() else None,
+    }
+    if whale_pressure is not None:
+        _mamba_data.update({
+            "q10_whale_pressure": whale_pressure,
+            "q10_onchain_value": onchain_value,
+            "q10_buying_power": buying_power,
+            "q10_market_structure": market_structure,
+        })
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    from mamba_encoder import get_mamba_prediction as _mamba_infer
+    mamba_result = _mamba_infer(_mamba_data, force=False)
+    if mamba_result.get('available'):
+        mamba_pred = mamba_result['combined']
+        mamba_ok = True
+        mamba_sfc = mamba_pred * 100
+        mamba_diff = mamba_sfc - sfc_pct
+        mamba_adjustment = mamba_diff * 0.03  # 3% nudge (complementary to QLSTM's 5%)
+        sfc_pct += mamba_adjustment
+        zone = "CRITICAL" if sfc_pct/100 > 0.75 else "HIGH" if sfc_pct/100 > 0.5 else "ELEVATED" if sfc_pct/100 > 0.25 else "NORMAL"
+        print(f"[SFC] Mamba: SFC={mamba_sfc:.1f}% conf={mamba_result['confidence']*100:.1f}% "
+              f"adj={mamba_adjustment:+.2f}pp → {sfc_pct:.1f}%", file=sys.stderr)
+    else:
+        print("[SFC] Mamba unavailable", file=sys.stderr)
+except Exception as e:
+    print(f"[SFC] Mamba error: {e}", file=sys.stderr)
+
 print("[SFC] Aggregating news...", file=sys.stderr)
 cp_key = os.getenv("CRYPTOPANIC_KEY", "")
 news_stress, news_headlines, news_sentiment, articles_scored, news_stats = get_news_stress_v2(cp_key, max_workers=6)
@@ -2218,6 +2271,14 @@ out = {
     # ProAdapt online learning
     "m32_proadapt_weight": round(_PROADAPT_W, 4),
     "m32_proadapt_final": round(_PROADAPT_FINAL, 4) if _PROADAPT_FINAL is not None else None,
+    # Mamba — State-Space Model (M32 Enhanced, CPU-friendly)
+    "m32_mamba": round(mamba_pred, 4) if mamba_pred is not None else None,
+    "m32_mamba_active": mamba_ok,
+    "m32_mamba_short": round(mamba_result['stress_short'], 4) if mamba_result and mamba_result.get('available') else None,
+    "m32_mamba_medium": round(mamba_result['stress_medium'], 4) if mamba_result and mamba_result.get('available') else None,
+    "m32_mamba_long": round(mamba_result['stress_long'], 4) if mamba_result and mamba_result.get('available') else None,
+    "m32_mamba_confidence": round(mamba_result['confidence'], 4) if mamba_result and mamba_result.get('available') else None,
+    "m32_adjustment_pp_mamba": round(mamba_adjustment, 4),
     # M33 — Global Liquidity Index
     "m33_glo_score": round(m33_glo_score, 3) if m33_glo_score is not None else None,
     "m33_glo_detail": m33_glo_detail if m33_glo_detail else None,
