@@ -22,36 +22,28 @@
 <body>
 <div class="login-card">
     <h1>SFC TERMINAL</h1>
-    <p>Enter a username to access your private paper trading dashboard.</p>
+    <p>Enter your username to access the dashboard.</p>
     <div class="error" id="error"></div>
-    <input type="text" id="username" placeholder="e.g. trader1, alice, bob" autocomplete="off" autocapitalize="off" autofocus>
-    <button id="loginBtn" onclick="login()">Start Trading →</button>
-    <div class="note">⚡ Just a username — no password needed.</div>
+    <form method="POST" action="/api/login" id="loginForm">
+        <input type="text" name="username" id="username" placeholder="Your username" autocomplete="off" autocapitalize="off" autofocus required>
+        <button type="submit" id="loginBtn">Start Trading →</button>
+    </form>
+    <div class="note">⚠ Just a username — no password.</div>
+    <div class="note" style="margin-top:4px;font-size:11px;color:#3a4460">Tip: use the same username as before to restore paper trading data.</div>
 </div>
 <script>
-async function login() {
+document.getElementById('loginForm').addEventListener('submit', function(e) {
   var u = document.getElementById('username').value.trim();
-  var btn = document.getElementById('loginBtn');
   var err = document.getElementById('error');
-  err.style.display = 'none';
-  if (!u) { err.textContent = 'Enter a username'; err.style.display = 'block'; return; }
-  if (!/^[a-zA-Z0-9_-]+$/.test(u)) { err.textContent = 'Use letters, numbers, hyphens and underscores only'; err.style.display = 'block'; return; }
-  btn.disabled = true;
-  btn.textContent = 'Logging in...';
-  try {
-    var res = await fetch('/api/login', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({username:u}) });
-    var data = await res.json();
-    if (!res.ok) { err.textContent = data.error; err.style.display = 'block'; btn.disabled = false; btn.textContent = 'Start Trading →'; return; }
-    localStorage.setItem('sfc_username', u);
-    window.location.href = '/?user=' + encodeURIComponent(u);
-  } catch(e) {
-    err.textContent = 'Connection error. Try again.';
+  if (!u || !/^[a-zA-Z0-9_-]+$/.test(u)) {
+    e.preventDefault();
+    err.textContent = !u ? 'Enter a username' : 'Letters, numbers, hyphens, underscores only';
     err.style.display = 'block';
-    btn.disabled = false;
-    btn.textContent = 'Start Trading →';
+    return;
   }
-}
-document.getElementById('username').addEventListener('keydown',function(e){if(e.key==='Enter')login()});
+  // Also save to localStorage for the frontend
+  localStorage.setItem('sfc_username', u);
+});
 </script>
 </body>
 </html>
