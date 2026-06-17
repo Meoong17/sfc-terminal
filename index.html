@@ -496,6 +496,11 @@ body::before {
   font-family: 'JetBrains Mono', monospace;
 }
 .card-body { padding: 18px; }
+.card-collapsed .card-body { display: none; }
+.card-collapsed .card-head { cursor: pointer; }
+.card-collapsed .card-head:hover { background: var(--bg-hover); }
+.card-collapsed .card-head .collapse-arrow { transition: transform 0.2s; }
+.card-collapsed .card-head .collapse-arrow { transform: rotate(-90deg); }
 .card-body-sm { padding: 12px 18px; }
 
 /* ══════════════════════════════════════════
@@ -1972,6 +1977,7 @@ function render(d) {
           </div>
           Q10 On-Chain Intelligence
         </div>
+          <span class="collapse-arrow" onclick="toggleCollapseCard(this)" style="cursor:pointer;font-size:10px;color:var(--text-3);padding:4px 8px;user-select:none">▶</span>
       </div>
       <div class="card-body">
         <div class="stat-3 mb-12">
@@ -2010,7 +2016,7 @@ function render(d) {
     </div>
 
     <!-- MARKET STRUCTURE (Derivatives Risk) — Q10+ Enhanced -->
-    <div class="card span-full mb-16" data-lazy style="display:${d.q10_available?'block':'none'}">
+    <div class="card span-full mb-16 card-collapsed" data-lazy style="display:${d.q10_available?'block':'none'}">
       <div class="card-head">
         <div class="card-title">
           <div class="card-icon">
@@ -2023,6 +2029,7 @@ function render(d) {
           </div>
           Market Structure
         </div>
+          <span class="collapse-arrow" onclick="toggleCollapseCard(this)" style="cursor:pointer;font-size:10px;color:var(--text-3);padding:4px 8px;user-select:none">▶</span>
         <div class="card-badge" style="color:var(--text-3);font-size:9px">Derivatives Risk · Q10+</div>
       </div>
       <div class="card-body">
@@ -2057,7 +2064,7 @@ function render(d) {
     </div>
 
     <!-- MACRO LIQUIDITY (M72-M75) — Layer 1 Macro Liquidity -->
-    <div class="card span-full mb-16" data-lazy style="display:${(d.m72_m2_growth!=null)?'block':'none'}">
+    <div class="card span-full mb-16 card-collapsed" data-lazy style="display:${(d.m72_m2_growth!=null)?'block':'none'}">
       <div class="card-head">
         <div class="card-title">
           <div class="card-icon">
@@ -2069,6 +2076,7 @@ function render(d) {
           </div>
           Macro Liquidity
         </div>
+          <span class="collapse-arrow" onclick="toggleCollapseCard(this)" style="cursor:pointer;font-size:10px;color:var(--text-3);padding:4px 8px;user-select:none">▶</span>
         <div class="card-badge" style="color:var(--text-3);font-size:9px">L1 Macro Liquidity · ${d.macro_methods_active||0}/4 active</div>
       </div>
       <div class="card-body">
@@ -2117,7 +2125,7 @@ function render(d) {
     </div>
 
     <!-- STABLECOIN LIQUIDITY (M76-M80) — Layer 2 Crypto Liquidity -->
-    <div class="card span-full mb-16" data-lazy style="display:${(d.m76_supply_growth!=null||d.m77_ssr!=null)?'block':'none'}">
+    <div class="card span-full mb-16 card-collapsed" data-lazy style="display:${(d.m76_supply_growth!=null||d.m77_ssr!=null)?'block':'none'}">
       <div class="card-head">
         <div class="card-title">
           <div class="card-icon">
@@ -2129,6 +2137,7 @@ function render(d) {
           </div>
           Stablecoin Liquidity
         </div>
+          <span class="collapse-arrow" onclick="toggleCollapseCard(this)" style="cursor:pointer;font-size:10px;color:var(--text-3);padding:4px 8px;user-select:none">▶</span>
         <div class="card-badge" style="color:var(--text-3);font-size:9px">L2 Crypto Liquidity · ${d.sc_methods_active||0}/5 active</div>
       </div>
       <div class="card-body">
@@ -2182,7 +2191,7 @@ function render(d) {
     </div>
 
     <!-- KELLY + MACRO row -->
-    <div class="card span-full mb-16" data-lazy>
+    <div class="card span-full mb-16 card-collapsed" data-lazy>
       <div class="card-head">
         <div class="card-title">
           <div class="card-icon">
@@ -2195,6 +2204,7 @@ function render(d) {
           </div>
           Kelly Position Sizing
         </div>
+          <span class="collapse-arrow" onclick="toggleCollapseCard(this)" style="cursor:pointer;font-size:10px;color:var(--text-3);padding:4px 8px;user-select:none">▶</span>
         <div class="card-badge">Allocation Guide</div>
       </div>
       <div class="card-body">
@@ -3492,6 +3502,15 @@ bootSFC();
 
 // SSE handles real-time updates when available.
 // On static (GitHub Pages / Workers), polling data.json every 30s is used instead.
+
+// ── COLLAPSIBLE CARDS — expand/collapse below-fold sections
+function toggleCollapseCard(el) {
+  const card = el.closest('.card') || el.parentElement.closest('.card');
+  if (!card) return;
+  card.classList.toggle('card-collapsed');
+  const arrow = card.querySelector('.collapse-arrow');
+  if (arrow) arrow.textContent = card.classList.contains('card-collapsed') ? '▶' : '▼';
+}
 
 // ── LAZY LOADING ── Cards below fold render only when visible
 function initLazyCards() {
