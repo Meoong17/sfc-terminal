@@ -2595,13 +2595,16 @@ function render(d) {
   `;
 
   document.getElementById('app').innerHTML = html;
-  buildFactorChart(d);
-  buildMethodChart(d);
-  if (chartVisible) updatePriceChart();
-  processSignalFromSFC(d);
-  updatePaperDisplay();
-  // Update regime display from fresh data
-  updateRegimeDisplay(d);
+  
+  // ── PROGRESSIVE RENDER: Charts deferred for faster initial paint ──
+  setTimeout(function() { buildFactorChart(d); }, 50);
+  setTimeout(function() { buildMethodChart(d); }, 100);
+  setTimeout(function() { if (chartVisible) updatePriceChart(); }, 300);
+  setTimeout(function() {
+    processSignalFromSFC(d);
+    updatePaperDisplay();
+    updateRegimeDisplay(d);
+  }, 150);
 }
 
 /* ── REGIME DISPLAY UPDATER (immune to floor overwrite) ── */
