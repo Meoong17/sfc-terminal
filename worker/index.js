@@ -214,15 +214,13 @@ export default {
       }
       const normalized = username.toLowerCase();
       const sessionUser = normalized;
-      // Set cookie via 200 + JS redirect (most reliable for cookie setting)
+      // Set cookie via 302 redirect (reliable: browser stores cookie then follows Location)
       if (contentType.includes('x-www-form-urlencoded')) {
-        const redirectHtml = `<!DOCTYPE html>
-<html><head><meta charset="UTF-8"><title>Redirecting...</title></head>
-<body><script>window.location.href='/?user='+encodeURIComponent(${JSON.stringify(username)})</script></body></html>`;
-        return new Response(redirectHtml, {
-          status: 200,
+        const safeUser = encodeURIComponent(username);
+        return new Response(null, {
+          status: 302,
           headers: {
-            'Content-Type': 'text/html; charset=utf-8',
+            'Location': `/?user=${safeUser}`,
             'Set-Cookie': setCookie('sfc_session', username),
             'Cache-Control': 'no-cache, no-store, must-revalidate',
             ...corsHeaders,
