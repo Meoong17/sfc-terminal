@@ -513,16 +513,19 @@ document.getElementById('loginForm').addEventListener('submit', function(e) {
       const sessionUser = getCookie(request, 'sfc_session');
       const queryUser = url.searchParams.get('user');
       
-      // Auto-login: if ?user= is present but no cookie, serve dashboard directly with cookie set
+      // Auto-login: if ?user= is present but no cookie, set cookie and serve dashboard from VPS
       if (!sessionUser && queryUser) {
         const setCookieHeader = setCookie('sfc_session', queryUser);
-        const rawUrl = 'https://raw.githubusercontent.com/Meoong17/sfc-terminal/main/index.html';
-        let html;
-        try {
-          const resp = await fetch(rawUrl, { signal: AbortSignal.timeout(5000) });
-          if (resp.ok) html = await resp.text();
-        } catch (_) {}
-        if (!html) return new Response('Loading...', { status: 503, headers: corsHeaders });
+        const resp = await fetchAny(urls, '/', 'text/html');
+        if (!resp) return new Response('Loading...', { status: 503, headers: corsHeaders });
+        let html = await resp.text();
+        // If VPS returns login page, inject redirect to force cookie-based login
+        if (html.includes('loginForm')) {
+          return new Response(null, {
+            status: 302,
+            headers: { 'Location': url.origin + '/login', 'Set-Cookie': setCookieHeader, ...corsHeaders },
+          });
+        }
         return new Response(html, {
           status: 200,
           headers: {
@@ -538,19 +541,10 @@ document.getElementById('loginForm').addEventListener('submit', function(e) {
         return Response.redirect(url.origin + '/login', 302);
       }
 
-      // Serve dashboard HTML from GitHub Pages (not VPS — VPS returns login page)
-      const rawUrl = 'https://raw.githubusercontent.com/Meoong17/sfc-terminal/main/index.html';
-      let html;
-      try {
-        const resp = await fetch(rawUrl, { signal: AbortSignal.timeout(5000) });
-        if (!resp.ok) throw new Error('HTTP ' + resp.status);
-        html = await resp.text();
-      } catch (e) {
-        // Fallback: try VPS
-        const resp = await fetchAny(urls, '/', 'text/html');
-        if (!resp) return new Response('Backend unreachable', { status: 502 });
-        html = await resp.text();
-      }
+      // Serve dashboard HTML from VPS backend (has the real dashboard)
+      const resp = await fetchAny(urls, '/', 'text/html');
+      if (!resp) return new Response('Backend unreachable', { status: 502 });
+      let html = await resp.text();
 
       // If backend is returning the login page, force dashboard redirect for logged-in users
       const loginPageSignals = [
