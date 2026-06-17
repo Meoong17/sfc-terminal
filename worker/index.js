@@ -214,18 +214,21 @@ export default {
       }
       const normalized = username.toLowerCase();
       const sessionUser = normalized;
-      // Set cookie via 302 redirect (reliable: browser stores cookie then follows Location)
+      // Set cookie via 200 + JS redirect (more reliable on mobile browsers like Brave)
       if (contentType.includes('x-www-form-urlencoded')) {
         const safeUser = encodeURIComponent(username);
-        return new Response(null, {
-          status: 302,
-          headers: {
-            'Location': `/?user=${safeUser}`,
-            'Set-Cookie': setCookie('sfc_session', username),
-            'Cache-Control': 'no-cache, no-store, must-revalidate',
-            ...corsHeaders,
-          },
-        });
+        return new Response(
+          `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Redirecting...</title></head><body><script>window.location.href='/?user=${safeUser}'</script></body></html>`,
+          {
+            status: 200,
+            headers: {
+              'Content-Type': 'text/html; charset=utf-8',
+              'Set-Cookie': setCookie('sfc_session', username),
+              'Cache-Control': 'no-cache, no-store, must-revalidate',
+              ...corsHeaders,
+            },
+          }
+        );
       }
       return new Response(JSON.stringify({ status: 'ok', username }), {
         status: 200,
