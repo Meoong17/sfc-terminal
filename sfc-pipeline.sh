@@ -62,35 +62,8 @@ log "Running paper trader..."
 $PYTHON paper_trader.py 2>>sfc-pipeline.log || log "⚠ Paper trader skipped (no data)"
 
 
-# ── Inject data into HTML ──
-# Restore real dashboard from .bak (always clean — worker serves login page separately)
-# Guard: restore if current index.html is too small, login page, or missing render()
-if [ -f "index.html.bak" ] && ( [ "$(wc -c < index.html)" -lt 50000 ] || grep -q 'loginForm' index.html 2>/dev/null || ! grep -q 'render(' index.html 2>/dev/null ); then
-  log "⚠ index.html corrupted — restoring from .bak"
-  cp index.html.bak index.html
-fi
-log "Restoring clean index.html from .bak..."
-if [ -f "index.html.bak" ] && [ "$(wc -c < index.html.bak)" -gt 50000 ]; then
-  cp index.html.bak index.html
-  log "Restored from .bak ($(wc -c < index.html) bytes)"
-else
-  log "⚠ No valid .bak found — trying to restore from git history"
-  GOOD_HASH=$(git log --all --format='%H' -- index.html 2>/dev/null | while read h; do
-    SIZE=$(git show "$h:index.html" 2>/dev/null | wc -c)
-    if [ "$SIZE" -gt 50000 ] 2>/dev/null; then
-      echo "$h" && break
-    fi
-  done)
-  if [ -n "$GOOD_HASH" ]; then
-    git show "$GOOD_HASH:index.html" > index.html 2>/dev/null
-    log "Restored from git ${GOOD_HASH:0:7} ($(wc -c < index.html) bytes)"
-  else
-    log "⚠ No good index.html found — using current file"
-  fi
-fi
-log "Injecting data into index.html..."
-$PYTHON inject_data.py data.json index.html index.html 2>>sfc-pipeline.log || \
-  log "⚠ Inject failed (non-fatal)"
+# ── Inject data into HTML (skipped: data.json loaded via fetch for smaller page size) ──
+log "data.json is fetched async by frontend (no HTML injection needed)"
 
 # ── Commit & push ──
 log "Committing..."
