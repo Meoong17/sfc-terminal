@@ -11,6 +11,63 @@ from datetime import datetime, timezone
 from dotenv import load_dotenv
 from onchain_fetch import fetch_all_onchain
 
+# ── 5 Advanced Modules (Model.docx) ──
+_ADV_FEATURES_MODULE = None
+_ADV_ENSEMBLE_MODULE = None
+_ADV_HMM_MODULE = None
+_ADV_MTF_MODULE = None
+_ADV_ONLINE_MODULE = None
+
+def _get_adv_features():
+    global _ADV_FEATURES_MODULE
+    if _ADV_FEATURES_MODULE is None:
+        try:
+            import feature_engineering as m
+            _ADV_FEATURES_MODULE = m
+        except Exception:
+            _ADV_FEATURES_MODULE = False
+    return _ADV_FEATURES_MODULE if _ADV_FEATURES_MODULE else None
+
+def _get_adv_ensemble():
+    global _ADV_ENSEMBLE_MODULE
+    if _ADV_ENSEMBLE_MODULE is None:
+        try:
+            import ensemble_meta as m
+            _ADV_ENSEMBLE_MODULE = m
+        except Exception:
+            _ADV_ENSEMBLE_MODULE = False
+    return _ADV_ENSEMBLE_MODULE if _ADV_ENSEMBLE_MODULE else None
+
+def _get_adv_hmm():
+    global _ADV_HMM_MODULE
+    if _ADV_HMM_MODULE is None:
+        try:
+            import hmm_regime as m
+            _ADV_HMM_MODULE = m
+        except Exception:
+            _ADV_HMM_MODULE = False
+    return _ADV_HMM_MODULE if _ADV_HMM_MODULE else None
+
+def _get_adv_mtf():
+    global _ADV_MTF_MODULE
+    if _ADV_MTF_MODULE is None:
+        try:
+            import multi_timeframe as m
+            _ADV_MTF_MODULE = m
+        except Exception:
+            _ADV_MTF_MODULE = False
+    return _ADV_MTF_MODULE if _ADV_MTF_MODULE else None
+
+def _get_adv_online():
+    global _ADV_ONLINE_MODULE
+    if _ADV_ONLINE_MODULE is None:
+        try:
+            import online_learning as m
+            _ADV_ONLINE_MODULE = m
+        except Exception:
+            _ADV_ONLINE_MODULE = False
+    return _ADV_ONLINE_MODULE if _ADV_ONLINE_MODULE else None
+
 load_dotenv()
 
 ATH_CACHE_FILE = os.path.join(os.path.dirname(__file__), '.ath_cache.json')
@@ -1382,6 +1439,31 @@ _factors_m2 = _m2_30d if _m2_30d is not None else m2_yoy
 _factors_dxy = _dxy_30d if _dxy_30d is not None else dxy
 print(f"[SFC] 30d rolling averages: BTC24h={_factors_btc_24h} DOM={_factors_dom} DVOL={_factors_dvol} FnG={_factors_fng} M2={_factors_m2}", file=sys.stderr)
 
+# ── ADVANCED FEATURE ENGINEERING (Peningkatan 1: 25+ technical indicators) ──
+_adv_features = {}
+_adv_features_module = _get_adv_features()
+if _adv_features_module:
+    try:
+        _adv_features = _adv_features_module.get_features()
+        if _adv_features:
+            print(f"[AFE] Loaded {len(_adv_features)} advanced features", file=sys.stderr)
+    except Exception as _afe_e:
+        print(f"[AFE] Error: {_afe_e}", file=sys.stderr)
+        _adv_features = {}
+
+# ── MULTI-TIMEFRAME FUSION (Peningkatan 4: 1h/4h/1d/1w alignment) ──
+_mtf_result = {}
+_mtf_module = _get_adv_mtf()
+if _mtf_module:
+    try:
+        _mtf_result = _mtf_module.safe_multi_timeframe_fusion()
+        if _mtf_result and 'alignment_score' in _mtf_result:
+            print(f"[MTF] Alignment={_mtf_result.get('alignment_score',0):.3f} "
+                  f"Divergence={_mtf_result.get('divergence_detected',False)}", file=sys.stderr)
+    except Exception as _mtf_e:
+        print(f"[MTF] Error: {_mtf_e}", file=sys.stderr)
+        _mtf_result = {}
+
 # ── ON-CHAIN DATA (Q10 Integration — ErcinDedeoglu/crypto-market-data) ──
 print("[SFC] Fetching on-chain data (Q10+)...", file=sys.stderr)
 onchain_scores = {}
@@ -1535,6 +1617,35 @@ else:
 # ── DYNAMIC ENSEMBLE BLEND ──
 # Use causal-adjusted blend: filter removes noise, boosts signal
 p_ens_original = 0.20*m1_klr + 0.25*m2_logit + 0.20*m3_bayes + 0.10*m4_ewc + 0.15*m5_qreg/100 + 0.10*m6_regime/100
+
+# ── XGBOOST META-ENSEMBLE (Peningkatan 2: second-layer prediction) ──
+_xgb_pred = None
+_xgb_confidence = None
+_xgb_module = _get_adv_ensemble()
+if _xgb_module:
+    try:
+        # Build method scores dict for XGBoost
+        _xgb_method_scores = {}
+        for _name, _val in [("m1_klr",m1_klr),("m2_logit",m2_logit),("m3_bayes",m3_bayes),
+                            ("m4_ewc",m4_ewc),("m5_qreg",m5_qreg),("m6_regime",m6_regime),
+                            ("m7_fisher",m7_s),("m8_yield",m8_s),("m9_liquidity",m9_s),
+                            ("m10_garch",m10_s),("m11_var",m11_s),("m12_jump",m12_s),
+                            ("m13_funding",m13_s),("m14_skew",m14_s),("m15_concentration",m15_s),
+                            ("m16_regime_ml",m16_s),("m17_granger",m17_s),("m18_entropy",m18_s),
+                            ("m19_mutual_info",m19_s)]:
+            _xgb_method_scores[_name] = _val if _val is not None else 0.5
+        for _i, _name in enumerate(["m20_obi","m21_trade_flow","m22_spread","m23_liquidity",
+                                     "m24_cape","m25_minsky","m26_kahneman","m27_taleb",
+                                     "m28_summers","m29_debt","m30_rajan","m31_altman"]):
+            _xgb_method_scores[_name] = inst_results.get(_name, 0.5) or 0.5
+        
+        _xgb_result = _xgb_module.predict_ensemble(_xgb_method_scores)
+        if _xgb_result and _xgb_result.get('model_loaded'):
+            _xgb_pred = _xgb_result['stress']
+            _xgb_confidence = _xgb_result.get('confidence', 0.5)
+            print(f"[XGB] Meta-ensemble: stress={_xgb_pred:.2f}% conf={_xgb_confidence:.2f}", file=sys.stderr)
+    except Exception as _xgb_e:
+        print(f"[XGB] Error: {_xgb_e}", file=sys.stderr)
 
 # Compute group averages from causally-filtered scores
 m1m6_scores = [filtered_scores.get(n, 0.5) for n in ["m1_klr","m2_logit","m3_bayes","m4_ewc","m5_qreg","m6_regime"]]
@@ -1791,12 +1902,69 @@ fb, ft, dv_sfc, phi = compute_floor_v2(btc, effective_sfc)
 
 regime, regime_prob, transition_risk = detect_regime(dvol, effective_sfc, news_stress, news_sentiment)
 
+# ── HMM REGIME DETECTION (Peningkatan 3: Hidden Markov Model) ──
+_hmm_result = {}
+_hmm_module = _get_adv_hmm()
+_hmm_available = False
+if _hmm_module:
+    try:
+        # Build feature vector: [daily_return, dvol/100, sfc_effective/100, rsi_14/100, fng/100]
+        _hmm_feat = np.array([[
+            (chg or 0) / 100.0,
+            (dvol or 50) / 100.0,
+            (effective_sfc or 20) / 100.0,
+            (rsi_14m or 50) / 100.0,
+            (fng or 50) / 100.0,
+        ]], dtype=np.float32)
+        _hmm_result = _hmm_module.predict_regime(_hmm_feat)
+        if _hmm_result and _hmm_result.get('regime') != 'NORMAL':
+            _hmm_regime = _hmm_result['regime']
+            _hmm_crisis = _hmm_result.get('crisis_probability', 0)
+            _hmm_available = True
+            # Override regime with HMM if it's more specific
+            if _hmm_regime in ('CRISIS', 'BEAR') and regime == 'NORMAL':
+                regime = _hmm_regime
+                regime_prob = max(regime_prob or 0, _hmm_crisis)
+                transition_risk = max(transition_risk or 0, _hmm_crisis * 0.5)
+            print(f"[HMM] Regime={_hmm_regime} crisis_prob={_hmm_crisis:.2f} override={regime}", file=sys.stderr)
+    except Exception as _hmm_e:
+        print(f"[HMM] Error: {_hmm_e}", file=sys.stderr)
+
 # Apply regime boost from advanced HMM detection to effective SFC
 if (ADVANCED_AVAILABLE is None or ADVANCED_AVAILABLE) and adv_regime_boost > 0 and effective_sfc is not None:
     old_sfc = effective_sfc
     effective_sfc = min(effective_sfc + adv_regime_boost, 100.0)
     zone = "CRITICAL" if effective_sfc/100 > 0.75 else "HIGH" if effective_sfc/100 > 0.5 else "ELEVATED" if effective_sfc/100 > 0.25 else "NORMAL"
     print(f"  [Advanced] SFC boosted by regime: {old_sfc:.1f}% → {effective_sfc:.1f}% (+{adv_regime_boost}) | Zone: {zone}", file=sys.stderr)
+
+# ── XGBoost Blend: blend ensemble SFC with XGBoost meta-prediction ──
+if _xgb_pred is not None and _xgb_confidence is not None and _xgb_confidence > 0.3:
+    _xgb_blend_weight = 0.3 * _xgb_confidence  # 0-30% weight based on confidence
+    _old_sfc = effective_sfc
+    effective_sfc = (1 - _xgb_blend_weight) * (effective_sfc or 0) + _xgb_blend_weight * _xgb_pred
+    effective_sfc = max(0.0, min(100.0, effective_sfc))
+    zone = "CRITICAL" if effective_sfc/100 > 0.75 else "HIGH" if effective_sfc/100 > 0.5 else "ELEVATED" if effective_sfc/100 > 0.25 else "NORMAL"
+    print(f"[XGB] Blended: old={_old_sfc:.1f}% → {effective_sfc:.1f}% (weight={_xgb_blend_weight:.2f})", file=sys.stderr)
+
+# ── ONLINE LEARNING EWMA (Peningkatan 5: adaptive correction) ──
+_online_module = _get_adv_online()
+if _online_module and effective_sfc is not None:
+    try:
+        _ewma = _online_module.load_ewma()
+        if _ewma:
+            _corrected = _online_module.correct_stress(
+                effective_sfc / 100.0,
+                composite_confidence if 'composite_confidence' in dir() else 0.5,
+                transition_risk if 'transition_risk' in dir() else 0.0
+            )
+            _old_sfc = effective_sfc
+            effective_sfc = _corrected * 100.0
+            effective_sfc = max(0.0, min(100.0, effective_sfc))
+            zone = "CRITICAL" if effective_sfc/100 > 0.75 else "HIGH" if effective_sfc/100 > 0.5 else "ELEVATED" if effective_sfc/100 > 0.25 else "NORMAL"
+            _online_module.save_ewma(_ewma)
+            print(f"[EWMA] Corrected: {_old_sfc:.1f}% → {effective_sfc:.1f}%", file=sys.stderr)
+    except Exception as _ewma_e:
+        print(f"[EWMA] Error: {_ewma_e}", file=sys.stderr)
 
 # State and signal — use post-boost effective_sfc to stay consistent with zone/signal_type
 if effective_sfc is not None:
@@ -2306,6 +2474,30 @@ out = {
     "q10_market_structure": market_structure,
     "q10_available": whale_pressure is not None and onchain_value is not None and buying_power is not None,
     "q10_details": onchain_scores.get("details", {}) if whale_pressure is not None else {},
+    # ── Advanced Feature Engineering (Peningkatan 1) ──
+    "afe_rsi_7": round(_adv_features.get("rsi_7", 0), 2) if _adv_features else None,
+    "afe_macd_signal": round(_adv_features.get("macd_signal", 0), 4) if _adv_features else None,
+    "afe_bb_width": round(_adv_features.get("bb_width", 0), 4) if _adv_features else None,
+    "afe_atr": round(_adv_features.get("atr", 0), 4) if _adv_features else None,
+    "afe_vwap": round(_adv_features.get("vwap", 0), 2) if _adv_features else None,
+    "afe_obv_norm": round(_adv_features.get("obv", 0), 4) if _adv_features else None,
+    "afe_available": bool(_adv_features),
+    # ── XGBoost Meta-Ensemble (Peningkatan 2) ──
+    "xgb_meta_prediction": round(_xgb_pred, 2) if _xgb_pred is not None else None,
+    "xgb_meta_confidence": round(_xgb_confidence, 3) if _xgb_confidence is not None else None,
+    "xgb_blend_weight": round(_xgb_blend_weight, 3) if '_xgb_blend_weight' in dir() and _xgb_pred is not None else None,
+    "xgb_available": _xgb_pred is not None,
+    # ── HMM Regime Detection (Peningkatan 3) ──
+    "hmm_regime": _hmm_result.get('regime') if _hmm_result else None,
+    "hmm_crisis_prob": round(_hmm_result.get('crisis_probability', 0), 3) if _hmm_result else None,
+    "hmm_available": _hmm_available,
+    # ── Multi-Timeframe Fusion (Peningkatan 4) ──
+    "mtf_alignment_score": round(_mtf_result.get('alignment_score', 0), 3) if _mtf_result else None,
+    "mtf_divergence": _mtf_result.get('divergence_detected', False) if _mtf_result else None,
+    "mtf_available": bool(_mtf_result),
+    # ── Online Learning EWMA (Peningkatan 5) ──
+    "ewma_corrected": True if '_ewma' in dir() else False,
+    "ewma_available": bool(_get_adv_online()),
     # Advanced modules: Regime Detection (P2), Uncertainty (P4), Alt Data (P6)
     "adv_regime": adv_regime.get('regime', 'NORMAL') if adv_regime else 'NORMAL',
     "adv_crisis_prob": round(adv_regime.get('crisis_probability', 0), 3) if adv_regime else 0,
