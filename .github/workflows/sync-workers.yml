@@ -6,6 +6,10 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
+    paths:
+      - 'wrangler.toml'
+      - 'worker/**'
+      - '.github/workflows/sync-workers.yml'
 
 permissions:
   contents: write
@@ -25,6 +29,21 @@ jobs:
         run: |
           curl -sL "https://sfc-terminal.meoong17.workers.dev/" -o index.html
           echo "Fetched $(wc -c < index.html) bytes"
+          # Show first line for verification
+          head -1 index.html
+
+      - name: Verify dashboard integrity
+        run: |
+          if ! grep -q 'SFC Terminal\|Quantitative Stress Intelligence\|Stablecoin Liquidity\|Macro Liquidity' index.html; then
+            echo "❌ Fetched file is NOT the dashboard — aborting commit"
+            cat index.html | head -5
+            exit 1
+          fi
+          if grep -q 'loginForm' index.html; then
+            echo "❌ Fetched file is the LOGIN page — aborting commit"
+            exit 1
+          fi
+          echo "✅ Dashboard verified"
 
       - name: Check for changes
         id: check
