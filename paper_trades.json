@@ -1,7 +1,17 @@
 {
-  "capital": 49895.13,
+  "capital": 49076.7,
   "peak_capital": 50117.92,
-  "positions": [],
+  "positions": [
+    {
+      "type": "LONG",
+      "entry_price": 64190.0,
+      "size": 818.43,
+      "entry_date": "2026-06-17T22:11:14.740167+00:00",
+      "reason": "SFC 18% \u00b7 Conf 35%",
+      "sfc_at_entry": 18.5,
+      "confidence_at_entry": 35.0
+    }
+  ],
   "trades": [
     {
       "id": 1,
@@ -290,6 +300,14 @@
       "pnl": -128.0,
       "pnl_pct": -3.14,
       "reason": "Signal CASH"
+    },
+    {
+      "id": 33,
+      "type": "OPEN",
+      "date": "2026-06-17T22:11:14.740172+00:00",
+      "price": 64190.0,
+      "size": 818.43,
+      "reason": "SFC 18% \u00b7 Conf 35%"
     }
   ],
   "equity_history": [
@@ -7236,6 +7254,13 @@
       "equity": 49895.13,
       "capital": 49895.13,
       "unrealized": 0
+    },
+    {
+      "ts": "2026-06-17T22:11:14.740180+00:00",
+      "btc": 64190.0,
+      "equity": 49895.13,
+      "capital": 49076.7,
+      "unrealized": 0.0
     }
   ],
   "daily_snapshots": {
@@ -7290,10 +7315,10 @@
       "sharpe": -0.45,
       "win_rate": 0.5,
       "max_dd_pct": 0.44,
-      "total_trades": 32,
-      "open_positions": 0,
-      "status": "CASH"
+      "total_trades": 33,
+      "open_positions": 1,
+      "status": "IN_MARKET"
     }
   },
-  "updated_at": "2026-06-17T22:04:58.095633+00:00"
+  "updated_at": "2026-06-17T22:11:14.744994+00:00"
 }

@@ -83,6 +83,15 @@ def _load_ath():
 # Import institutional methods (M20-M31) and ML ensemble
 sys.path.insert(0, os.path.dirname(__file__))
 
+# Import stablecoin liquidity methods (M76-M80)
+try:
+    from stablecoin_liquidity import compute_all_stablecoin_metrics
+    STABLECOIN_AVAILABLE = True
+except ImportError as e:
+    STABLECOIN_AVAILABLE = False
+    print(f"[SFC] Stablecoin liquidity module unavailable: {e}", file=sys.stderr)
+    def compute_all_stablecoin_metrics(*a, **k): return {}, {}, 0, None
+
 # Import causal inference
 try:
     from causal_inference import CausalFilter
@@ -1479,6 +1488,25 @@ except Exception as e:
     print(f"[SFC] On-chain fetch failed: {e}", file=sys.stderr)
     whale_pressure = onchain_value = buying_power = market_structure = None
 
+# ── STABLECOIN LIQUIDITY METRICS (M76-M80 / Layer 2 Crypto Liquidity) ──
+print("[SFC] Computing M76-M80 stablecoin liquidity metrics...", file=sys.stderr)
+_sc_results, sc_details, sc_active, sc_avg = {}, {}, 0, None
+if STABLECOIN_AVAILABLE:
+    try:
+        # Get BTC dominance from existing data
+        _btc_dom_for_sc = dom if dom else 58.3
+        _onchain_details_for_sc = onchain_scores.get("details", {}) if onchain_scores else {}
+        _sc_results, sc_details, sc_active, sc_avg = compute_all_stablecoin_metrics(
+            btc_price=btc,
+            btc_mcap=mcap,
+            btc_dominance_pct=_btc_dom_for_sc,
+            onchain_details=_onchain_details_for_sc,
+            force_refresh=False,
+        )
+        print(f"[SFC] M76-M80: {sc_active}/5 active, avg={sc_avg}", file=sys.stderr)
+    except Exception as e:
+        print(f"[SFC] Stablecoin metrics failed: {e}", file=sys.stderr)
+
 # Score factors from market data (using 30d rolling averages + on-chain)
 factors = score_factors_from_market(btc, _factors_btc_24h, _factors_dom, _factors_dvol, _factors_fng, _factors_pc, _factors_m2, _factors_dxy,
                                      onchain_whale=whale_pressure, onchain_value=onchain_value, onchain_buy=buying_power,
@@ -2398,7 +2426,10 @@ out = {
     # Institutional methods (M20-M31)
     "inst_methods_active": inst_active_count,
     "inst_methods_avg": round(inst_avg_value, 3) if inst_active_count > 0 and inst_avg_value is not None else None,
-    "total_methods_active": total_active_methods,
+    # Stablecoin liquidity (M76-M80)
+    "sc_methods_active": sc_active,
+    "sc_methods_avg": round(sc_avg, 3) if sc_active > 0 and sc_avg is not None else None,
+    "total_methods_active": total_active_methods + sc_active,
     # M20-M31 individual scores
     "m20_obi": round(inst_results.get("m20_obi", 0), 3) if "m20_obi" in inst_results else None,
     "m20_detail": inst_details.get("m20_detail"),
@@ -2424,6 +2455,17 @@ out = {
     "m30_detail": inst_details.get("m30_detail"),
     "m31_altman": round(inst_results.get("m31_altman", 0), 3) if "m31_altman" in inst_results else None,
     "m31_detail": inst_details.get("m31_detail"),
+    # Stablecoin liquidity (M76-M80) with details
+    "m76_supply_growth": round(_sc_results.get("m76_supply_growth", 0), 3) if _sc_results else None,
+    "m76_detail": sc_details.get("m76_detail"),
+    "m77_ssr": round(_sc_results.get("m77_ssr", 0), 3) if _sc_results else None,
+    "m77_detail": sc_details.get("m77_detail"),
+    "m78_exchange_flow": round(_sc_results.get("m78_exchange_flow", 0), 3) if _sc_results else None,
+    "m78_detail": sc_details.get("m78_detail"),
+    "m79_velocity": round(_sc_results.get("m79_velocity", 0), 3) if _sc_results else None,
+    "m79_detail": sc_details.get("m79_detail"),
+    "m80_dominance": round(_sc_results.get("m80_dominance", 0), 3) if _sc_results else None,
+    "m80_detail": sc_details.get("m80_detail"),
     # Microstructure change detection (M20-M23 cross-run deltas)
     "micro_change_flags": micro_change_flags,
     "micro_trend_score": round(micro_trend_score, 3) if micro_change_flags else None,
@@ -2579,7 +2621,7 @@ qlstm_str = f" QLSTM={qlstm_pred*100:.1f}" if qlstm_pred is not None else ""
 m65_str = f" CNN={_m65_stress:.2f}" if CNN_ATTENTION_AVAILABLE else ""
 m68_str = f" DRL={_m68_signal}" if DRL_AVAILABLE else ""
 m69_str = f" SYS={_m69_overall:.2f}" if GNN_AVAILABLE else ""
-print(f"\n✅ BTC={btc_str} | SFC={effective_sfc:.1f}% | Zone={zone} | RSI-14M={rsi_str} | SOPR={sopr_str} | News={news_stress:.1f} | {regime} | TF=MONTHLY | Q9={'✓' if Q9_AVAILABLE else '✗'} | Methods={total_active_methods}/33{qlstm_str}{m65_str}{m68_str}{m69_str}", file=sys.stderr)
+print(f"\n✅ BTC={btc_str} | SFC={effective_sfc:.1f}% | Zone={zone} | RSI-14M={rsi_str} | SOPR={sopr_str} | News={news_stress:.1f} | {regime} | TF=MONTHLY | Q9={'✓' if Q9_AVAILABLE else '✗'} | Methods={total_active_methods + sc_active}/38 | SC={sc_active}/5{qlstm_str}{m65_str}{m68_str}{m69_str}", file=sys.stderr)
 
 # Paper trading moved to pipeline script (sfc-pipeline.sh) to avoid
 # race condition: collect.py stdout > data.json is still buffered
