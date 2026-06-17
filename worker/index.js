@@ -510,24 +510,16 @@ document.getElementById('loginForm').addEventListener('submit', function(e) {
       });
     }
 
-    // — index.html
+    // — index.html — serve dashboard to ALL users (auth handled by frontend)
     if (path === '/' || path === '') {
-      const sessionUser = getCookie(request, 'sfc_session');
       const queryUser = url.searchParams.get('user');
       
-      // Auto-login: if ?user= is present but no cookie, set cookie and serve dashboard from VPS
-      if (!sessionUser && queryUser) {
+      // Auto-login: if ?user= is present, set cookie
+      if (queryUser) {
         const setCookieHeader = setCookie('sfc_session', queryUser);
         const resp = await fetchAny(urls, '/', 'text/html');
-        if (!resp) return new Response('Loading...', { status: 503, headers: corsHeaders });
-        let html = await resp.text();
-        // If VPS returns login page, inject redirect to force cookie-based login
-        if (html.includes('loginForm')) {
-          return new Response(null, {
-            status: 302,
-            headers: { 'Location': url.origin + '/login', 'Set-Cookie': setCookieHeader, ...corsHeaders },
-          });
-        }
+        if (!resp) return new Response('Backend unreachable', { status: 502 });
+        const html = await resp.text();
         return new Response(html, {
           status: 200,
           headers: {
@@ -539,11 +531,7 @@ document.getElementById('loginForm').addEventListener('submit', function(e) {
         });
       }
       
-      if (!sessionUser) {
-        return Response.redirect(url.origin + '/login', 302);
-      }
-
-      // Serve dashboard HTML from VPS backend (has the real dashboard)
+      // Serve dashboard for everyone (no auth required — frontend handles login)
       const resp = await fetchAny(urls, '/', 'text/html');
       if (!resp) return new Response('Backend unreachable', { status: 502 });
       let html = await resp.text();
