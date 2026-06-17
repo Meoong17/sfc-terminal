@@ -10,7 +10,9 @@ const TUNNEL = 'https://take-feedback-won-disclaimers.trycloudflare.com';
 const BACKUP = 'http://43.134.89.23:8765';
 
 async function fetchAny(urls, path, accept) {
-  for (const base of urls) {
+  // Try tunnel first, then VPS direct IP
+  const ordered = [TUNNEL, BACKUP];
+  for (const base of ordered) {
     try {
       const resp = await fetch(base + path, {
         headers: { 'Accept': accept || '*/*' },
