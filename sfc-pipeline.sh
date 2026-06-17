@@ -64,6 +64,11 @@ $PYTHON paper_trader.py 2>>sfc-pipeline.log || log "⚠ Paper trader skipped (no
 
 # ── Inject data into HTML ──
 # Restore real dashboard from .bak (always clean — worker serves login page separately)
+# Guard: restore if current index.html is too small, login page, or missing render()
+if [ -f "index.html.bak" ] && ( [ "$(wc -c < index.html)" -lt 50000 ] || grep -q 'loginForm' index.html 2>/dev/null || ! grep -q 'render(' index.html 2>/dev/null ); then
+  log "⚠ index.html corrupted — restoring from .bak"
+  cp index.html.bak index.html
+fi
 log "Restoring clean index.html from .bak..."
 if [ -f "index.html.bak" ] && [ "$(wc -c < index.html.bak)" -gt 50000 ]; then
   cp index.html.bak index.html
@@ -102,7 +107,7 @@ else
     if git pull --rebase --autostash -X theirs origin main 2>&1; then
         # ⚠ Git pull may override index.html with remote's corrupted version.
         # Re-check and restore from .bak if needed.
-        if [ -f "index.html.bak" ] && ( [ "$(wc -c < index.html)" -lt 50000 ] || grep -q 'loginForm' index.html 2>/dev/null ); then
+        if [ -f "index.html.bak" ] && ( [ "$(wc -c < index.html)" -lt 50000 ] || grep -q 'loginForm' index.html 2>/dev/null || ! grep -q 'render(' index.html 2>/dev/null ); then
           log "⚠ index.html was corrupted during pull — restoring from .bak"
           cp index.html.bak index.html
           log "Restored ($(wc -c < index.html) bytes)"
@@ -129,7 +134,7 @@ else
     fi
 
     # Final guard — ensure index.html is the real dashboard even after failed/pushed git ops
-    if [ -f "index.html.bak" ] && ( [ "$(wc -c < index.html)" -lt 50000 ] || grep -q 'loginForm' index.html 2>/dev/null ); then
+    if [ -f "index.html.bak" ] && ( [ "$(wc -c < index.html)" -lt 50000 ] || grep -q 'loginForm' index.html 2>/dev/null || ! grep -q 'render(' index.html 2>/dev/null ); then
       log "⚠ Final guard: index.html corrupted — restoring from .bak"
       cp index.html.bak index.html
       git add index.html
