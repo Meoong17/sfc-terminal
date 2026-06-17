@@ -47,6 +47,28 @@ function defaultUserState(username) {
   };
 }
 
+// Compression helper — gzip JSON responses for ~80% size reduction
+async function gzip(data) {
+  if (typeof data === 'string') data = new TextEncoder().encode(data);
+  const cs = new CompressionStream('gzip');
+  const writer = cs.writable.getWriter();
+  writer.write(data);
+  writer.close();
+  const chunks = [];
+  const reader = cs.readable.getReader();
+  let total = 0;
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+    total += value.length;
+  }
+  const out = new Uint8Array(total);
+  let offset = 0;
+  for (const c of chunks) { out.set(c, offset); offset += c.length; }
+  return out;
+}
+
 // Cookie helpers
 function getCookie(request, name) {
   const cookie = request.headers.get('Cookie') || '';
@@ -410,12 +432,41 @@ document.getElementById('loginForm').addEventListener('submit', function(e) {
       const resp = await fetchAny(urls, '/snapshot', 'application/json');
       if (!resp) return new Response('Backend unreachable', { status: 502 });
       const data = await resp.json();
-      const response = new Response(JSON.stringify(data), {
+      const body = JSON.stringify(data);
+      const compressed = await gzip(body);
+      const response = new Response(compressed, {
         status: 200,
-        headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=30', ...corsHeaders },
+        headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'public, max-age=30',
+          'Content-Encoding': 'gzip',
+          ...corsHeaders,
+        },
       });
       ctx.waitUntil(cache.put(cacheKey, response.clone()));
       return response;
+    }
+
+    // /data.json — SFC live data with gzip compression
+    if (path === '/data.json') {
+      const resp = await fetchAny(urls, '/data.json', 'application/json');
+      if (!resp) return new Response('{}', {
+        status: 200,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      });
+      const data = await resp.json();
+      const body = JSON.stringify(data);
+      const compressed = await gzip(body);
+      return new Response(compressed, {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Encoding': 'gzip',
+          'Cache-Control': 'no-cache',
+          'Vary': 'Accept-Encoding',
+          ...corsHeaders,
+        },
+      });
     }
 
     // /paper_history.json — paper trading track record

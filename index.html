@@ -2010,7 +2010,7 @@ function render(d) {
     </div>
 
     <!-- MARKET STRUCTURE (Derivatives Risk) — Q10+ Enhanced -->
-    <div class="card span-full mb-16" style="display:${d.q10_available?'block':'none'}">
+    <div class="card span-full mb-16" data-lazy style="display:${d.q10_available?'block':'none'}">
       <div class="card-head">
         <div class="card-title">
           <div class="card-icon">
@@ -2057,7 +2057,7 @@ function render(d) {
     </div>
 
     <!-- MACRO LIQUIDITY (M72-M75) — Layer 1 Macro Liquidity -->
-    <div class="card span-full mb-16" style="display:${(d.m72_m2_growth!=null)?'block':'none'}">
+    <div class="card span-full mb-16" data-lazy style="display:${(d.m72_m2_growth!=null)?'block':'none'}">
       <div class="card-head">
         <div class="card-title">
           <div class="card-icon">
@@ -2117,7 +2117,7 @@ function render(d) {
     </div>
 
     <!-- STABLECOIN LIQUIDITY (M76-M80) — Layer 2 Crypto Liquidity -->
-    <div class="card span-full mb-16" style="display:${(d.m76_supply_growth!=null||d.m77_ssr!=null)?'block':'none'}">
+    <div class="card span-full mb-16" data-lazy style="display:${(d.m76_supply_growth!=null||d.m77_ssr!=null)?'block':'none'}">
       <div class="card-head">
         <div class="card-title">
           <div class="card-icon">
@@ -2182,7 +2182,7 @@ function render(d) {
     </div>
 
     <!-- KELLY + MACRO row -->
-    <div class="card span-full mb-16">
+    <div class="card span-full mb-16" data-lazy>
       <div class="card-head">
         <div class="card-title">
           <div class="card-icon">
@@ -3492,6 +3492,36 @@ bootSFC();
 
 // SSE handles real-time updates when available.
 // On static (GitHub Pages / Workers), polling data.json every 30s is used instead.
+
+// ── LAZY LOADING ── Cards below fold render only when visible
+function initLazyCards() {
+  if ('IntersectionObserver' in window) {
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          const el = entry.target;
+          el.style.opacity = '1';
+          el.style.transform = 'translateY(0)';
+          observer.unobserve(el);
+        }
+      });
+    }, { rootMargin: '200px' }); // start loading 200px before visible
+    
+    document.querySelectorAll('[data-lazy]').forEach(el => {
+      el.style.opacity = '0';
+      el.style.transform = 'translateY(20px)';
+      el.style.transition = 'opacity 0.4s ease, transform 0.4s ease';
+      observer.observe(el);
+    });
+  }
+}
+// Run lazy observer after initial render (and after each re-render)
+const origRender = render;
+render = function(d) {
+  origRender(d);
+  // Delay observer until DOM is painted
+  setTimeout(initLazyCards, 100);
+};
 
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js').catch(e => console.log('SW failed:', e));
