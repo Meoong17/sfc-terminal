@@ -87,6 +87,106 @@ def extract_historical_snapshots():
 
 
 # ================================================================
+# 1b. LOAD HISTORICAL BTC FEATURES (from fetch_historical_btc.py)
+# ================================================================
+def load_historical_btc_data():
+    """
+    Load pre-computed historical BTC feature vectors and compute
+    proxy stress targets from price action.
+    
+    Historical data covers 2021-01-01 to present (~2000 daily snapshots).
+    Since these don't have SFC-derived stress targets, we compute a
+    proxy from RSI + daily returns + volatility.
+    
+    Returns:
+        features: (n, n_features) numpy array
+        targets: (n,) numpy array — proxy stress 0-1
+        dates: list of ISO date strings
+    """
+    feat_path = os.path.join(SFC_DIR, ".historical_features.npy")
+    dates_path = os.path.join(SFC_DIR, ".historical_dates.npy")
+    
+    if not os.path.exists(feat_path) or not os.path.exists(dates_path):
+        print("[Train] ⚠ Historical BTC data not found. Run fetch_historical_btc.py first.")
+        return None, None, None
+    
+    print("[Train] Loading historical BTC data...")
+    features = np.load(feat_path)
+    dates = np.load(dates_path, allow_pickle=True)
+    
+    print(f"[Train] Historical features: {features.shape}, dates: {len(dates)}")
+    print(f"[Train] Date range: {dates[0]} to {dates[-1]}")
+    
+    # Compute proxy stress targets from price features
+    n = len(features)
+    targets = np.zeros(n, dtype=np.float32)
+    
+    # Derive proxy stress from available features:
+    # feature[0] = btc_price/100k, feature[1] = btc_24h_change/20, 
+    # feature[5] = RSI/100, feature[4] = DVOL proxy
+    
+    for i in range(n):
+        stress = 0.0
+        
+        # RSI-based stress: RSI < 30 = stress, RSI > 70 = low stress
+        rsi = features[i][5] * 100.0  # de-normalize
+        if rsi > 0:
+            if rsi < 30:
+                stress += 0.4 * (1.0 - rsi / 30.0)  # 0-0.4 stress from RSI
+            elif rsi > 70:
+                stress += 0.0  # Low stress in overbought
+            else:
+                stress += 0.2 * (1.0 - abs(rsi - 50) / 20.0)  # moderate
+        
+        # Daily return stress: large negative = stress
+        daily_return = features[i][1] * 20.0  # de-normalize (%)
+        if daily_return < -5:
+            stress += 0.3  # Sharp drop
+        elif daily_return < -3:
+            stress += 0.2
+        elif daily_return < -1:
+            stress += 0.1
+        
+        # Volatility stress: high vol = moderate stress
+        dvol = features[i][4]  # already 0-1 normalized
+        if dvol > 0.6:
+            stress += 0.2 * (dvol - 0.6) / 0.4
+        
+        # FNG-based stress: extreme fear = stress
+        fng = features[i][8] * 100.0
+        if fng > 0 and fng < 20:
+            stress += 0.1 * (20.0 - fng) / 20.0
+        
+        targets[i] = min(stress, 1.0)
+    
+    print(f"[Train] Proxy stress targets: min={targets.min():.4f}, max={targets.max():.4f}, mean={targets.mean():.4f}")
+    
+    return features, targets, dates
+
+
+def merge_datasets(git_features, git_targets, hist_features, hist_targets):
+    """
+    Merge git-snapshot data with historical BTC data chronologically.
+    Historical data (2021 onwards) comes BEFORE git snapshot data (June 2026).
+    """
+    if hist_features is None:
+        print("[Train] No historical data — using only git snapshots")
+        return git_features, git_targets
+    
+    # Combine: historical data first (older), then git snapshots (newer)
+    combined_features = np.vstack([hist_features, git_features])
+    combined_targets = np.concatenate([hist_targets, git_targets])
+    
+    print(f"\n[Train] Dataset merge:")
+    print(f"  Git snapshots:  {len(git_features)}")
+    print(f"  Historical BTC: {len(hist_features)}")
+    print(f"  Combined:       {len(combined_features)}")
+    print(f"  Feature dim:    {combined_features.shape[1]}")
+    
+    return combined_features, combined_targets
+
+
+# ================================================================
 # 2. BUILD FEATURES AND TARGETS
 # ================================================================
 def build_dataset(snapshots):
@@ -356,14 +456,18 @@ if __name__ == '__main__':
     print("MAMBA TRAINING PIPELINE")
     print("=" * 60)
     
-    # 1. Extract snapshots
+    # 1. Extract git snapshots
     snapshots = extract_historical_snapshots()
     if len(snapshots) < SEQ_LEN + 10:
         print(f"[Train] ERROR: Need at least {SEQ_LEN + 10} snapshots, got {len(snapshots)}")
         sys.exit(1)
     
-    # 2. Build features
-    features, targets = build_dataset(snapshots)
+    # 2. Build features from git snapshots
+    git_features, git_targets = build_dataset(snapshots)
+    
+    # 2b. Load historical BTC data and merge
+    hist_features, hist_targets, hist_dates = load_historical_btc_data()
+    features, targets = merge_datasets(git_features, git_targets, hist_features, hist_targets)
     
     # 3. Create sequences
     X, y = create_sequences(features, targets, SEQ_LEN, HORIZONS)
