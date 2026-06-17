@@ -511,6 +511,29 @@ document.getElementById('loginForm').addEventListener('submit', function(e) {
     // — index.html
     if (path === '/' || path === '') {
       const sessionUser = getCookie(request, 'sfc_session');
+      const queryUser = url.searchParams.get('user');
+      
+      // Auto-login: if ?user= is present but no cookie, set cookie and serve dashboard
+      if (!sessionUser && queryUser) {
+        const safeUser = encodeURIComponent(queryUser);
+        const dashUrl = new URL(url);
+        dashUrl.searchParams.delete('user');
+        const setCookieHeader = setCookie('sfc_session', queryUser);
+        // Serve dashboard directly with cookie set, no redirect
+        const resp = await fetchAny(urls, '/', 'text/html');
+        if (!resp) return new Response('Backend unreachable', { status: 502 });
+        let html = await resp.text();
+        return new Response(html, {
+          status: 200,
+          headers: {
+            'Content-Type': 'text/html; charset=utf-8',
+            'Set-Cookie': setCookieHeader,
+            'Cache-Control': 'public, max-age=0, must-revalidate',
+            ...corsHeaders,
+          },
+        });
+      }
+      
       if (!sessionUser) {
         return Response.redirect(url.origin + '/login', 302);
       }
