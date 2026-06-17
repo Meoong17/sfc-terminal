@@ -1798,7 +1798,7 @@ function render(d) {
             <div class="consensus-ring" style="background:${agree>0.6?'var(--green-dim)':agree>0.3?'var(--amber-dim)':'var(--red-dim)'};border:2px solid ${agreeColor};color:${agreeColor}">${(agree*100).toFixed(0)}%</div>
             <div class="consensus-info">
               <div class="consensus-label">Method Consensus — ${agree>0.6?'Strong':agree>0.3?'Moderate':'Low'}</div>
-              <div class="consensus-sub">${d.total_methods_active||28} active methods · ${d.inst_methods_active||12} institutional · ${d.sc_methods_active||0} stablecoin</div>
+              <div class="consensus-sub">${d.total_methods_active||28} active methods · ${d.inst_methods_active||12} institutional · ${d.sc_methods_active||0} SC · ${d.macro_methods_active||0} macro</div>
             </div>
           </div>
         </div>
@@ -2052,6 +2052,66 @@ function render(d) {
           <span>${d.q10_details?.korea_premium_index?.status==='ok'?`Kimchi Premium: ${d.q10_details.korea_premium_index.value>0?'+':''}${fmtNum(d.q10_details.korea_premium_index.value,2)}%`:''}</span>
           <span>${d.q10_details?.coinbase_premium_gap?.status==='ok'?`Coinbase Premium: $${fmtNum(d.q10_details.coinbase_premium_gap.value,1)}`:''}</span>
           <span>${d.q10_details?.funding_rates?.status==='ok'?`Funding: ${(d.q10_details.funding_rates.value*100).toFixed(3)}%`:''}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- MACRO LIQUIDITY (M72-M75) — Layer 1 Macro Liquidity -->
+    <div class="card span-full mb-16" style="display:${(d.m72_m2_growth!=null)?'block':'none'}">
+      <div class="card-head">
+        <div class="card-title">
+          <div class="card-icon">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <rect x="1" y="1" width="4" height="4" rx="1" stroke="#4a9eff" stroke-width="1.2"/>
+              <rect x="7" y="1" width="4" height="4" rx="1" stroke="#f0b429" stroke-width="1.2"/>
+              <line x1="3" y1="7" x2="9" y2="7" stroke="#00ff9d" stroke-width="1.2"/>
+            </svg>
+          </div>
+          Macro Liquidity
+        </div>
+        <div class="card-badge" style="color:var(--text-3);font-size:9px">L1 Macro Liquidity · ${d.macro_methods_active||0}/4 active</div>
+      </div>
+      <div class="card-body">
+        <div class="stat-3 mb-12">
+          <div class="stat-box">
+            <div class="stat-label">M72 M2 Growth</div>
+            <div class="stat-val" style="color:${d.m72_m2_growth!=null&&d.m72_m2_growth<0.4?'var(--green)':d.m72_m2_growth!=null&&d.m72_m2_growth<0.7?'var(--amber)':'var(--red)'}">${d.m72_m2_growth!=null?fmtNum(d.m72_m2_growth*100,0):'—'}</div>
+            <div class="stat-note">M2 YoY: ${d.m72_detail?.m2_yoy_pct!=null?fmtNum(d.m72_detail.m2_yoy_pct,1)+'%':'—'}</div>
+            <div class="prog-track mt-4"><div class="prog-fill ${d.m72_m2_growth<0.4?'pf-green':d.m72_m2_growth<0.7?'pf-amber':'pf-red'}" style="width:${(d.m72_m2_growth||0)*100}%"></div></div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-label">M73 M2 Momentum</div>
+            <div class="stat-val" style="color:${d.m73_m2_momentum!=null&&d.m73_m2_momentum<0.3?'var(--green)':d.m73_m2_momentum!=null&&d.m73_m2_momentum<0.6?'var(--amber)':'var(--red)'}">${d.m73_m2_momentum!=null?fmtNum(d.m73_m2_momentum*100,0):'—'}</div>
+            <div class="stat-note">${d.m73_detail?.label?.replace(/_/g,' ')||'—'}</div>
+            <div class="prog-track mt-4"><div class="prog-fill ${d.m73_m2_momentum<0.3?'pf-green':d.m73_m2_momentum<0.6?'pf-amber':'pf-red'}" style="width:${(d.m73_m2_momentum||0)*100}%"></div></div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-label">M74 Fed Balance</div>
+            <div class="stat-val" style="color:${d.m74_fed_balance!=null&&d.m74_fed_balance<0.3?'var(--green)':d.m74_fed_balance!=null&&d.m74_fed_balance<0.6?'var(--amber)':'var(--red)'}">${d.m74_fed_balance!=null?fmtNum(d.m74_fed_balance*100,0):'—'}</div>
+            <div class="stat-note">${d.m74_detail?.label?.replace(/_/g,' ')||'—'}</div>
+            <div class="prog-track mt-4"><div class="prog-fill ${d.m74_fed_balance<0.3?'pf-green':d.m74_fed_balance<0.6?'pf-amber':'pf-red'}" style="width:${(d.m74_fed_balance||0)*100}%"></div></div>
+          </div>
+        </div>
+        <div class="stat-3 mb-12">
+          <div class="stat-box">
+            <div class="stat-label">M75 Composite</div>
+            <div class="stat-val" style="color:${d.m75_liquidity_composite!=null&&d.m75_liquidity_composite<0.3?'var(--green)':d.m75_liquidity_composite!=null&&d.m75_liquidity_composite<0.6?'var(--amber)':'var(--red)'}">${d.m75_liquidity_composite!=null?fmtNum(d.m75_liquidity_composite*100,0):'—'}</div>
+            <div class="stat-note">${d.m75_detail?.regime||'—'}</div>
+            <div class="prog-track mt-4"><div class="prog-fill ${d.m75_liquidity_composite<0.3?'pf-green':d.m75_liquidity_composite<0.6?'pf-amber':'pf-red'}" style="width:${(d.m75_liquidity_composite||0)*100}%"></div></div>
+            <div style="font-size:8px;color:var(--text-3);margin-top:4px;line-height:1.4">Fed YoY: ${d.m74_detail?.fed_yoy_pct!=null?fmtNum(d.m74_detail.fed_yoy_pct,1)+'%':'—'}</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-label">Regime</div>
+            <div class="stat-val" style="color:${d.m75_detail?.regime==='EXPANSIVE'||d.m75_detail?.regime==='ACCOMMODATIVE'?'var(--green)':d.m75_detail?.regime==='NEUTRAL'?'var(--amber)':'var(--red)'}" style="font-size:16px">${d.m75_detail?.regime?.charAt(0)+d.m75_detail?.regime?.slice(1).toLowerCase()||'—'}</div>
+            <div class="stat-note">Weighted L1 signal</div>
+          </div>
+          <div class="stat-box" style="justify-content:center;align-items:center">
+            <div style="font-size:10px;color:var(--text-3);line-height:1.5;text-align:center">
+              <div>Layer 1 Macro Liquidity</div>
+              <div style="margin-top:4px;font-size:9px;color:var(--text-4)">${d.macro_methods_active||0}/4 · avg ${d.macro_methods_avg!=null?fmtNum(d.macro_methods_avg*100,0)+'%':'—'}</div>
+              <div style="margin-top:2px;font-size:8px;color:var(--text-4)">M72 M2 Growth · M73 M2 Momentum<br>M74 Fed Balance · M75 Composite</div>
+            </div>
+          </div>
         </div>
       </div>
     </div>

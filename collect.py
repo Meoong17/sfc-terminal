@@ -1280,6 +1280,184 @@ def calculate_m33_global_liquidity():
     _GLO_CACHE["ts"] = now
     return sfc_score, details
 
+
+# ── MACRO LIQUIDITY (M72-M75 / Layer 1) ─────────────────────────────
+_MACRO_CACHE = {"score": None, "details": {}, "ts": 0}
+
+def calculate_m72_m2_growth():
+    """M72: Global M2 Growth — YoY % change in US M2 money supply.
+    
+    Uses existing m2_yoy variable. Higher M2 growth = more liquidity = bullish.
+    """
+    m2 = _fred("M2SL", 13)  # 13 monthly = 1 year
+    if not m2 or len(m2) < 2:
+        return None, {"m2_yoy": None, "status": "unavailable"}
+    
+    m2_yoy_val = (m2[0] - m2[12]) / m2[12] * 100 if len(m2) >= 13 else None
+    if m2_yoy_val is None and len(m2) >= 2:
+        m2_yoy_val = (m2[0] - m2[-1]) / m2[-1] * 100
+    
+    # Score: M2 growth 2-7% = normal, <0% = contraction (bearish), >10% = overheating
+    if m2_yoy_val < 0:
+        score = max(0.05, 0.3 + m2_yoy_val * 0.03)
+    elif m2_yoy_val < 5:
+        score = 0.3 + (m2_yoy_val / 5) * 0.4
+    elif m2_yoy_val < 10:
+        score = 0.7 + min(0.2, (m2_yoy_val - 5) * 0.04)
+    else:
+        score = 0.9  # overheating — potential tightening
+    
+    detail = {
+        "m2_yoy_pct": round(m2_yoy_val, 2),
+        "m2_latest": round(m2[0], 0) if m2 else None,
+        "status": "ok",
+    }
+    return round(score, 3), detail
+
+
+def calculate_m73_m2_momentum():
+    """M73: M2 Momentum — 3-month growth minus 12-month growth.
+    
+    Positive = accelerating liquidity (bullish). Negative = decelerating (bearish).
+    """
+    m2 = _fred("M2SL", 13)
+    if not m2 or len(m2) < 13:
+        return None, {"m2_momentum": None, "status": "unavailable"}
+    
+    growth_3m = (m2[0] - m2[3]) / m2[3] * 100
+    growth_12m = (m2[0] - m2[12]) / m2[12] * 100
+    momentum = growth_3m - growth_12m  # acceleration
+    
+    # Score: momentum > +1% = accelerating (bullish)
+    # momentum 0 to +1% = steady
+    # momentum < 0 = decelerating (bearish)
+    score = 1.0 / (1.0 + math.exp(-1.5 * (momentum - 0.3)))
+    score = max(0.05, min(0.95, score))
+    
+    if momentum > 1:
+        label = "ACCELERATING"
+    elif momentum > 0:
+        label = "STEADY"
+    elif momentum > -1:
+        label = "DECELERATING"
+    else:
+        label = "CONTRACTING"
+    
+    detail = {
+        "m2_momentum": round(momentum, 3),
+        "m2_growth_3m": round(growth_3m, 2),
+        "m2_growth_12m": round(growth_12m, 2),
+        "label": label,
+        "status": "ok",
+    }
+    return round(score, 3), detail
+
+
+def calculate_m74_fed_balance():
+    """M74: Fed Balance Sheet — YoY % change in Fed total assets (WALCL).
+    
+    Fed expanding balance sheet = liquidity injection = bullish.
+    Fed shrinking (QT) = liquidity withdrawal = bearish.
+    Uses same data as M33 GLO.
+    """
+    walcl = _fred("WALCL", 13)
+    if not walcl or len(walcl) < 13:
+        return None, {"fed_yoy": None, "status": "unavailable"}
+    
+    fed_yoy = (walcl[0] - walcl[12]) / walcl[12] * 100
+    
+    # Fed balance sheet expansion:
+    # >+10% = massive QE → very bullish (low stress)
+    # +2% to +10% = gradual expansion → mildly bullish
+    # -2% to +2% = neutral/stable
+    # -5% to -2% = mild QT → mildly bearish
+    # <-5% = aggressive QT → bearish
+    
+    if fed_yoy > 10:
+        score = 0.1  # massive liquidity — very low stress
+    elif fed_yoy > 2:
+        score = 0.2  # expansion — low stress
+    elif fed_yoy > -2:
+        score = 0.4  # stable — medium-low
+    elif fed_yoy > -5:
+        score = 0.6  # mild QT
+    else:
+        score = 0.8  # aggressive QT — high stress
+    
+    if fed_yoy > 2:
+        label = "EXPANDING"
+    elif fed_yoy > -2:
+        label = "STABLE"
+    elif fed_yoy > -5:
+        label = "MILD_QT"
+    else:
+        label = "AGGRESSIVE_QT"
+    
+    detail = {
+        "fed_yoy_pct": round(fed_yoy, 2),
+        "fed_balance": round(walcl[0], 0),
+        "label": label,
+        "status": "ok",
+    }
+    return round(score, 3), detail
+
+
+def calculate_m75_liquidity_composite(m72_score, m72_detail, m73_score, m73_detail, m74_score, m74_detail):
+    """M75: Liquidity Composite — weighted blend of M72-M74.
+    
+    Combines all three macro liquidity signals into one composite score.
+    """
+    scores = []
+    weights = []
+    
+    if m72_score is not None:
+        scores.append(m72_score)
+        weights.append(0.30)  # M2 growth: 30%
+    if m73_score is not None:
+        scores.append(m73_score)
+        weights.append(0.30)  # M2 momentum: 30%
+    if m74_score is not None:
+        scores.append(m74_score)
+        weights.append(0.40)  # Fed balance sheet: 40% (most direct policy signal)
+    
+    if not scores:
+        return None, {"composite": None, "status": "unavailable"}
+    
+    total_w = sum(weights)
+    composite = sum(s * w for s, w in zip(scores, weights)) / total_w
+    
+    # Map to SFC stress score (high composite = high macro stress = bearish)
+    # For the frontend: M72-M75 produce a 0-1 score where HIGH = more stress
+    # This follows the same convention as M1-M80
+    
+    active_scores = ", ".join([
+        f"M72={m72_score:.2f}" if m72_score is not None else "",
+        f"M73={m73_score:.2f}" if m73_score is not None else "",
+        f"M74={m74_score:.2f}" if m74_score is not None else "",
+    ]).strip(", ")
+    
+    if composite < 0.2:
+        regime = "EXPANSIVE"
+    elif composite < 0.4:
+        regime = "ACCOMMODATIVE"
+    elif composite < 0.6:
+        regime = "NEUTRAL"
+    elif composite < 0.8:
+        regime = "TIGHTENING"
+    else:
+        regime = "CONTRACTIVE"
+    
+    detail = {
+        "composite": round(composite, 3),
+        "regime": regime,
+        "m72_score": round(m72_score, 3) if m72_score is not None else None,
+        "m73_score": round(m73_score, 3) if m73_score is not None else None,
+        "m74_score": round(m74_score, 3) if m74_score is not None else None,
+        "active_components": active_scores,
+        "status": "ok",
+    }
+    return round(composite, 3), detail
+
 # ============================================================
 # MONTHLY TIMEFRAME: Daily Market Snapshot Cache (30d rolling)
 # ============================================================
@@ -1568,6 +1746,18 @@ glo_adj = 6 / (1 + math.exp(-0.08 * (glo_val - 50))) - 3
 factors["Lt"] += glo_adj
 factors["Lt"] = max(-3.0, min(3.0, factors["Lt"]))
 print(f"[SFC] GLO Lt adjustment: {glo_adj:+.3f} (glo={glo_val:.1f}) Lt={factors['Lt']:.3f}", file=sys.stderr)
+
+# ── MACRO LIQUIDITY (M72-M75 / Layer 1) ──
+print("[SFC] Computing M72-M75 macro liquidity metrics...", file=sys.stderr)
+_m72_score, _m72_detail = calculate_m72_m2_growth()
+_m73_score, _m73_detail = calculate_m73_m2_momentum()
+_m74_score, _m74_detail = calculate_m74_fed_balance()
+_m75_score, _m75_detail = calculate_m75_liquidity_composite(
+    _m72_score, _m72_detail, _m73_score, _m73_detail, _m74_score, _m74_detail
+)
+_macro_active = sum(1 for x in [_m72_score, _m73_score, _m74_score, _m75_score] if x is not None)
+_macro_avg = round(sum(x for x in [_m72_score, _m73_score, _m74_score, _m75_score] if x is not None) / max(_macro_active, 1), 3)
+print(f"[SFC] M72-M75: {_macro_active}/4 active, avg={_macro_avg}, regime={_m75_detail.get('regime','N/A') if _m75_detail else 'N/A'}", file=sys.stderr)
 
 # ── CAUSAL INFERENCE FILTER ──
 print("[SFC] Running causal inference filter...", file=sys.stderr)
@@ -1914,8 +2104,14 @@ ml_metrics = evaluate_accuracy()
 print(f"[SFC] ML Ensemble: {ml_msg} | Accuracy: {ml_metrics.get('message', 'N/A')}", file=sys.stderr)
 
 # Count total active methods
-total_active_methods = 6 + new_active + inst_active_count + (1 if qlstm_ok else 0) + (1 if m33_glo_score is not None else 0)
-print(f"[SFC] Total active methods: {total_active_methods}/33 (M1-M6+M7-M19+M20-M31+M32_Q+M33_GLO)", file=sys.stderr)
+total_active_methods = (
+    6 + new_active + inst_active_count 
+    + (1 if qlstm_ok else 0) 
+    + (1 if m33_glo_score is not None else 0)
+    + sc_active
+    + _macro_active
+)
+print(f"[SFC] Total active methods: {total_active_methods}/42 (M1-M6+M7-M19+M20-M31+M32_Q+M33_GLO+M76-M80+M72-M75)", file=sys.stderr)
 
 # Compute effective SFC
 liq_mod = 0.0
@@ -2492,6 +2688,17 @@ out = {
     # M33 — Global Liquidity Index
     "m33_glo_score": round(m33_glo_score, 3) if m33_glo_score is not None else None,
     "m33_glo_detail": m33_glo_detail if m33_glo_detail else None,
+    # Macro liquidity (M72-M75 / Layer 1)
+    "macro_methods_active": _macro_active,
+    "macro_methods_avg": _macro_avg if _macro_active > 0 else None,
+    "m72_m2_growth": round(_m72_score, 3) if _m72_score is not None else None,
+    "m72_detail": _m72_detail,
+    "m73_m2_momentum": round(_m73_score, 3) if _m73_score is not None else None,
+    "m73_detail": _m73_detail,
+    "m74_fed_balance": round(_m74_score, 3) if _m74_score is not None else None,
+    "m74_detail": _m74_detail,
+    "m75_liquidity_composite": round(_m75_score, 3) if _m75_score is not None else None,
+    "m75_detail": _m75_detail,
     # XAI feature importance
     "xai_top_features": _XAI_FEATURES,
     # ML ensemble
@@ -2621,7 +2828,7 @@ qlstm_str = f" QLSTM={qlstm_pred*100:.1f}" if qlstm_pred is not None else ""
 m65_str = f" CNN={_m65_stress:.2f}" if CNN_ATTENTION_AVAILABLE else ""
 m68_str = f" DRL={_m68_signal}" if DRL_AVAILABLE else ""
 m69_str = f" SYS={_m69_overall:.2f}" if GNN_AVAILABLE else ""
-print(f"\n✅ BTC={btc_str} | SFC={effective_sfc:.1f}% | Zone={zone} | RSI-14M={rsi_str} | SOPR={sopr_str} | News={news_stress:.1f} | {regime} | TF=MONTHLY | Q9={'✓' if Q9_AVAILABLE else '✗'} | Methods={total_active_methods + sc_active}/38 | SC={sc_active}/5{qlstm_str}{m65_str}{m68_str}{m69_str}", file=sys.stderr)
+print(f"\n✅ BTC={btc_str} | SFC={effective_sfc:.1f}% | Zone={zone} | RSI-14M={rsi_str} | SOPR={sopr_str} | News={news_stress:.1f} | {regime} | TF=MONTHLY | Q9={'✓' if Q9_AVAILABLE else '✗'} | Methods={total_active_methods}/42 | Macro={_macro_active}/4 | SC={sc_active}/5{qlstm_str}{m65_str}{m68_str}{m69_str}", file=sys.stderr)
 
 # Paper trading moved to pipeline script (sfc-pipeline.sh) to avoid
 # race condition: collect.py stdout > data.json is still buffered
