@@ -535,34 +535,13 @@ document.getElementById('loginForm').addEventListener('submit', function(e) {
       const resp = await fetchAny(urls, '/', 'text/html');
       if (!resp) return new Response('Backend unreachable', { status: 502 });
       let html = await resp.text();
-
-      // If backend is returning the login page, force dashboard redirect for logged-in users
-      const loginPageSignals = [
-        html.includes('loginForm'),
-        html.includes('Enter your username to access the dashboard.'),
-        html.includes('sfc_session'),
-      ];
-      const isLoginPage = loginPageSignals.filter(Boolean).length >= 2;
-      if (isLoginPage) {
-        const safeUser = encodeURIComponent(sessionUser);
-        return new Response(
-          `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Redirecting...</title></head><body><script>window.location.href='/?user=${safeUser}'</script></body></html>`,
-          {
-            status: 200,
-            headers: {
-              'Content-Type': 'text/html; charset=utf-8',
-              'Cache-Control': 'no-cache, no-store, must-revalidate',
-              ...corsHeaders,
-            },
-          }
-        );
-      }
-
+      
       return new Response(html, {
         status: 200,
         headers: {
           'Content-Type': 'text/html; charset=utf-8',
           'Cache-Control': 'public, max-age=0, must-revalidate',
+          ...corsHeaders,
         },
       });
     }

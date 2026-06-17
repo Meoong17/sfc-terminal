@@ -1,39 +1,1164 @@
 <!DOCTYPE html>
-<html>
+<!-- b=1 -->
+<html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SFC Terminal | Login</title>
-    <style>
-        *{margin:0;padding:0;box-sizing:border-box}
-        body{background:#07080d;font-family:'Space Grotesk',system-ui,-apple-system,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px}
-        .login-card{background:#0e111a;border-radius:28px;padding:40px;width:100%;max-width:440px;border:1px solid rgba(255,255,255,0.08);box-shadow:0 20px 40px rgba(0,0,0,0.5)}
-        .login-card h1{font-size:28px;font-weight:700;background:linear-gradient(135deg,#fff,#7864ff);-webkit-background-clip:text;background-clip:text;color:transparent;margin-bottom:8px}
-        .login-card p{color:#8892a8;font-size:14px;margin-bottom:32px;line-height:1.5}
-        input{width:100%;padding:14px 18px;background:#1a1f2e;border:1px solid #2a3347;border-radius:16px;color:#edf1f7;font-size:16px;margin-bottom:8px;outline:none}
-        input:focus{border-color:#7864ff;box-shadow:0 0 0 2px rgba(120,100,255,0.2)}
-        button{width:100%;padding:14px;background:#7864ff;border:none;border-radius:16px;color:white;font-weight:600;font-size:16px;cursor:pointer}
-        button:hover{background:#5d4ae0}
-        button:disabled{opacity:0.5;cursor:not-allowed}
-        .note{font-size:12px;color:#5a6478;text-align:center;margin-top:24px}
-        .error{color:#ff4060;font-size:13px;margin-bottom:16px;display:none}
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net 'unsafe-inline'; style-src 'self' https://fonts.googleapis.com 'unsafe-inline'; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.binance.com https://sfc-terminal.meoong17.workers.dev;">
+<title>SFC Terminal | Quantitative Stress Intelligence</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+<style>
+/* ══════════════════════════════════════════════════════════════
+   SFC TERMINAL v4 — Redesigned Design System
+   Dark-mode, Linear-inspired precision with crypto-accent purple
+══════════════════════════════════════════════════════════════ */
+
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --bg-void:      #07080d;
+  --bg-base:      #0b0d15;
+  --bg-card:      #0e111a;
+  --bg-raise:     #131723;
+  --bg-float:     #1a1f2e;
+  --bg-hover:     #1f2436;
+
+  --border-0:    rgba(255,255,255,0.03);
+  --border-1:    rgba(255,255,255,0.06);
+  --border-2:    rgba(255,255,255,0.09);
+  --border-3:    rgba(255,255,255,0.14);
+
+  --text-1: #edf1f7;
+  --text-2: #8892a8;
+  --text-3: #49536b;
+  --text-4: #2a3347;
+
+  --purple:   #7864ff;
+  --purple2:  #5d4ae0;
+  --purple-dim: rgba(120,100,255,0.12);
+  --purple-glow: rgba(120,100,255,0.2);
+  --purple-border: rgba(120,100,255,0.3);
+
+  --cyan:     #00d4ff;
+  --cyan-dim:  rgba(0,212,255,0.1);
+  --green:    #00f5a0;
+  --green-dim: rgba(0,245,160,0.1);
+  --red:      #ff4060;
+  --red-dim:   rgba(255,64,96,0.1);
+  --amber:    #f0b429;
+  --amber-dim: rgba(240,180,41,0.1);
+  --blue:     #4a9eff;
+  --blue-dim:  rgba(74,158,255,0.1);
+
+  --grad-purple:  linear-gradient(135deg,#7864ff,#5d4ae0);
+  --grad-cyan:    linear-gradient(135deg,#00d4ff,#0099e6);
+  --grad-green:   linear-gradient(135deg,#00f5a0,#00c87b);
+  --grad-red:     linear-gradient(135deg,#ff4060,#cc1a35);
+  --grad-amber:   linear-gradient(135deg,#f0b429,#d48a00);
+  --border-red: #ff4060;
+  --border-green: #00f5a0;
+
+  --glow-purple: 0 0 30px rgba(120,100,255,0.15);
+  --glow-cyan:   0 0 30px rgba(0,212,255,0.12);
+  --glow-green:  0 0 30px rgba(0,245,160,0.12);
+  --glow-red:    0 0 30px rgba(255,64,96,0.12);
+
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 14px;
+  --r-xl: 18px;
+
+  --nav-h: 52px;
+  --band-h: 36px;
+}
+
+html { height: 100%; }
+
+body {
+  background: var(--bg-void);
+  color: var(--text-1);
+  font-family: 'Space Grotesk', sans-serif;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100%;
+  overflow-x: hidden;
+}
+
+/* Subtle grid background */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px);
+  background-size: 48px 48px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+#app { position: relative; z-index: 1; }
+
+::-webkit-scrollbar { width: 3px; height: 3px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--text-4); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-3); }
+
+/* ══════════════════════════════════════════
+   LOADING SCREEN
+══════════════════════════════════════════ */
+.loading-screen {
+  position: fixed;
+  inset: 0;
+  background: var(--bg-void);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  z-index: 999;
+}
+.loading-logo {
+  width: 56px; height: 56px;
+  border-radius: var(--r-md);
+  background: var(--grad-purple);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 700;
+  font-size: 18px;
+  color: #fff;
+  box-shadow: var(--glow-purple);
+}
+.loading-spinner {
+  width: 28px; height: 28px;
+  border: 2px solid var(--border-2);
+  border-top-color: var(--purple);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+.loading-text {
+  font-size: 12px;
+  color: var(--text-3);
+  letter-spacing: 0.08em;
+  font-weight: 500;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ══════════════════════════════════════════
+   NAV
+══════════════════════════════════════════ */
+.shell { display: flex; flex-direction: column; min-height: 100vh; }
+
+.nav {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  height: var(--nav-h);
+  background: rgba(7,8,13,0.88);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--border-1);
+}
+
+.nav-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.nav-logo {
+  width: 30px; height: 30px;
+  border-radius: var(--r-sm);
+  background: var(--grad-purple);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 700;
+  font-size: 10px;
+  color: #fff;
+  box-shadow: var(--glow-purple);
+}
+.nav-wordmark { display: flex; flex-direction: column; }
+.nav-title {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+.nav-title span { color: var(--purple); }
+.nav-sub {
+  font-size: 8px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  margin-top: 1px;
+}
+
+.nav-center {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  background: rgba(255,255,255,0.03);
+  padding: 2px;
+  border-radius: 8px;
+}
+.nav-tab {
+  padding: 5px 12px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-2);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.nav-tab:hover { color: var(--text-1); background: rgba(255,255,255,0.04); }
+.nav-tab.active { color: #fff; background: var(--purple-dim); }
+
+.nav-right {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.nav-meta { display: flex; flex-direction: column; align-items: flex-end; }
+.nav-meta-label {
+  font-size: 8px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+.nav-meta-val {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-1);
+}
+.nav-pill {
+  padding: 4px 12px;
+  border-radius: 100px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.pill-buy   { background: var(--green-dim); color: var(--green); border: 1px solid rgba(0,245,160,0.25); }
+.pill-watch { background: var(--amber-dim); color: var(--amber); border: 1px solid rgba(240,180,41,0.2); }
+.pill-cash  { background: var(--red-dim);   color: var(--red);   border: 1px solid var(--border-red); }
+
+/* ══════════════════════════════════════════
+   STATUS BAND
+══════════════════════════════════════════ */
+.status-band {
+  display: flex;
+  gap: 6px;
+  padding: 6px 24px;
+  height: var(--band-h);
+  background: var(--bg-base);
+  border-bottom: 1px solid var(--border-1);
+  overflow-x: auto;
+  scrollbar-width: none;
+  align-items: center;
+}
+.status-band::-webkit-scrollbar { display: none; }
+.s-chip {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 100px;
+  border: 1px solid var(--border-1);
+  background: var(--bg-card);
+  font-size: 9px;
+  font-weight: 500;
+  color: var(--text-2);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.s-dot {
+  width: 4px; height: 4px;
+  border-radius: 50%;
+}
+.dot-g { background: var(--green); box-shadow: 0 0 5px rgba(0,245,160,0.5); }
+.dot-r { background: var(--red);   box-shadow: 0 0 5px rgba(255,64,96,0.5); }
+.dot-a { background: var(--amber); box-shadow: 0 0 5px rgba(240,180,41,0.5); }
+.dot-b { background: var(--blue);  box-shadow: 0 0 5px rgba(74,158,255,0.5); }
+.dot-c { background: var(--cyan);  box-shadow: 0 0 5px rgba(0,212,255,0.5); }
+.dot-p { background: var(--purple);box-shadow: 0 0 5px rgba(120,100,255,0.5); }
+
+/* ══════════════════════════════════════════
+   MAIN CONTENT
+══════════════════════════════════════════ */
+.main {
+  padding: 20px 24px;
+  max-width: 1440px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+/* Section heading bar */
+.section-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.section-head-line {
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, var(--border-2), transparent);
+}
+.section-head-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  white-space: nowrap;
+}
+
+/* ══════════════════════════════════════════
+   KPI ROW
+══════════════════════════════════════════ */
+.kpi-row {
+  display: grid;
+  grid-template-columns: 2.2fr 1fr 1fr 1fr 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.kpi {
+  background: var(--bg-card);
+  border: 1px solid var(--border-1);
+  border-radius: var(--r-lg);
+  padding: 14px 16px;
+  position: relative;
+  overflow: hidden;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.kpi:hover {
+  border-color: var(--border-2);
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.02);
+}
+
+.kpi-hero {
+  border-color: var(--purple-border);
+  background: linear-gradient(135deg, rgba(120,100,255,0.06) 0%, var(--bg-card) 100%);
+}
+.kpi-hero:hover {
+  border-color: rgba(120,100,255,0.4);
+  box-shadow: var(--glow-purple);
+}
+
+/* Gradient top accent for all KPIs */
+.kpi::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 1px; right: 1px;
+  height: 2px;
+  border-radius: var(--r-lg) var(--r-lg) 0 0;
+  opacity: 0.6;
+}
+.kpi-hero::before { background: var(--grad-purple); }
+
+.kpi-label {
+  font-size: 8px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  margin-bottom: 6px;
+}
+.kpi-num {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  margin-bottom: 3px;
+}
+.kpi-hero .kpi-num { font-size: 32px; }
+.kpi-aux {
+  font-size: 9px;
+  font-weight: 500;
+  color: var(--text-2);
+}
+.kpi-badge {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: 100px;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin-top: 3px;
+}
+.kb-g { background: var(--green-dim); color: var(--green); }
+.kb-r { background: var(--red-dim); color: var(--red); }
+.kb-a { background: var(--amber-dim); color: var(--amber); }
+
+.chg-p { color: var(--green); }
+.chg-n { color: var(--red); }
+.chg-z { color: var(--text-2); }
+
+/* ══════════════════════════════════════════
+   GRID LAYOUTS
+══════════════════════════════════════════ */
+.grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+.grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.grid-4 {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.span-full { grid-column: 1 / -1; }
+
+/* ══════════════════════════════════════════
+   CARD
+══════════════════════════════════════════ */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-1);
+  border-radius: var(--r-xl);
+  overflow: hidden;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  position: relative;
+}
+.card:hover {
+  border-color: var(--border-2);
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.015);
+}
+
+/* Gradient top accent bar for all cards */
+.card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 1px; right: 1px;
+  height: 1.5px;
+  border-radius: var(--r-xl) var(--r-xl) 0 0;
+  background: linear-gradient(90deg, transparent, rgba(120,100,255,0.2), transparent);
+  opacity: 0.4;
+  z-index: 1;
+}
+
+.card-head {
+  padding: 12px 18px 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--border-1);
+}
+.card-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-2);
+}
+.card-icon {
+  width: 20px; height: 20px;
+  border-radius: 5px;
+  background: var(--bg-raise);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.card-icon svg { display: block; }
+.card-badge {
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--text-3);
+  font-family: 'JetBrains Mono', monospace;
+}
+.card-body { padding: 18px; }
+.card-collapsed .card-body { display: none; }
+.card-collapsed .card-head { cursor: pointer; }
+.card-collapsed .card-head:hover { background: var(--bg-hover); }
+.card-collapsed .card-head .collapse-arrow { transition: transform 0.2s; }
+.card-collapsed .card-head .collapse-arrow { transform: rotate(-90deg); }
+.card-body-sm { padding: 12px 18px; }
+
+/* ══════════════════════════════════════════
+   SFC STRESS HERO (Arc Gauge)
+══════════════════════════════════════════ */
+.sfc-hero-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 14px 0 18px;
+}
+.sfc-arc-container {
+  position: relative;
+  width: 170px;
+  height: 95px;
+  margin-bottom: 6px;
+}
+.sfc-arc-container svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.sfc-big-num {
+  position: absolute;
+  bottom: -2px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 44px;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  text-align: center;
+  white-space: nowrap;
+}
+.sfc-desc {
+  font-size: 9px;
+  color: var(--text-3);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-top: 2px;
+}
+.sfc-zone-pill {
+  display: inline-block;
+  padding: 3px 14px;
+  border-radius: 100px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-top: 8px;
+}
+.zone-normal   { background: var(--green-dim); color: var(--green); border: 1px solid rgba(0,245,160,0.2); }
+.zone-elevated { background: var(--amber-dim); color: var(--amber); border: 1px solid rgba(240,180,41,0.2); }
+.zone-critical { background: var(--red-dim);   color: var(--red);   border: 1px solid rgba(255,64,96,0.2); }
+
+/* Progress bar */
+.prog-track {
+  height: 3px;
+  background: var(--bg-raise);
+  border-radius: 3px;
+  overflow: hidden;
+  margin: 6px 0;
+}
+.prog-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.6s ease;
+}
+.pf-green  { background: var(--grad-green); }
+.pf-red    { background: var(--grad-red); }
+.pf-amber  { background: var(--grad-amber); }
+.pf-cyan   { background: var(--grad-cyan); }
+.pf-purple { background: var(--grad-purple); }
+
+/* ══════════════════════════════════════════
+   METHOD ENSEMBLE GRID
+══════════════════════════════════════════ */
+.method-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 5px;
+  margin-bottom: 12px;
+}
+.method-cell {
+  background: var(--bg-raise);
+  border-radius: var(--r-sm);
+  padding: 7px 5px;
+  text-align: center;
+  border: 1px solid var(--border-1);
+  transition: border-color 0.15s;
+}
+.method-cell:hover { border-color: var(--border-2); }
+.method-cell-name {
+  font-size: 7px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  margin-bottom: 3px;
+}
+.method-cell-val {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+/* ══════════════════════════════════════════
+   CONSENSUS
+══════════════════════════════════════════ */
+.consensus-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0 0;
+  border-top: 1px solid var(--border-1);
+  margin-top: 6px;
+}
+.consensus-ring {
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.consensus-info { flex: 1; }
+.consensus-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-1);
+  margin-bottom: 1px;
+}
+.consensus-sub {
+  font-size: 8px;
+  color: var(--text-3);
+  letter-spacing: 0.04em;
+}
+
+/* ══════════════════════════════════════════
+   CHART
+══════════════════════════════════════════ */
+.chart-shell {
+  position: relative;
+  border-radius: var(--r-md);
+  padding: 3px;
+  background: linear-gradient(135deg, rgba(120,100,255,0.04) 0%, transparent 60%);
+  overflow: hidden;
+}
+.chart-shell canvas {
+  display: block;
+  width: 100% !important;
+  max-height: 220px;
+}
+
+/* ══════════════════════════════════════════
+   INFO TABLE ROWS
+══════════════════════════════════════════ */
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border-1);
+  font-size: 11px;
+}
+.info-row:last-child { border-bottom: none; }
+.info-k {
+  font-size: 10px;
+  color: var(--text-3);
+  font-weight: 500;
+}
+.info-v {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 600;
+  font-size: 11px;
+}
+
+/* ══════════════════════════════════════════
+   GAUGE RINGS
+══════════════════════════════════════════ */
+.gauge-wrap {
+  position: relative;
+  width: 80px;
+  height: 80px;
+  margin: 0 auto 4px;
+}
+.gauge-wrap svg { width: 100%; height: 100%; }
+.gauge-center-val {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 700;
+  font-size: 16px;
+}
+.metric-label {
+  font-size: 8px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  text-align: center;
+  margin-bottom: 6px;
+}
+.sopr-num {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 22px;
+  font-weight: 700;
+  text-align: center;
+  margin: 6px 0 3px;
+}
+.dual-cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.metric-center { text-align: center; padding: 4px; }
+
+/* ══════════════════════════════════════════
+   SIGNAL BLOCK
+══════════════════════════════════════════ */
+.signal-pill {
+  display: inline-block;
+  padding: 6px 20px;
+  border-radius: 100px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+.sp-buy   { background: var(--green-dim); color: var(--green); border: 1px solid rgba(0,245,160,0.25); }
+.sp-watch { background: var(--amber-dim); color: var(--amber); border: 1px solid rgba(240,180,41,0.2); }
+.sp-cash  { background: var(--red-dim);   color: var(--red);   border: 1px solid rgba(255,64,96,0.2); }
+
+
+/* ── NEWS TICKER ── */
+.news-wrap {
+  margin-bottom: 14px;
+  position: relative;
+}
+.news-viewport {
+  height: 52px;
+  overflow: hidden;
+  background: var(--bg-card);
+  border: 1px solid var(--border-1);
+  border-radius: var(--r-lg);
+  position: relative;
+}
+.news-viewport::after {
+  content: '';
+  position: absolute;
+  right: 0; top: 0; bottom: 0;
+  width: 60px;
+  background: linear-gradient(90deg, transparent 0%, var(--bg-card) 100%);
+  pointer-events: none;
+  z-index: 1;
+}
+.news-track { position: relative; height: 100%; }
+.news-item {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  font-size: 10px;
+  color: var(--text-2);
+  opacity: 0;
+  transform: translateY(100%);
+  transition: transform 0.4s cubic-bezier(0.4,0,0.2,1), opacity 0.4s ease;
+  will-change: transform, opacity;
+  line-height: 1.5;
+}
+.news-item::before {
+  content: '';
+  width: 3px; height: 3px;
+  border-radius: 50%;
+  background: var(--purple);
+  flex-shrink: 0;
+  margin-right: 8px;
+}
+.news-item.active  { opacity: 1; transform: translateY(0); }
+.news-item.exit    { opacity: 0; transform: translateY(-100%); }
+.news-dots {
+  display: flex;
+  justify-content: center;
+  gap: 3px;
+  margin-top: 4px;
+}
+.news-dot {
+  height: 2px;
+  width: 10px;
+  border-radius: 2px;
+  background: var(--text-4);
+  cursor: pointer;
+  transition: background 0.2s, width 0.2s;
+}
+.news-dot.active { background: var(--purple); width: 18px; }
+
+/* ══════════════════════════════════════════
+   KELLY / BACKTEST PANELS
+══════════════════════════════════════════ */
+.stat-3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.stat-box {
+  background: var(--bg-raise);
+  border-radius: var(--r-md);
+  padding: 10px 8px;
+  text-align: center;
+  border: 1px solid var(--border-1);
+}
+.stat-label {
+  font-size: 8px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  margin-bottom: 4px;
+}
+.stat-val {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1;
+}
+.stat-note {
+  font-size: 8px;
+  color: var(--text-3);
+  margin-top: 3px;
+}
+
+.stat-4 {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+/* ══════════════════════════════════════════
+   XAI FEATURES
+══════════════════════════════════════════ */
+.xai-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border-1);
+}
+.xai-bar-row:last-child { border-bottom: none; }
+.xai-name {
+  font-size: 10px;
+  font-weight: 600;
+  width: 100px;
+  flex-shrink: 0;
+  color: var(--text-1);
+}
+.xai-track {
+  flex: 1;
+  height: 5px;
+  background: var(--bg-raise);
+  border-radius: 5px;
+  overflow: hidden;
+}
+.xai-fill { height: 100%; border-radius: 5px; }
+.xai-pct {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: 700;
+  width: 32px;
+  text-align: right;
+  flex-shrink: 0;
+}
+.xai-dir {
+  font-size: 10px;
+  width: 16px;
+  text-align: center;
+  flex-shrink: 0;
+}
+.xai-note {
+  padding: 6px 10px;
+  background: rgba(120,100,255,0.04);
+  border-left: 2px solid var(--purple);
+  border-radius: 0 var(--r-sm) var(--r-sm) 0;
+  font-size: 9px;
+  color: var(--text-2);
+  line-height: 1.6;
+  margin-top: 10px;
+}
+
+/* ══════════════════════════════════════════
+   PAPER TRADING
+══════════════════════════════════════════ */
+.paper-stats {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+  padding: 12px 18px;
+}
+.paper-stat {
+  background: var(--bg-raise);
+  border-radius: var(--r-md);
+  padding: 8px 6px;
+  text-align: center;
+  border: 1px solid var(--border-1);
+}
+.paper-stat-label {
+  font-size: 7px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  margin-bottom: 3px;
+}
+.paper-stat-val {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 16px;
+  font-weight: 700;
+}
+.paper-log {
+  background: rgba(0,0,0,0.3);
+  border-radius: var(--r-md);
+  margin: 0 18px 10px;
+  padding: 8px 10px;
+  height: 100px;
+  overflow-y: auto;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  line-height: 1.6;
+  color: var(--text-2);
+  border: 1px solid var(--border-1);
+}
+.paper-log div {
+  padding: 1px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.015);
+}
+.paper-controls {
+  display: flex;
+  gap: 6px;
+  padding: 0 18px 12px;
+}
+.paper-btn {
+  padding: 5px 12px;
+  border-radius: var(--r-sm);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: 'Space Grotesk', sans-serif;
+  border: none;
+}
+.pb-green {
+  background: var(--green-dim);
+  border: 1px solid rgba(0,245,160,0.2);
+  color: var(--green);
+}
+.pb-green:hover { background: var(--green); color: #07080d; }
+.pb-red {
+  background: var(--red-dim);
+  border: 1px solid rgba(255,64,96,0.2);
+  color: var(--red);
+}
+.pb-red:hover { background: var(--red); color: #07080d; }
+
+.paper-collapse {
+  cursor: pointer;
+  padding: 2px 0;
+  font-size: 8px;
+  color: var(--text-3);
+  text-align: center;
+  user-select: none;
+}
+.paper-collapse:hover { color: var(--text-2); }
+
+/* ══════════════════════════════════════════
+   HELP PANEL
+══════════════════════════════════════════ */
+.help-panel {
+  margin-top: 12px;
+  background: var(--bg-base);
+  border: 1px solid var(--border-1);
+  border-radius: var(--r-xl);
+  padding: 18px;
+}
+.help-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin-top: 14px;
+}
+.help-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-1);
+  border-radius: var(--r-lg);
+  padding: 12px;
+}
+.help-card-full { grid-column: 1 / -1; }
+.help-card-title {
+  font-size: 10px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+.help-body {
+  font-size: 9px;
+  color: var(--text-2);
+  line-height: 1.6;
+}
+.help-body ul, .help-body ol { margin: 3px 0; padding-left: 12px; }
+.help-body li { margin-bottom: 1px; }
+.help-body code {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8px;
+  background: var(--purple-dim);
+  padding: 1px 4px;
+  border-radius: 2px;
+  color: var(--purple);
+}
+.help-body strong { color: var(--text-1); font-weight: 600; }
+
+/* ══════════════════════════════════════════
+   SECURITY CHIPS
+══════════════════════════════════════════ */
+.sec-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 100px;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+.sc-critical { background: rgba(255,64,96,0.12); color: var(--red); border: 1px solid rgba(255,64,96,0.2); }
+.sc-high     { background: var(--amber-dim); color: var(--amber); border: 1px solid rgba(240,180,41,0.2); }
+.sc-safe     { background: var(--green-dim); color: var(--green); border: 1px solid rgba(0,245,160,0.2); }
+.sec-event-text {
+  margin-top: 6px;
+  padding: 6px 10px;
+  background: rgba(255,64,96,0.03);
+  border-left: 2px solid var(--red);
+  border-radius: 0 var(--r-sm) var(--r-sm) 0;
+  font-size: 9px;
+  color: var(--text-2);
+  line-height: 1.6;
+}
+
+/* ══════════════════════════════════════════
+   FOOTER
+══════════════════════════════════════════ */
+.footer {
+  padding: 14px 24px;
+  border-top: 1px solid var(--border-1);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 9px;
+  color: var(--text-3);
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.footer-links { display: flex; gap: 12px; }
+.footer-link {
+  cursor: pointer;
+  transition: color 0.2s;
+  font-weight: 500;
+}
+.footer-link:hover { color: var(--text-2); }
+
+/* ══════════════════════════════════════════
+   CALIBRATION NOTE
+══════════════════════════════════════════ */
+.calib-note {
+  padding: 6px 8px;
+  background: var(--amber-dim);
+  border-left: 2px solid var(--amber);
+  border-radius: 0 var(--r-sm) var(--r-sm) 0;
+  font-size: 8px;
+  color: var(--text-2);
+  margin-top: 8px;
+}
+
+/* ══════════════════════════════════════════
+   MISC UTILITIES
+══════════════════════════════════════════ */
+.mb-4  { margin-bottom: 4px; }
+.mb-8  { margin-bottom: 8px; }
+.mb-12 { margin-bottom: 12px; }
+.mb-16 { margin-bottom: 16px; }
+.mt-4  { margin-top: 4px; }
+.mt-8  { margin-top: 8px; }
+.mt-12 { margin-top: 12px; }
+.text-center { text-align: center; }
+.mono { font-family: 'JetBrains Mono', monospace; }
+.text-sm { font-size: 9px; color: var(--text-3); }
+.text-xs { font-size: 8px; color: var(--text-3); }
+
+/* ══════════════════════════════════════════
+   RESPONSIVE
+══════════════════════════════════════════ */
+@media (max-width: 1400px) {
+  .kpi-row { grid-template-columns: 2fr 1fr 1fr 1fr; }
+}
+@media (max-width: 1100px) {
+  .kpi-row { grid-template-columns: repeat(3, 1fr); }
+  .grid-2 { grid-template-columns: 1fr; }
+  .grid-3 { grid-template-columns: 1fr 1fr; }
+  .grid-4 { grid-template-columns: repeat(2, 1fr); }
+  .help-grid { grid-template-columns: repeat(2, 1fr); }
+  .stat-4 { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 768px) {
+  .nav-center { display: none; }
+  .main { padding: 12px; }
+  .status-band { padding: 6px 12px; }
+  .kpi-row { grid-template-columns: repeat(2, 1fr); }
+  .kpi-hero .kpi-num { font-size: 24px; }
+  .kpi-num { font-size: 18px; }
+  .kpi-hero { grid-column: 1 / -1; }
+  .grid-3 { grid-template-columns: 1fr; }
+  .grid-4 { grid-template-columns: 1fr; }
+  .paper-stats { grid-template-columns: repeat(4, 1fr); }
+  .help-grid { grid-template-columns: 1fr; }
+  .dual-cols { grid-template-columns: 1fr; }
+  .stat-3 { grid-template-columns: 1fr 1fr; }
+  .sfc-big-num { font-size: 36px; }
+  .stat-4 { grid-template-columns: repeat(2, 1fr); }
+  .chart-shell canvas { height: 160px !important; }
+}
+@media (max-width: 480px) {
+  .kpi-hero .kpi-num { font-size: 18px; }
+  .kpi-num { font-size: 15px; }
+  .kpi-row { gap: 6px; }
+  .kpi { padding: 10px; }
+}
+</style>
 </head>
 <body>
-<div class="login-card">
-    <h1>SFC TERMINAL</h1>
-    <p>Enter your username to access the dashboard.</p>
-    <div class="error" id="error"></div>
-    <form method="POST" action="/api/login" id="loginForm">
-        <input type="text" name="username" id="username" placeholder="Your username" autocomplete="off" autocapitalize="off" autofocus required>
-        <button type="submit" id="loginBtn">Start Trading →</button>
-    </form>
-    <div class="note">⚠ Just a username — no password.</div>
-    <div class="note" style="margin-top:4px;font-size:11px;color:#3a4460">Tip: use the same username as before to restore paper trading data.</div>
+
+<div id="app">
+  <div class="loading-screen">
+    <div class="loading-logo">SFC</div>
+    <div class="loading-spinner"></div>
+    <div class="loading-text">Initializing SFC Terminal...</div>
+  </div>
 </div>
+
 <script>
 /* __EMBEDDED_DATA_PLACEHOLDER__ */
-var __EMBEDDED_DATA = {"ts": "2026-06-17T23:32:03.210751+00:00", "btc": 64518.0, "btc_24h": -1.839, "btc_mcap": 1291577253535.5403, "fng": 22, "fng_cls": "Fear", "dom": 58.2, "dvol": 39.57, "sfc_base": 11.624842794444529, "sfc_effective": 34.207262365226214, "news_stress": 3.6, "news_headlines": ["\ud83d\udd34[Rt][BitcoinMag] Fed Signals Possible Rate Hikes as Kevin Warsh Opens \u2018New Chapter\u2019 at Centr", "\ud83d\udd34[Lt][Google:Fed] Federal Reserve leaves interest rates unchanged, signals support for rate h", "\ud83d\udd34[Ft][FT] How the oil market shrugged off the Iran crisis", "\ud83d\udd34[Rt][CoinTelegrap] Gaming groups urge Congress to ban prediction markets sports betting in CLA", "\ud83d\udd34[Rt][BeInCrypto] Spain Ex-PM Zapatero Denies Bailout Scheme as Court Hunts His Crypto", "\u26aa[Lt][Google:Fed] Federal Reserve holds interest rates steady as Trump\u2019s new chairman faces f", "\u26aa[Rt][CoinTelegrap] Here\u2019s what happened in crypto today", "\u26aa[Rt][CoinTelegrap] Crypto-backed GOP candidate wins Alabama Senate runoff with June primaries "], "news_sentiment": 0.015, "news_stats": {"total_articles": 65, "sources_hit": 14, "stress_raw": 3.6, "stress_capped": 3.6}, "m2_yoy": 4.72, "liq_mod": 1.8, "liq_total_24h": 2003003324.88, "liq_long_vol": 737821982.14, "liq_short_vol": 1265181342.74, "zone": "ELEVATED", "floor_buffer": 5197, "floor_total": 59321, "regime": "CRISIS", "regime_prob": 1.0, "transition_risk": 0.5, "dxy": 99.54, "pc_oi": 0.65, "pc_vol": 1.53, "dv_sfc": 0.081, "phi": 1.0, "state": "DISSIPATIVE SLIDE", "signal": "STAY IN CASH / GOLD", "factors": {"Lt": -2.608578452727374, "St": 0.10927455092417393, "Rt": -1.894706749735843, "Ft": 1.4993458367586119, "Sc": 0.1379027463146878}, "ath": 126080, "ath_date": "2025-10-06T18:57:42.558Z", "rsi_14": 44.73, "rsi_regime": "NEUTRAL", "sopr_proxy": 0.8235, "sopr_signal": "EXTREME_CAPITULATION", "sopr_score": 0.95, "cascade_risk": 0.533, "liq_density": 1.0, "liq_pressure": "BALANCED", "composite_confidence": 0.337, "confidence_components": {"method_agree": 0.897, "low_stress_boost": 0.0526, "rsi": 0.03, "sopr": -0.05, "dvol": 0.05, "squeeze_penalty": 0.0, "cascade_penalty": -0.1, "fear_penalty": -0.0, "news_penalty": -0.0, "vol_penalty": 0.0, "transition_penalty": 0.0}, "m1_klr": 5.9, "m2_logit": 6.8, "m3_bayes": 4.0, "m4_ewc": 5.0, "m5_qreg": 7.0, "m6_regime_score": 1.0, "method_agreement": 0.897, "m7_fisher": 0.35, "m7_detail": {"real_rate": 0.63, "fed_rate": 3.63, "cpi_yoy": 3.0}, "m8_yield": 0.45, "m8_detail": {"slope": 0.38, "spread": 2.7}, "m9_liquidity": null, "m9_detail": null, "m10_garch": 0.85, "m10_detail": {"garch_vol": 0.1182, "persistence": 0.99}, "m11_var": 0.85, "m11_detail": {"var_95": -0.1573, "es_95": -0.1761}, "m12_jump": 0.85, "m12_detail": {"jump_risk": 0.1062, "gap_count": 33}, "m13_funding": null, "m13_detail": null, "m14_skew": 0.1, "m14_detail": {"skew": 0.0, "put_iv": 52.79, "call_iv": 52.79}, "m15_concentration": 0.1, "m15_detail": {"hhi": 0.005, "top3_share": 0.047}, "m16_regime_ml": 0.45, "m16_detail": {"p_crisis": 0.45, "recent_mean": 0.0232, "recent_std": 0.1402}, "m17_granger": 0.1, "m17_detail": {"corr": 0.141, "lag_corr": -0.2}, "m18_entropy": 0.55, "m18_detail": {"entropy_norm": 0.831, "entropy_raw": 1.912}, "m19_mutual_info": 0.15, "m19_detail": {"mi_norm": 0.099, "mi_raw": 0.109}, "new_methods_active": 10, "new_methods_avg": 0.229, "inst_methods_active": 12, "inst_methods_avg": 0.413, "sc_methods_active": 5, "sc_methods_avg": 0.354, "total_methods_active": 44, "m20_obi": 0.75, "m20_detail": {"obi_change": "SELL_SURGE", "obi_delta": -0.2323, "obi": -0.6307, "obi_norm": 0.1846, "bid_vol": 1.38, "ask_vol": 6.1}, "m21_trade_flow": 0.3, "m21_detail": {"large_sell_notional": 0, "large_buy_notional": 0, "large_ratio": 0, "large_sell_ratio": 0.5, "large_share": 0}, "m22_spread": 0.18, "m22_detail": {"spread_bps": 0.0016, "range_bps": 392.27, "bid": 64500.67, "ask": 64500.68, "mid": 64500.68, "spread_change": "STABLE", "spread_delta": -0.0}, "m23_liquidity": 0.8, "m23_detail": {"slippage_pct": 2.506, "levels_used_buy": 83, "levels_used_sell": 999, "mid_price": 64500.68, "liq_change": "DEEPENING_FAST", "slippage_delta": -2.494}, "m24_cape": 0.1, "m24_detail": {"cape": 0.6979, "current_price": 64439.24, "sma_1y_realized": 92328.11}, "m25_minsky": 0.15, "m25_detail": {"funding_rate": 0, "funding_8h": 0.0, "accel": -3e-06, "oi_futures": 2222206760, "minsky_stage": "NORMAL"}, "m26_kahneman": 0.245, "m26_detail": {"loss_aversion": 0.35, "anchoring": 0.15, "fear": 0.2, "realized_price": 69109.77, "ath": 126080.0, "pl_pct": -6.64}, "m27_taleb": 0.502, "m27_detail": {"dvol": 54.49, "skewness": -0.0973, "max_drawdown": 0.2591, "vol_7d_ann": 0.2802, "vol_90d_ann": 0.5449, "term": "3M>1W", "tail_danger": "ELEVATED"}, "m28_summers": 0.2, "m28_detail": {"real_rate": 0.63, "gdp_growth": 2.57, "fed_rate": 3.63, "regime": "NORMAL"}, "m29_debt": 0.85, "m29_detail": {"debt_gdp_ratio": 1.226, "crisis_risk": "HIGH"}, "m30_rajan": 0.15, "m30_detail": {"fsi_score": 0.15, "components": {"credit_growth": 4.72, "asset_vol": 52.79, "yield_curve": 0.38, "hy_spread": 2.7, "top3_concentration": 0.047, "fng": 22}, "stability": "NORMAL"}, "m31_altman": 0.15, "m31_detail": {"z_score": 6.862, "x1_liquidity": 0.0, "x2_network": 4.0, "x3_efficiency": 0.834, "x4_oi_ratio": 0.695, "x5_turnover": 4.954, "zone": "SAFE"}, "m76_supply_growth": 0.177, "m76_detail": {"growth_30d_pct": -1.84, "growth_7d_pct": -0.21, "latest_mcap": 190926486428.0, "mcap_30d_ago": 194504778081.0, "status": "ok"}, "m77_ssr": 0.433, "m77_detail": {"ssr": 6.76, "stablecoin_mcap": 190926486428.0, "btc_mcap": 1291577253536.0, "label": "MODERATE", "status": "ok"}, "m78_exchange_flow": 0.409, "m78_detail": {"netflow": 23937966.08, "netflow_pct_of_reserve": 0.04, "reserve": 63631086226.0, "label": "MILD_INFLOW", "status": "ok"}, "m79_velocity": 0.049, "m79_detail": {"velocity": 0.001, "daily_inflow": 42901147.0, "daily_outflow": 18963181.0, "reserve": 63631086226.0, "label": "DORMANT", "status": "ok"}, "m80_dominance": 0.7, "m80_detail": {"dominance_pct": 8.61, "stablecoin_mcap": 190926486428.0, "total_crypto_mcap": 2217958937026.0, "dom_change_30d": -0.16, "trend": "STABLE", "status": "ok"}, "micro_change_flags": {"obi": "SELL_SURGE"}, "micro_trend_score": 0.333, "micro_deteriorating": true, "m32_qlstm": 0.1306, "m32_active": true, "m32_adjustment_pp": 0.0962, "m32_garch_residual": -4.2283, "m32_garch_volatility": 4.8902, "m32_hybrid_pred": 8.8328, "m32_proadapt_weight": 0.5, "m32_proadapt_final": 8.8329, "m32_mamba": 0.2431, "m32_mamba_active": true, "m32_mamba_short": 0.2345, "m32_mamba_medium": 0.2549, "m32_mamba_long": 0.2467, "m32_mamba_confidence": 0.5212, "m32_adjustment_pp_mamba": 0.3922, "m33_glo_score": 0.85, "m33_glo_detail": {"fed_yoy": 1.04, "ecb_yoy": -0.32, "jpn_yoy": -9.44, "fed_balance": 6725397.0, "ecb_balance": 6135633.0, "jpn_balance": 6643630.0, "glo_z_score": -2.004, "glo_score": 9.9, "glo_label": "CONTRACTIVE"}, "macro_methods_active": 4, "macro_methods_avg": 0.377, "m72_m2_growth": 0.678, "m72_detail": {"m2_yoy_pct": 4.72, "m2_latest": 22804.0, "status": "ok"}, "m73_m2_momentum": 0.05, "m73_detail": {"m2_momentum": -3.052, "m2_growth_3m": 1.67, "m2_growth_12m": 4.72, "label": "CONTRACTING", "status": "ok"}, "m74_fed_balance": 0.4, "m74_detail": {"fed_yoy_pct": 1.04, "fed_balance": 6725397.0, "label": "STABLE", "status": "ok"}, "m75_liquidity_composite": 0.378, "m75_detail": {"composite": 0.378, "regime": "ACCOMMODATIVE", "m72_score": 0.678, "m73_score": 0.05, "m74_score": 0.4, "active_components": "M72=0.68, M73=0.05, M74=0.40", "status": "ok"}, "xai_top_features": [{"idx": 21, "name": "M22_Spread", "importance": 2.336491584777832, "direction": "positive", "corr": 0.5955481303470097, "importance_pct": 45.7}, {"idx": 0, "name": "M1_KLR", "importance": 1.4887442588806152, "direction": "negative", "corr": -0.6327568246169533, "importance_pct": 29.1}, {"idx": 22, "name": "M23_LiquidityDepth", "importance": -0.4704453945159912, "direction": "negative", "corr": -0.3104301822211954, "importance_pct": 9.2}, {"idx": 24, "name": "M25_Minsky", "importance": -0.45523548126220703, "direction": "positive", "corr": 0.44104628174304084, "importance_pct": 8.9}, {"idx": 1, "name": "M2_Logit", "importance": -0.35761141777038574, "direction": "negative", "corr": -0.5780976631401987, "importance_pct": 7.0}], "ml_ensemble_score": 0.216, "ml_ensemble_confidence": 0.8, "ml_ensemble_msg": "WeightedAvg=0.216", "ml_accuracy": 1.0, "ml_total_labeled": 2000, "ml_correct": 2000, "m1_m6_weight_pct": 84.8, "m7_m19_weight_pct": 9.2, "m20_m31_weight_pct": 6.0, "causal_methods_active": 28, "causal_excluded": "m3_bayes, m9_liquidity, m13_funding, m17_granger", "causal_excluded_count": 4, "q10_whale_pressure": 63.2, "q10_onchain_value": 72.6, "q10_buying_power": 35.7, "q10_market_structure": 70.0, "q10_available": true, "q10_details": {"exchange_netflow": {"score": 52.6, "value": -408.003911, "date": "2026-06-17", "status": "ok"}, "whale_ratio": {"score": 80.8, "value": 0.5989409, "date": "2026-06-16", "status": "ok"}, "exchange_supply_ratio": {"score": 79.7, "value": 0.1338682, "date": "2026-06-16", "status": "ok"}, "funding_rates": {"score": 95.9, "value": 0.0034752150000000002, "date": "2026-06-17", "status": "ok"}, "mvrv_ratio": {"score": 93.4, "value": 1.22670408, "date": "2026-06-16", "status": "ok"}, "puell_multiple": {"score": 77.3, "value": 0.7448302424125172, "date": "2026-06-15", "status": "ok"}, "miners_position": {"score": 53.7, "value": -0.5091495344315384, "date": "2026-06-15", "status": "ok"}, "stablecoin_reserve": {"score": 29.3, "value": 63631086225.88935, "date": "2026-06-17", "status": "ok"}, "taker_buy_sell": {"score": 0, "value": 0.82821407, "date": "2026-06-17", "status": "ok"}, "exchange_inflow_total": {"score": 0, "value": 572.818802, "date": "2026-06-17", "status": "ok"}, "exchange_outflow_total": {"score": 100, "value": 980.822713, "date": "2026-06-17", "status": "ok"}, "coinbase_premium_gap": {"score": 17.0, "value": -58.37, "date": "2026-06-16", "status": "ok"}, "korea_premium_index": {"score": 31.2, "value": -0.78, "date": "2026-06-16", "status": "ok"}, "miner_netflow_total": {"score": 59.2, "value": -72.51870877, "date": "2026-06-17", "status": "ok"}, "stablecoin_exchange_inflow": {"score": 0, "value": 42901147.005074, "date": "2026-06-17", "status": "ok"}, "stablecoin_exchange_outflow": {"score": 100, "value": 18963180.930036, "date": "2026-06-17", "status": "ok"}, "stablecoin_exchange_netflow": {"score": 47.9, "value": 23937966.075038, "date": "2026-06-17", "status": "ok"}, "exchange_stablecoins_ratio": {"score": 43.6, "value": 2.313e-05, "date": "2026-06-16", "status": "ok"}, "open_interest": {"score": 38.4, "value": 23035857979.711025, "date": "2026-06-17", "status": "ok"}, "long_liquidations_usd": {"score": 100, "value": 0, "date": "2026-06-17", "status": "ok"}, "short_liquidations_usd": {"score": 100, "value": 0, "date": "2026-06-17", "status": "ok"}, "fund_flow_ratio": {"score": 71.2, "value": 0.06455056, "date": "2026-06-16", "status": "ok"}, "whale_pressure_score": 63.2, "onchain_value_score": 72.6, "buying_power_score": 35.7, "market_structure_score": 70.0}, "afe_rsi_7": 0.44, "afe_macd_signal": -0.6419, "afe_bb_width": 0.0077, "afe_atr": 0.7053, "afe_vwap": 0.73, "afe_obv_norm": 0.0096, "afe_available": true, "xgb_meta_prediction": 17.64, "xgb_meta_confidence": 0.676, "xgb_blend_weight": 0.203, "xgb_available": true, "hmm_regime": "CRISIS", "hmm_crisis_prob": 1.0, "hmm_available": true, "mtf_alignment_score": -1.0, "mtf_divergence": false, "mtf_available": true, "ewma_corrected": true, "ewma_available": true, "adv_regime": "CRISIS", "adv_crisis_prob": 0.957, "adv_regime_stability": 0.043, "adv_regime_boost": 25, "adv_uncertainty": 0.0, "adv_confidence": "HIGH_CONFIDENCE_CALM", "adv_trends_recession": 0.78, "adv_trends_crash": 0.78, "adv_reddit_sentiment": 0.0, "adv_reddit_label": "NEUTRAL", "adv_cg_dd_ath": -1.0, "bt_sharpe": 1.97, "bt_sharpe_low": 1.58, "bt_sharpe_high": 2.36, "bt_max_dd": 0.0989, "bt_win_rate": 0.95, "bt_win_rate_low": 0.94, "bt_win_rate_high": 0.959, "bt_return": 0.5, "bt_periods": 2000, "bt_stability": 0.84, "bt_calibration_note": "Limited stress events in training window \u2014 metrics are upper-bound estimates", "bt_label": "WALK-FORWARD VALIDATED", "kelly_p_win": 0.337, "kelly_b_payoff": 2.0, "kelly_fraction": 0.0055, "kelly_half": 0.0028, "kelly_quarter": 0.0014, "kelly_override_reason": null, "signal_type": "STRESS", "signal_strength": 0.684, "timing_precision": "MEDIUM", "alert_window_days": 26.9, "timeframe": "MONTHLY", "readiness_score": 0.222, "shock_factor": 0.25, "shock_event": "BeInCrypto: Spain Ex-PM Zapatero Denies Bailout Scheme as Court Hunts Hi", "shock_severity": "HIGH", "sec_events": 1, "q9_available": true, "q9_articles": 0, "m65_cnn_attention": 0.5056, "m65_pattern_type": "MODERATE_STRESS - developing pattern", "m65_available": true, "m66_ga_features": null, "m66_ga_count": 0, "m66_available": true, "m67_augmented_shape": null, "m67_available": true, "m68_drl_signal": "HOLD", "m68_available": true, "m69_systemic_risk": 0.5599, "m69_btc_systemic_risk": 1.0, "m69_market_regime": "STRESS", "m69_correlation_breakdown": false, "m69_available": true, "m70_shap_ok": true, "m70_shap_top_1": "F40", "m70_shap_top_1_pct": 14.5, "m70_shap_top_3": "F40, M2_Logit, M16_Sharpe", "m71_lime_ok": true, "m71_lime_top_1": "M20_OBI", "m71_lime_top_1_pct": 24.1, "m71_lime_top_3": "M20_OBI, M6_Regime, M1_KLR"};
+var __EMBEDDED_DATA = {"ts": "2026-06-17T23:45:00.786159+00:00", "btc": 64443.68, "btc_24h": -1.953, "btc_mcap": 1290193705267.5354, "fng": 22, "fng_cls": "Fear", "dom": 58.2, "dvol": 39.57, "sfc_base": 11.419517269087018, "sfc_effective": 34.043601844625705, "news_stress": 3.6, "news_headlines": ["\ud83d\udd34[Rt][BitcoinMag] Fed Signals Possible Rate Hikes as Kevin Warsh Opens \u2018New Chapter\u2019 at Centr", "\ud83d\udd34[Lt][Google:Fed] Federal Reserve leaves interest rates unchanged, signals support for rate h", "\ud83d\udd34[Ft][FT] How the oil market shrugged off the Iran crisis", "\ud83d\udd34[Rt][CoinTelegrap] Gaming groups urge Congress to ban prediction markets sports betting in CLA", "\ud83d\udd34[Rt][BeInCrypto] Spain Ex-PM Zapatero Denies Bailout Scheme as Court Hunts His Crypto", "\u26aa[Lt][Google:Fed] Federal Reserve holds interest rates steady as Trump\u2019s new chairman faces f", "\u26aa[Rt][CoinTelegrap] Here\u2019s what happened in crypto today", "\u26aa[Rt][CoinTelegrap] Crypto-backed GOP candidate wins Alabama Senate runoff with June primaries "], "news_sentiment": 0.015, "news_stats": {"total_articles": 65, "sources_hit": 14, "stress_raw": 3.6, "stress_capped": 3.6}, "m2_yoy": 4.72, "liq_mod": 1.8, "liq_total_24h": 2003003324.88, "liq_long_vol": 737821982.14, "liq_short_vol": 1265181342.74, "zone": "ELEVATED", "floor_buffer": 5111, "floor_total": 59332, "regime": "CRISIS", "regime_prob": 1.0, "transition_risk": 0.5, "dxy": 99.54, "pc_oi": 0.65, "pc_vol": 1.54, "dv_sfc": 0.079, "phi": 1.0, "state": "DISSIPATIVE SLIDE", "signal": "STAY IN CASH / GOLD", "factors": {"Lt": -2.633716556817071, "St": 0.10973869982810136, "Rt": -1.894706749735843, "Ft": 1.4993458367586119, "Sc": 0.1379027463146878}, "ath": 126080, "ath_date": "2025-10-06T18:57:42.558Z", "rsi_14": 44.7, "rsi_regime": "NEUTRAL", "sopr_proxy": 0.8226, "sopr_signal": "EXTREME_CAPITULATION", "sopr_score": 0.95, "cascade_risk": 0.533, "liq_density": 1.0, "liq_pressure": "BALANCED", "composite_confidence": 0.337, "confidence_components": {"method_agree": 0.897, "low_stress_boost": 0.0528, "rsi": 0.03, "sopr": -0.05, "dvol": 0.05, "squeeze_penalty": 0.0, "cascade_penalty": -0.1, "fear_penalty": -0.0, "news_penalty": -0.0, "vol_penalty": 0.0, "transition_penalty": 0.0}, "m1_klr": 5.9, "m2_logit": 6.9, "m3_bayes": 4.0, "m4_ewc": 4.9, "m5_qreg": 7.0, "m6_regime_score": 1.0, "method_agreement": 0.897, "m7_fisher": 0.35, "m7_detail": {"real_rate": 0.63, "fed_rate": 3.63, "cpi_yoy": 3.0}, "m8_yield": 0.45, "m8_detail": {"slope": 0.38, "spread": 2.7}, "m9_liquidity": null, "m9_detail": null, "m10_garch": 0.85, "m10_detail": {"garch_vol": 0.1182, "persistence": 0.99}, "m11_var": 0.85, "m11_detail": {"var_95": -0.1573, "es_95": -0.1761}, "m12_jump": 0.85, "m12_detail": {"jump_risk": 0.1062, "gap_count": 33}, "m13_funding": null, "m13_detail": null, "m14_skew": 0.1, "m14_detail": {"skew": 0.0, "put_iv": 52.74, "call_iv": 52.74}, "m15_concentration": 0.1, "m15_detail": {"hhi": 0.005, "top3_share": 0.047}, "m16_regime_ml": 0.45, "m16_detail": {"p_crisis": 0.45, "recent_mean": 0.0231, "recent_std": 0.1403}, "m17_granger": 0.1, "m17_detail": {"corr": 0.141, "lag_corr": -0.2}, "m18_entropy": 0.55, "m18_detail": {"entropy_norm": 0.831, "entropy_raw": 1.912}, "m19_mutual_info": 0.15, "m19_detail": {"mi_norm": 0.099, "mi_raw": 0.109}, "new_methods_active": 10, "new_methods_avg": 0.229, "inst_methods_active": 12, "inst_methods_avg": 0.385, "sc_methods_active": 5, "sc_methods_avg": 0.354, "total_methods_active": 44, "m20_obi": 0.35, "m20_detail": {"obi_change": "STABLE", "obi_delta": 0.0369, "obi": 0.7635, "obi_norm": 0.8817, "bid_vol": 3.93, "ask_vol": 0.53}, "m21_trade_flow": 0.3, "m21_detail": {"large_sell_notional": 0, "large_buy_notional": 0, "large_ratio": 0, "large_sell_ratio": 0.5, "large_share": 0}, "m22_spread": 0.18, "m22_detail": {"spread_bps": 0.0016, "range_bps": 392.62, "bid": 64443.68, "ask": 64443.69, "mid": 64443.69, "spread_change": "STABLE", "spread_delta": -0.0}, "m23_liquidity": 0.8, "m23_detail": {"slippage_pct": 5.0, "levels_used_buy": 999, "levels_used_sell": 999, "mid_price": 64443.68, "liq_change": "THINNING_FAST", "slippage_delta": 4.989}, "m24_cape": 0.1, "m24_detail": {"cape": 0.6973, "current_price": 64381.68, "sma_1y_realized": 92327.96}, "m25_minsky": 0.15, "m25_detail": {"funding_rate": 0, "funding_8h": 0.0, "accel": -3e-06, "oi_futures": 2222739970, "minsky_stage": "NORMAL"}, "m26_kahneman": 0.245, "m26_detail": {"loss_aversion": 0.35, "anchoring": 0.15, "fear": 0.2, "realized_price": 69107.85, "ath": 126080.0, "pl_pct": -6.75}, "m27_taleb": 0.502, "m27_detail": {"dvol": 54.47, "skewness": -0.0968, "max_drawdown": 0.2591, "vol_7d_ann": 0.2848, "vol_90d_ann": 0.5447, "term": "3M>1W", "tail_danger": "ELEVATED"}, "m28_summers": 0.2, "m28_detail": {"real_rate": 0.63, "gdp_growth": 2.57, "fed_rate": 3.63, "regime": "NORMAL"}, "m29_debt": 0.85, "m29_detail": {"debt_gdp_ratio": 1.226, "crisis_risk": "HIGH"}, "m30_rajan": 0.15, "m30_detail": {"fsi_score": 0.15, "components": {"credit_growth": 4.72, "asset_vol": 52.74, "yield_curve": 0.38, "hy_spread": 2.7, "top3_concentration": 0.047, "fng": 22}, "stability": "NORMAL"}, "m31_altman": 0.15, "m31_detail": {"z_score": 6.919, "x1_liquidity": 0.0, "x2_network": 4.0, "x3_efficiency": 0.833, "x4_oi_ratio": 0.678, "x5_turnover": 5.082, "zone": "SAFE"}, "m76_supply_growth": 0.177, "m76_detail": {"growth_30d_pct": -1.84, "growth_7d_pct": -0.21, "latest_mcap": 190926486428.0, "mcap_30d_ago": 194504778081.0, "status": "ok"}, "m77_ssr": 0.434, "m77_detail": {"ssr": 6.76, "stablecoin_mcap": 190926486428.0, "btc_mcap": 1290193705268.0, "label": "MODERATE", "status": "ok"}, "m78_exchange_flow": 0.409, "m78_detail": {"netflow": 23937966.08, "netflow_pct_of_reserve": 0.04, "reserve": 63631086226.0, "label": "MILD_INFLOW", "status": "ok"}, "m79_velocity": 0.049, "m79_detail": {"velocity": 0.001, "daily_inflow": 42901147.0, "daily_outflow": 18963181.0, "reserve": 63631086226.0, "label": "DORMANT", "status": "ok"}, "m80_dominance": 0.7, "m80_detail": {"dominance_pct": 8.62, "stablecoin_mcap": 190926486428.0, "total_crypto_mcap": 2215648273324.0, "dom_change_30d": -0.16, "trend": "STABLE", "status": "ok"}, "micro_change_flags": {"liq": "THINNING_FAST"}, "micro_trend_score": 0.333, "micro_deteriorating": true, "m32_qlstm": 0.1191, "m32_active": true, "m32_adjustment_pp": 0.047, "m32_garch_residual": -4.2368, "m32_garch_volatility": 4.6159, "m32_hybrid_pred": 7.6779, "m32_proadapt_weight": 0.5, "m32_proadapt_final": 7.6779, "m32_mamba": 0.2431, "m32_mamba_active": true, "m32_mamba_short": 0.2345, "m32_mamba_medium": 0.2549, "m32_mamba_long": 0.2467, "m32_mamba_confidence": 0.5212, "m32_adjustment_pp_mamba": 0.3986, "m33_glo_score": 0.85, "m33_glo_detail": {"fed_yoy": 1.04, "ecb_yoy": -0.32, "jpn_yoy": -9.44, "fed_balance": 6725397.0, "ecb_balance": 6135633.0, "jpn_balance": 6643630.0, "glo_z_score": -2.004, "glo_score": 9.9, "glo_label": "CONTRACTIVE"}, "macro_methods_active": 4, "macro_methods_avg": 0.377, "m72_m2_growth": 0.678, "m72_detail": {"m2_yoy_pct": 4.72, "m2_latest": 22804.0, "status": "ok"}, "m73_m2_momentum": 0.05, "m73_detail": {"m2_momentum": -3.052, "m2_growth_3m": 1.67, "m2_growth_12m": 4.72, "label": "CONTRACTING", "status": "ok"}, "m74_fed_balance": 0.4, "m74_detail": {"fed_yoy_pct": 1.04, "fed_balance": 6725397.0, "label": "STABLE", "status": "ok"}, "m75_liquidity_composite": 0.378, "m75_detail": {"composite": 0.378, "regime": "ACCOMMODATIVE", "m72_score": 0.678, "m73_score": 0.05, "m74_score": 0.4, "active_components": "M72=0.68, M73=0.05, M74=0.40", "status": "ok"}, "xai_top_features": [{"idx": 21, "name": "M22_Spread", "importance": 2.393190383911133, "direction": "positive", "corr": 0.6049215035719788, "importance_pct": 41.2}, {"idx": 0, "name": "M1_KLR", "importance": 1.2690730094909668, "direction": "negative", "corr": -0.6420731495360973, "importance_pct": 21.8}, {"idx": 3, "name": "M4_EWC", "importance": 0.9862194061279297, "direction": "positive", "corr": 0.5408509938403415, "importance_pct": 17.0}, {"idx": 24, "name": "M25_Minsky", "importance": -0.6130404472351074, "direction": "positive", "corr": 0.45233372410783834, "importance_pct": 10.5}, {"idx": 7, "name": "M8_MonteCarlo", "importance": 0.5508170127868652, "direction": "negative", "corr": -0.17127662167006588, "importance_pct": 9.5}], "ml_ensemble_score": 0.21, "ml_ensemble_confidence": 0.8, "ml_ensemble_msg": "WeightedAvg=0.210", "ml_accuracy": 1.0, "ml_total_labeled": 2000, "ml_correct": 2000, "m1_m6_weight_pct": 84.8, "m7_m19_weight_pct": 9.2, "m20_m31_weight_pct": 6.0, "causal_methods_active": 28, "causal_excluded": "m3_bayes, m9_liquidity, m13_funding, m17_granger", "causal_excluded_count": 4, "q10_whale_pressure": 63.2, "q10_onchain_value": 72.6, "q10_buying_power": 35.7, "q10_market_structure": 70.0, "q10_available": true, "q10_details": {"exchange_netflow": {"score": 52.6, "value": -408.003911, "date": "2026-06-17", "status": "ok"}, "whale_ratio": {"score": 80.8, "value": 0.5989409, "date": "2026-06-16", "status": "ok"}, "exchange_supply_ratio": {"score": 79.7, "value": 0.1338682, "date": "2026-06-16", "status": "ok"}, "funding_rates": {"score": 95.9, "value": 0.0034752150000000002, "date": "2026-06-17", "status": "ok"}, "mvrv_ratio": {"score": 93.4, "value": 1.22670408, "date": "2026-06-16", "status": "ok"}, "puell_multiple": {"score": 77.3, "value": 0.7448302424125172, "date": "2026-06-15", "status": "ok"}, "miners_position": {"score": 53.7, "value": -0.5091495344315384, "date": "2026-06-15", "status": "ok"}, "stablecoin_reserve": {"score": 29.3, "value": 63631086225.88935, "date": "2026-06-17", "status": "ok"}, "taker_buy_sell": {"score": 0, "value": 0.82821407, "date": "2026-06-17", "status": "ok"}, "exchange_inflow_total": {"score": 0, "value": 572.818802, "date": "2026-06-17", "status": "ok"}, "exchange_outflow_total": {"score": 100, "value": 980.822713, "date": "2026-06-17", "status": "ok"}, "coinbase_premium_gap": {"score": 17.0, "value": -58.37, "date": "2026-06-16", "status": "ok"}, "korea_premium_index": {"score": 31.2, "value": -0.78, "date": "2026-06-16", "status": "ok"}, "miner_netflow_total": {"score": 59.2, "value": -72.51870877, "date": "2026-06-17", "status": "ok"}, "stablecoin_exchange_inflow": {"score": 0, "value": 42901147.005074, "date": "2026-06-17", "status": "ok"}, "stablecoin_exchange_outflow": {"score": 100, "value": 18963180.930036, "date": "2026-06-17", "status": "ok"}, "stablecoin_exchange_netflow": {"score": 47.9, "value": 23937966.075038, "date": "2026-06-17", "status": "ok"}, "exchange_stablecoins_ratio": {"score": 43.6, "value": 2.313e-05, "date": "2026-06-16", "status": "ok"}, "open_interest": {"score": 38.4, "value": 23035857979.711025, "date": "2026-06-17", "status": "ok"}, "long_liquidations_usd": {"score": 100, "value": 0, "date": "2026-06-17", "status": "ok"}, "short_liquidations_usd": {"score": 100, "value": 0, "date": "2026-06-17", "status": "ok"}, "fund_flow_ratio": {"score": 71.2, "value": 0.06455056, "date": "2026-06-16", "status": "ok"}, "whale_pressure_score": 63.2, "onchain_value_score": 72.6, "buying_power_score": 35.7, "market_structure_score": 70.0}, "afe_rsi_7": 0.44, "afe_macd_signal": -0.6422, "afe_bb_width": 0.0077, "afe_atr": 0.7061, "afe_vwap": 0.71, "afe_obv_norm": 0.0095, "afe_available": true, "xgb_meta_prediction": 17.64, "xgb_meta_confidence": 0.676, "xgb_blend_weight": 0.203, "xgb_available": true, "hmm_regime": "CRISIS", "hmm_crisis_prob": 1.0, "hmm_available": true, "mtf_alignment_score": -1.0, "mtf_divergence": false, "mtf_available": true, "ewma_corrected": true, "ewma_available": true, "adv_regime": "CRISIS", "adv_crisis_prob": 0.959, "adv_regime_stability": 0.041, "adv_regime_boost": 25, "adv_uncertainty": 0.0, "adv_confidence": "HIGH_CONFIDENCE_CALM", "adv_trends_recession": 0.78, "adv_trends_crash": 0.78, "adv_reddit_sentiment": 0.0, "adv_reddit_label": "NEUTRAL", "adv_cg_dd_ath": -1.0, "bt_sharpe": 1.97, "bt_sharpe_low": 1.58, "bt_sharpe_high": 2.36, "bt_max_dd": 0.0989, "bt_win_rate": 0.95, "bt_win_rate_low": 0.94, "bt_win_rate_high": 0.959, "bt_return": 0.5, "bt_periods": 2000, "bt_stability": 0.84, "bt_calibration_note": "Limited stress events in training window \u2014 metrics are upper-bound estimates", "bt_label": "WALK-FORWARD VALIDATED", "kelly_p_win": 0.337, "kelly_b_payoff": 2.0, "kelly_fraction": 0.0055, "kelly_half": 0.0028, "kelly_quarter": 0.0014, "kelly_override_reason": null, "signal_type": "STRESS", "signal_strength": 0.681, "timing_precision": "MEDIUM", "alert_window_days": 26.9, "timeframe": "MONTHLY", "readiness_score": 0.222, "shock_factor": 0.25, "shock_event": "BeInCrypto: Spain Ex-PM Zapatero Denies Bailout Scheme as Court Hunts Hi", "shock_severity": "HIGH", "sec_events": 1, "q9_available": true, "q9_articles": 0, "m65_cnn_attention": 0.5128, "m65_pattern_type": "MODERATE_STRESS - developing pattern", "m65_available": true, "m66_ga_features": null, "m66_ga_count": 0, "m66_available": true, "m67_augmented_shape": null, "m67_available": true, "m68_drl_signal": "HOLD", "m68_available": true, "m69_systemic_risk": 0.5599, "m69_btc_systemic_risk": 1.0, "m69_market_regime": "STRESS", "m69_correlation_breakdown": false, "m69_available": true, "m70_shap_ok": true, "m70_shap_top_1": "M15_Kurtosis", "m70_shap_top_1_pct": 14.3, "m70_shap_top_3": "M15_Kurtosis, M9_LiquidityGap, M17_Granger", "m71_lime_ok": true, "m71_lime_top_1": "M20_OBI", "m71_lime_top_1_pct": 24.1, "m71_lime_top_3": "M20_OBI, M6_Regime, M1_KLR"};
 
 
 
@@ -2155,9 +3280,282 @@ function processSignalFromSFC(d) {
     addPaperLog('⏳ Waiting for first trade signal from SFC...');
     return;
   }
-  // Also save to localStorage for the frontend
-  localStorage.setItem('sfc_username', u);
-});
+
+  // 5s debounce — avoid double-processing when BTC+SFC arrive near-simultaneously
+  const now = Date.now();
+  if (now - paperTrader._lastSignalTs < 5000) return;
+  paperTrader._lastSignalTs = now;
+
+  // Evaluate signal (mirrors paper_trader.py evaluate_signal)
+  const decision = paperTrader.evaluateSignal(d);
+
+  // Execute trade decision (mirrors paper_trader.py execute)
+  const tradesBefore = paperTrader.trades.length;
+  paperTrader.execute(decision);
+
+  // Log any trades that happened
+  if (paperTrader.trades.length > tradesBefore) {
+    const lastTrade = paperTrader.trades[paperTrader.trades.length - 1];
+    if (lastTrade.type === 'OPEN') {
+      addPaperLog(`🟢 [OPEN] LONG $${fmtNum(decision.size,0)} at $${fmtNum(decision.btc_price,0)} — ${decision.reason}`);
+    } else if (lastTrade.type === 'CLOSE') {
+      if (lastTrade.reason && lastTrade.reason.startsWith('Trailing Stop')) {
+        addPaperLog(`🔴 [TRAILING STOP] $${fmtNum(decision.btc_price,0)} — ${lastTrade.reason}`);
+      } else {
+        addPaperLog(`🔴 [CLOSE] All at $${fmtNum(decision.btc_price,0)} — ${decision.reason}`);
+      }
+    }
+    // Auto-save to KV after any trade
+    if (currentUser) saveUserState().catch(() => {});
+  } else if (decision.action === 'HOLD' && paperTrader.positions.length === 0 && Math.random() < 0.05) {
+    addPaperLog(`👀 Watching — ${decision.reason}`);
+  }
+
+  updatePaperDisplay();
+}
+
+function updatePaperDisplay(perf) {
+  if (!paperTrader) return;
+  if (!perf) perf = paperTrader.getPerformance();
+  const el = id => document.getElementById(id);
+  if (!el('paperEquity')) return;
+
+  el('paperEquity').textContent = '$' + fmtNum(perf.equity, 2);
+  el('paperEquity').style.color = perf.total_return >= 0 ? 'var(--green)' : 'var(--red)';
+  el('paperReturn').textContent = perf.total_return_pct.toFixed(2) + '%';
+  el('paperReturn').style.color = perf.total_return >= 0 ? 'var(--green)' : 'var(--red)';
+  el('paperSharpe').textContent = perf.sharpe.toFixed(2);
+  el('paperSharpe').style.color = perf.sharpe > 1.5 ? 'var(--green)' : perf.sharpe > 0.5 ? 'var(--amber)' : 'var(--red)';
+  el('paperWinRate').textContent = perf.win_rate_pct.toFixed(0) + '%';
+  el('paperWinRate').style.color = perf.win_rate_pct > 60 ? 'var(--green)' : 'var(--amber)';
+  el('paperDD').textContent = perf.max_dd_pct.toFixed(1) + '%';
+  el('paperDD').style.color = perf.max_dd_pct < 10 ? 'var(--green)' : perf.max_dd_pct < 20 ? 'var(--amber)' : 'var(--red)';
+  if (el('paperPnL')) {
+    const pnl = perf.unrealized_pnl || 0;
+    el('paperPnL').textContent = (pnl >= 0 ? '+' : '') + '$' + pnl.toFixed(2);
+    el('paperPnL').style.color = pnl >= 0 ? 'var(--green)' : 'var(--red)';
+  }
+  el('paperTradeCount').textContent = perf.total_trades;
+
+  const ps = document.getElementById('paperStatus');
+  if (ps) ps.textContent = perf.open_positions > 0 ? '● IN MARKET' : '● CASH';
+  if (el('paperLastUpdate')) el('paperLastUpdate').textContent = new Date().toLocaleTimeString();
+
+  // Track record text from server-backed state
+  const dailyKeys = Object.keys(paperTrader.dailySnapshots).sort();
+  let recordHtml = '<span style="color:var(--text-2)">Server-backed paper trader</span>';
+  if (dailyKeys.length >= 1) {
+    const first = paperTrader.dailySnapshots[dailyKeys[0]];
+    const last = paperTrader.dailySnapshots[dailyKeys[dailyKeys.length - 1]];
+    recordHtml += '<br><span style="color:var(--text-2)">' + dailyKeys.length + ' day' + (dailyKeys.length !== 1 ? 's' : '') + ' tracked &middot; ';
+    recordHtml += 'Start: $' + fmtNum(first.equity, 2) + ' &middot; ';
+    recordHtml += 'Latest: $' + fmtNum(last.equity, 2) + '</span>';
+  } else if (paperTrader.equityHistory.length > 0) {
+    const first = paperTrader.equityHistory[0];
+    const last = paperTrader.equityHistory[paperTrader.equityHistory.length - 1];
+    recordHtml += '<br><span style="color:var(--text-2)">' + paperTrader.equityHistory.length + ' tick' + (paperTrader.equityHistory.length !== 1 ? 's' : '') + ' tracked &middot; ';
+    recordHtml += 'Start: $' + fmtNum(first.equity, 2) + ' &middot; ';
+    recordHtml += 'Latest: $' + fmtNum(last.equity, 2) + '</span>';
+  } else {
+    recordHtml += '<br><span style="color:var(--text-2)">Initialized &middot; Capital: $' + fmtNum(paperTrader.capital, 2) + '</span>';
+  }
+  if (el('paperTrackRecord')) el('paperTrackRecord').innerHTML = recordHtml;
+}
+
+function addPaperLog(msg) {
+  const log = document.getElementById('paperLog');
+  if (!log) return;
+  const div = document.createElement('div');
+  div.textContent = msg;
+  log.appendChild(div);
+  log.scrollTop = log.scrollHeight;
+  while (log.children.length > 100) log.removeChild(log.firstChild);
+}
+
+function resetPaperTrading() {
+  paperTrader = new PaperTrader(PAPER_INITIAL_CAPITAL);
+  const log = document.getElementById('paperLog');
+  if (log) log.innerHTML = '<div>🟢 Paper trading reset to $' + PAPER_INITIAL_CAPITAL.toLocaleString() + ' capital</div>';
+  updatePaperDisplay();
+  // Reset KV state for multi-user
+  if (currentUser) {
+    paperTrader.userConfig = {};
+    saveUserState().catch(() => {});
+    addPaperLog('💾 KV state reset saved');
+  }
+}
+
+function exportPaperTrades() {
+  if (!paperTrader || paperTrader.trades.length === 0) { addPaperLog('⚠ No trades to export'); return; }
+  const blob = new Blob([JSON.stringify(paperTrader.trades, null, 2)], {type: 'application/json'});
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url;
+  a.download = 'sfc_paper_trades_' + new Date().toISOString().slice(0,10) + '.json';
+  a.click();
+  URL.revokeObjectURL(url);
+  addPaperLog('📥 Exported ' + paperTrader.trades.length + ' trades');
+}
+
+function manualBuy() {
+  if (!paperTrader) { addPaperLog('⚠ Paper trader not initialized'); return; }
+  if (paperTrader.positions.length > 0) { addPaperLog('⚠ Already have an open position. Close it first or wait.'); return; }
+
+  const price = currentData?.btc;
+  if (!price || price <= 0) { addPaperLog('⚠ No BTC price available'); return; }
+
+  // Get buy amount: user input or from config's max_allocation_pct
+  const amountInput = document.getElementById('manualBuyAmount');
+  let size = 0;
+  if (amountInput?.value && parseFloat(amountInput.value) > 0) {
+    size = parseFloat(amountInput.value);
+  } else {
+    const allocPct = (paperTrader.userConfig?.max_allocation_pct || 25) / 100;
+    size = Math.round(paperTrader.capital * allocPct * 100) / 100;
+  }
+
+  // Cap at available capital
+  size = Math.min(size, paperTrader.capital);
+  if (size < 10) { addPaperLog('⚠ Insufficient capital (min $10)'); return; }
+
+  const decision = {
+    reason: 'Manual Buy',
+    btc_price: price,
+    sfc_pct: currentData?.sfc_effective || 0,
+    confidence: currentData?.composite_confidence || 0,
+  };
+
+  paperTrader._openPosition(size, price, decision);
+  paperTrader._updatePnL(price);
+  paperTrader._dailySnapshot();
+
+  addPaperLog(`🟢 [MANUAL BUY] LONG $${fmtNum(size,0)} at $${fmtNum(price,0)}`);
+  updatePaperDisplay();
+
+  // Clear the input
+  if (amountInput) amountInput.value = '';
+
+  // Save to KV
+  if (currentUser) saveUserState().catch(() => {});
+}
+
+function manualCloseAll() {
+  if (!paperTrader) { addPaperLog('⚠ Paper trader not initialized'); return; }
+  if (paperTrader.positions.length === 0) { addPaperLog('⚠ No open positions to close'); return; }
+
+  const price = currentData?.btc;
+  if (!price || price <= 0) { addPaperLog('⚠ No BTC price available'); return; }
+
+  paperTrader._closeAllPositions(price, 'Manual Close');
+  paperTrader._updatePnL(price);
+  paperTrader._dailySnapshot();
+
+  addPaperLog(`🔴 [MANUAL CLOSE] All at $${fmtNum(price,0)}`);
+  updatePaperDisplay();
+
+  // Save to KV
+  if (currentUser) saveUserState().catch(() => {});
+}
+
+/* ── INIT ── */
+loadHistory();
+
+// Load initial data from SSE snapshot — full render ONCE
+let _sseAvailable = false;
+
+async function bootSFC() {
+  // PRIORITY 1: Try /snapshot for SSE connection (fastest — local server)
+  let initial = null;
+  try {
+    const r = await fetch('/snapshot');
+    if (r.ok) initial = await r.json();
+  } catch (e) { /* snapshot not available */ }
+
+  if (initial && (initial.sfc || initial.btc)) {
+    _sseAvailable = true;
+    const data = initial.sfc || initial;
+    currentData = data;
+    render(data);
+  } else {
+    // No SSE server — fetch data.json directly (10-15KB, fast)
+    await fetchLiveData();
+  }
+
+  // Now init paper trader in background
+  await initPaperTrading();
+
+  // Ensure config panel visible and values set after any render path
+  setTimeout(function() {
+    if (currentUser && paperTrader) {
+      loadConfigToForm(paperTrader.userConfig || {});
+      updatePaperDisplay();
+    }
+  }, 200);
+  setTimeout(startNewsSlide, 100);
+  setTimeout(restoreScrollPos, 200);
+  // Start SSE only if server was detected (/snapshot responded)
+  if (_sseAvailable) {
+    startSSE();
+  } else {
+    // No SSE server — fall back to polling data.json every 30s
+    setInterval(fetchLiveData, 30000);
+  }
+}
+bootSFC();
+
+// SSE handles real-time updates when available.
+// On static (GitHub Pages / Workers), polling data.json every 30s is used instead.
+
+// ── COLLAPSIBLE CARDS — expand/collapse below-fold sections
+function toggleCollapseCard(el) {
+  const card = el.closest('.card') || el.parentElement.closest('.card');
+  if (!card) return;
+  card.classList.toggle('card-collapsed');
+  const arrow = card.querySelector('.collapse-arrow');
+  if (arrow) arrow.textContent = card.classList.contains('card-collapsed') ? '▶' : '▼';
+}
+
+// ── LAZY LOADING ── Cards below fold render only when visible
+function initLazyCards() {
+  if ('IntersectionObserver' in window) {
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          const el = entry.target;
+          el.style.opacity = '1';
+          el.style.transform = 'translateY(0)';
+          observer.unobserve(el);
+        }
+      });
+    }, { rootMargin: '200px' }); // start loading 200px before visible
+    
+    document.querySelectorAll('[data-lazy]').forEach(el => {
+      el.style.opacity = '0';
+      el.style.transform = 'translateY(20px)';
+      el.style.transition = 'opacity 0.4s ease, transform 0.4s ease';
+      observer.observe(el);
+    });
+  }
+}
+// Run lazy observer after initial render (and after each re-render)
+const origRender = render;
+render = function(d) {
+  origRender(d);
+  // Delay observer until DOM is painted
+  setTimeout(initLazyCards, 100);
+};
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(e => console.log('SW failed:', e));
+  // When a new SW takes over, force a reload to pick up fresh index.html —
+  // otherwise the page is stuck on the old cached HTML until next manual refresh.
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (navigator.serviceWorker.controller) {
+      console.log('[SW] New controller — reloading');
+      window.location.reload();
+    }
+  });
+}
 </script>
 </body>
 </html>
