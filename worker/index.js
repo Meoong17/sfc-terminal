@@ -539,6 +539,17 @@ document.getElementById('loginForm').addEventListener('submit', function(e) {
       });
     }
 
-    return new Response('Not Found', { status: 404, headers: corsHeaders });
+    // Catch-all: serve dashboard for any unknown path (SPA fallback)
+    const resp = await fetchAny(urls, '/', 'text/html');
+    if (!resp) return new Response('Not Found', { status: 404, headers: corsHeaders });
+    const fallbackHtml = await resp.text();
+    return new Response(fallbackHtml, {
+      status: 200,
+      headers: {
+        'Content-Type': 'text/html; charset=utf-8',
+        'Cache-Control': 'public, max-age=0, must-revalidate',
+        ...corsHeaders,
+      },
+    });
   },
 };
