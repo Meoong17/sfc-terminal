@@ -92,6 +92,24 @@ except ImportError as e:
     print(f"[SFC] Stablecoin liquidity module unavailable: {e}", file=sys.stderr)
     def compute_all_stablecoin_metrics(*a, **k): return {}, {}, 0, None
 
+# Import ETF flow module (M81-M82)
+try:
+    from etf_flow import compute_etf_metrics
+    ETF_AVAILABLE = True
+except ImportError as e:
+    ETF_AVAILABLE = False
+    print(f"[SFC] ETF flow module unavailable: {e}", file=sys.stderr)
+    def compute_etf_metrics(*a, **k): return 0.5, 0.5, {"status": "unavailable"}
+
+# Import fiscal liquidity module (M83-M84)
+try:
+    from fiscal_liquidity import compute_fiscal_liquidity_metrics
+    FISCAL_AVAILABLE = True
+except ImportError as e:
+    FISCAL_AVAILABLE = False
+    print(f"[SFC] Fiscal liquidity module unavailable: {e}", file=sys.stderr)
+    def compute_fiscal_liquidity_metrics(*a, **k): return 0.5, 0.5, 0.5, {"status": "unavailable"}
+
 # Import causal inference
 try:
     from causal_inference import CausalFilter
@@ -522,6 +540,55 @@ def get_dxy():
             pass
         return None
 
+
+def _compute_dxy_btc_correlation():
+    """Compute rolling 30-day correlation between DXY changes and BTC returns.
+    
+    Reads from daily market cache. Returns correlation coefficient (-1 to 1)
+    or None if insufficient data.
+    
+    When correlation > 0.3: DXY and BTC move together (risk-on USD regime).
+      In this regime, DXY strength = bullish for crypto (flip Sc sign).
+    When correlation < -0.3: Normal inverse regime.
+      DXY strength = bearish (standard Sc logic).
+    When -0.3 < corr < 0.3: Mixed/unclear regime. Use neutral/weakened Sc.
+    """
+    cache_file = os.path.join(os.path.dirname(__file__), '.daily_market_cache.json')
+    if not os.path.exists(cache_file):
+        return None
+    try:
+        with open(cache_file) as f:
+            cache = json.load(f)
+        if len(cache) < 15:
+            return None
+        
+        # Extract daily DXY and BTC returns
+        dxy_vals = []
+        btc_vals = []
+        for entry in cache:
+            dxy = entry.get("dxy")
+            btc = entry.get("btc_24h")
+            if dxy is not None and btc is not None:
+                dxy_vals.append(dxy)
+                btc_vals.append(btc)
+        
+        if len(dxy_vals) < 15:
+            return None
+        
+        # Compute Pearson correlation
+        n = len(dxy_vals)
+        mean_dxy = sum(dxy_vals) / n
+        mean_btc = sum(btc_vals) / n
+        num = sum((d - mean_dxy) * (b - mean_btc) for d, b in zip(dxy_vals, btc_vals))
+        denom = math.sqrt(sum((d - mean_dxy)**2 for d in dxy_vals) * sum((b - mean_btc)**2 for b in btc_vals))
+        if denom == 0:
+            return None
+        corr = num / denom
+        return max(-1.0, min(1.0, corr))
+    except Exception:
+        return None
+
+
 def get_put_call_ratio():
     try:
         r = requests.get("https://www.deribit.com/api/v2/public/get_book_summary_by_currency?currency=BTC&kind=option", timeout=10)
@@ -612,7 +679,7 @@ def _sigmoid_factor(val, center, k=0.15):
 
 def score_factors_from_market(btc, btc_24h, dom, dvol, fng, pc_oi, m2_yoy, dxy, glo_score=None,
                                 onchain_whale=None, onchain_value=None, onchain_buy=None,
-                                onchain_market_structure=None):
+                                onchain_market_structure=None, dxy_btc_corr=None):
     """Score 5 factors from market data using smooth sigmoid/logistic functions. Range -3 to +3
     onchain_whale/onchain_value/onchain_buy: 0-100 scores from on-chain data (Q10)
     onchain_market_structure: 0-100 score from derivatives data (Q10+)"""
@@ -646,12 +713,26 @@ def score_factors_from_market(btc, btc_24h, dom, dvol, fng, pc_oi, m2_yoy, dxy, 
         # High vol = systemic stress (negative)
         factors["Ft"] = -_sigmoid_factor(dvol, center=65.0, k=0.06)
     
-    # Sc (External) — based on DXY (US dollar index)
+    # Sc (External) — based on DXY (US dollar index) with correlation gate
+    # DXY-BTC correlation determines whether DXY strength is a headwind or tailwind
     if dxy is not None:
-        # Strong dollar = crypto headwind (negative), weak = tailwind (positive)
-        factors["Sc"] = -_sigmoid_factor(dxy, center=100.0, k=0.2)
-    # High dominance amplifies external risk
-    if dom is not None and dom > 65:
+        if dxy_btc_corr is not None and dxy_btc_corr > 0.3:
+            # Positive correlation regime: DXY and BTC move together (risk-on USD)
+            # Strong dollar = bullish for crypto → flip sign
+            factors["Sc"] = _sigmoid_factor(dxy, center=100.0, k=0.2)
+            corr_regime = "POSITIVE"
+        elif dxy_btc_corr is not None and dxy_btc_corr > -0.3:
+            # Mixed regime: neither clearly positive nor negative
+            # Weaken the Sc factor magnitude
+            factors["Sc"] = -_sigmoid_factor(dxy, center=100.0, k=0.2) * 0.5
+            corr_regime = "MIXED"
+        else:
+            # Normal inverse regime: DXY up = BTC down (standard)
+            factors["Sc"] = -_sigmoid_factor(dxy, center=100.0, k=0.2)
+            corr_regime = "INVERSE"
+        print(f"[DXY Gate] corr={dxy_btc_corr:.2f} regime={corr_regime} Sc={factors['Sc']:+.3f}", file=sys.stderr)
+    # High dominance amplifies external risk only in inverse/mixed regime
+    if dom is not None and dom > 65 and (dxy_btc_corr is None or dxy_btc_corr < 0.3):
         factors["Sc"] -= 0.5
     
     # ── ON-CHAIN ADJUSTMENTS (Q10 Integration) ──
@@ -1626,6 +1707,11 @@ _factors_m2 = _m2_30d if _m2_30d is not None else m2_yoy
 _factors_dxy = _dxy_30d if _dxy_30d is not None else dxy
 print(f"[SFC] 30d rolling averages: BTC24h={_factors_btc_24h} DOM={_factors_dom} DVOL={_factors_dvol} FnG={_factors_fng} M2={_factors_m2}", file=sys.stderr)
 
+# ── DXY-BTC Correlation Gate (for Sc factor sign) ──
+dxy_btc_corr = _compute_dxy_btc_correlation()
+if dxy_btc_corr is not None:
+    print(f"[DXY Gate] Rolling 30d DXY-BTC correlation: {dxy_btc_corr:.3f}", file=sys.stderr)
+
 # ── ADVANCED FEATURE ENGINEERING (Peningkatan 1: 25+ technical indicators) ──
 _adv_features = {}
 _adv_features_module = _get_adv_features()
@@ -1685,10 +1771,56 @@ if STABLECOIN_AVAILABLE:
     except Exception as e:
         print(f"[SFC] Stablecoin metrics failed: {e}", file=sys.stderr)
 
+# ── ETF FLOW (M81-M82) ──
+_etf_results = None
+_etf_m81_score = 0.5
+_etf_m82_score = 0.5
+_etf_details = {"status": "unavailable"}
+if ETF_AVAILABLE:
+    try:
+        _etf_m81_score, _etf_m82_score, _etf_details = compute_etf_metrics(btc_price=btc)
+        print(f"[ETF] M81={_etf_m81_score:.3f} M82={_etf_m82_score:.3f} | "
+              f"flow={_etf_details.get('m81_latest_flow_btc', '?')} BTC | "
+              f"cumulative={_etf_details.get('m82_cumulative_btc', '?'):,.0f} BTC", file=sys.stderr)
+    except Exception as e:
+        print(f"[ETF] Error: {e}", file=sys.stderr)
+
+# ── FISCAL LIQUIDITY (M83-M84) ──
+_m83_score = 0.5
+_m84_score = 0.5
+_m85_composite = 0.5
+_fiscal_details = {"status": "unavailable"}
+if FISCAL_AVAILABLE:
+    try:
+        _m83_score, _m84_score, _m85_composite, _fiscal_details = compute_fiscal_liquidity_metrics()
+        print(f"[FISCAL] M83(TGA)={_m83_score:.3f} M84(RRP)={_m84_score:.3f} "
+              f"Composite={_m85_composite:.3f} | Regime={_fiscal_details.get('regime','?')}", file=sys.stderr)
+    except Exception as e:
+        print(f"[FISCAL] Error: {e}", file=sys.stderr)
+
 # Score factors from market data (using 30d rolling averages + on-chain)
 factors = score_factors_from_market(btc, _factors_btc_24h, _factors_dom, _factors_dvol, _factors_fng, _factors_pc, _factors_m2, _factors_dxy,
                                      onchain_whale=whale_pressure, onchain_value=onchain_value, onchain_buy=buying_power,
-                                     onchain_market_structure=market_structure)
+                                     onchain_market_structure=market_structure, dxy_btc_corr=dxy_btc_corr)
+
+# ── ETF FLOW FACTOR ADJUSTMENT ──
+if _etf_m81_score != 0.5 or _etf_m82_score != 0.5:
+    etf_rt_adj = (0.5 - _etf_m81_score) * 1.5
+    etf_lt_adj = (0.5 - _etf_m82_score) * 1.5
+    factors["Rt"] += max(-1.5, min(1.5, etf_rt_adj))
+    factors["Lt"] += max(-1.5, min(1.5, etf_lt_adj))
+    print(f"[ETF] Factor adj: Rt={etf_rt_adj:+.3f} Lt={etf_lt_adj:+.3f}", file=sys.stderr)
+
+# ── FISCAL LIQUIDITY FACTOR ADJUSTMENT ──
+if _m83_score != 0.5 or _m84_score != 0.5:
+    tga_adj = (0.5 - _m83_score) * 1.0
+    rrp_adj = (0.5 - _m84_score) * 1.0
+    factors["Lt"] += max(-1.0, min(1.0, tga_adj + rrp_adj))
+    print(f"[FISCAL] Factor adj: TGA={tga_adj:+.3f} RRP={rrp_adj:+.3f} Lt_total={tga_adj+rrp_adj:+.3f}", file=sys.stderr)
+
+# Re-clamp factors after all adjustments
+for k in factors:
+    factors[k] = max(-3.0, min(3.0, factors[k]))
 
 # Calculate SFC ensemble
 sfc_pct, zone, factors_raw, norm_factors, m1_klr, m2_logit, m3_bayes, m4_ewc, m5_qreg, m6_regime, method_agreement = calculate_sfc_ensemble(factors)
@@ -2083,7 +2215,7 @@ print("[SFC] Computing ML ensemble prediction...", file=sys.stderr)
 # Build feature vector from all available methods
 all_method_scores = []
 for s in [m1_klr, m2_logit, m3_bayes, m4_ewc/100, m5_qreg/100, m6_regime/100,
-          m7_s, m8_s, m9_s, m10_s, m11_s, m12_s, m13_s, m14_s, m15_s, m16_s, m17_s, m18_s, m19_s]:
+          m7_s, m9_s, m10_s, m11_s, m12_s, m13_s, m14_s, m15_s, m16_s, m17_s, m18_s, m19_s]:
     all_method_scores.append(s if s is not None else 0.5)
 # Add institutional method scores
 for name in sorted(inst_results.keys()):
@@ -2430,6 +2562,26 @@ elif fng is not None and fng > 85:
 # SOPR capitulation — on-chain stress
 if sopr_proxy is not None and sopr_proxy < 0.98:
     cc_penalty += 0.05
+
+# ── M8 YIELD CURVE CONFIDENCE MODULATOR (refactored from stress signal) ──
+# Inverted yield curve = macro uncertainty → reduce confidence
+# Steep curve = normal expansion → increase confidence
+# Wide credit spreads = credit stress → reduce confidence
+if m8_d is not None:
+    slope = m8_d.get("slope")
+    spread = m8_d.get("spread")
+    if slope is not None:
+        if slope < 0:
+            cc_penalty += 0.08  # inverted → high macro uncertainty
+        elif slope < 0.5:
+            cc_penalty += 0.04  # flattening → mild uncertainty
+        elif slope > 2.0:
+            cc_base += 0.03  # steep normal → slightly more confident
+    if spread is not None and spread > 400:
+        cc_penalty += 0.06  # credit market stress
+    elif spread is not None and spread > 300:
+        cc_penalty += 0.03
+    print(f"[M8] Yield curve confidence adj: slope={slope} spread={spread} penalty={cc_penalty:.2f}", file=sys.stderr)
 
 # Very negative news sentiment
 if news_sentiment < -0.5:
