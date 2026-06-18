@@ -730,7 +730,7 @@ def score_factors_from_market(btc, btc_24h, dom, dvol, fng, pc_oi, m2_yoy, dxy, 
             # Normal inverse regime: DXY up = BTC down (standard)
             factors["Sc"] = -_sigmoid_factor(dxy, center=100.0, k=0.2)
             corr_regime = "INVERSE"
-        print(f"[DXY Gate] corr={dxy_btc_corr:.2f} regime={corr_regime} Sc={factors['Sc']:+.3f}", file=sys.stderr)
+        print(f"[DXY Gate] corr={dxy_btc_corr} regime={corr_regime} Sc={factors['Sc']:+.3f}", file=sys.stderr)
     # High dominance amplifies external risk only in inverse/mixed regime
     if dom is not None and dom > 65 and (dxy_btc_corr is None or dxy_btc_corr < 0.3):
         factors["Sc"] -= 0.5
@@ -2236,14 +2236,18 @@ ml_metrics = evaluate_accuracy()
 print(f"[SFC] ML Ensemble: {ml_msg} | Accuracy: {ml_metrics.get('message', 'N/A')}", file=sys.stderr)
 
 # Count total active methods
+_fiscal_active = (1 if isinstance(_fiscal_details.get("m83"), dict) and _fiscal_details["m83"].get("status") == "ok" else 0) + \
+                 (1 if isinstance(_fiscal_details.get("m84"), dict) and _fiscal_details["m84"].get("status") == "ok" else 0)
 total_active_methods = (
     6 + new_active + inst_active_count 
     + (1 if qlstm_ok else 0) 
     + (1 if m33_glo_score is not None else 0)
     + sc_active
     + _macro_active
+    + (2 if isinstance(_etf_details, dict) and _etf_details.get("status") == "ok" else 0)
+    + _fiscal_active
 )
-print(f"[SFC] Total active methods: {total_active_methods}/42 (M1-M6+M7-M19+M20-M31+M32_Q+M33_GLO+M76-M80+M72-M75)", file=sys.stderr)
+print(f"[SFC] Total active methods: {total_active_methods} (M1-M6+M7-M19+M20-M31+M32_Q+M33_GLO+M76-M80+M72-M75+M81-M85+DXY)", file=sys.stderr)
 
 # Compute effective SFC
 liq_mod = 0.0
@@ -2851,6 +2855,23 @@ out = {
     "m74_detail": _m74_detail,
     "m75_liquidity_composite": round(_m75_score, 3) if _m75_score is not None else None,
     "m75_detail": _m75_detail,
+    # ETF flow (M81-M82)
+    "etf_methods_active": 2 if _etf_details.get("status") == "ok" else 0,
+    "m81_etf_flow": round(_etf_m81_score, 3),
+    "m81_detail": _etf_details if _etf_details.get("status") == "ok" else None,
+    "m82_etf_holdings": round(_etf_m82_score, 3),
+    "m82_detail": _etf_details if _etf_details.get("status") == "ok" else None,
+    # Fiscal liquidity (M83-M84)
+    "fiscal_methods_active": (1 if _fiscal_details.get("m83", {}).get("status") == "ok" else 0) + (1 if _fiscal_details.get("m84", {}).get("status") == "ok" else 0),
+    "m83_tga_score": round(_m83_score, 3),
+    "m83_detail": _fiscal_details.get("m83") if _fiscal_details.get("status") == "ok" else None,
+    "m84_rrp_score": round(_m84_score, 3),
+    "m84_detail": _fiscal_details.get("m84") if _fiscal_details.get("status") == "ok" else None,
+    "m85_fiscal_composite": round(_m85_composite, 3) if _fiscal_details.get("status") == "ok" else None,
+    "m85_detail": {"regime": _fiscal_details.get("regime")} if _fiscal_details.get("status") == "ok" else None,
+    # DXY correlation gate
+    "dxy_btc_corr": round(dxy_btc_corr, 3) if dxy_btc_corr is not None else None,
+    "dxy_gate_regime": "POSITIVE" if dxy_btc_corr is not None and dxy_btc_corr > 0.3 else "INVERSE" if dxy_btc_corr is not None and dxy_btc_corr < -0.3 else "MIXED" if dxy_btc_corr is not None else None,
     # XAI feature importance
     "xai_top_features": _XAI_FEATURES,
     # ML ensemble
