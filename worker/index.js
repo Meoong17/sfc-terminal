@@ -15,8 +15,8 @@ async function fetchAny(urls, path, accept) {
   for (const base of ordered) {
     try {
       const resp = await fetch(base + path, {
-        headers: { 'Accept': accept || '*/*' },
-        signal: AbortSignal.timeout(2000),
+        headers: { 'Accept': accept || '*/*', 'Accept-Encoding': 'identity' },
+        signal: AbortSignal.timeout(5000),
       });
       if (resp.ok) return resp;
     } catch (_) {}
@@ -434,14 +434,11 @@ document.getElementById('loginForm').addEventListener('submit', function(e) {
       const resp = await fetchAny(urls, '/snapshot', 'application/json');
       if (!resp) return new Response('Backend unreachable', { status: 502 });
       const data = await resp.json();
-      const body = JSON.stringify(data);
-      const compressed = await gzip(body);
-      const response = new Response(compressed, {
+      const response = new Response(JSON.stringify(data), {
         status: 200,
         headers: {
           'Content-Type': 'application/json',
           'Cache-Control': 'public, max-age=30',
-          'Content-Encoding': 'gzip',
           ...corsHeaders,
         },
       });
@@ -449,7 +446,7 @@ document.getElementById('loginForm').addEventListener('submit', function(e) {
       return response;
     }
 
-    // /data.json — SFC live data with gzip compression
+    // /data.json — SFC live data (passthrough, no gzip — saves Worker CPU)
     if (path === '/data.json') {
       const resp = await fetchAny(urls, '/data.json', 'application/json');
       if (!resp) return new Response('{}', {
@@ -457,15 +454,11 @@ document.getElementById('loginForm').addEventListener('submit', function(e) {
         headers: { 'Content-Type': 'application/json', ...corsHeaders },
       });
       const data = await resp.json();
-      const body = JSON.stringify(data);
-      const compressed = await gzip(body);
-      return new Response(compressed, {
+      return new Response(JSON.stringify(data), {
         status: 200,
         headers: {
           'Content-Type': 'application/json',
-          'Content-Encoding': 'gzip',
           'Cache-Control': 'no-cache',
-          'Vary': 'Accept-Encoding',
           ...corsHeaders,
         },
       });
