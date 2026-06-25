@@ -1,228 +1,92 @@
 #!/usr/bin/env python3
-"""
-ETF Cache Updater — called by cron job to refresh .etf_cache.json
-Tries multiple data sources:
-  1. Farside UK (via web scrape with requests + cloudscraper fallback)
-  2. CoinGlass API (if cookies available)
-  3. SoSoValue API (if api key configured)
-  4. Falls back to existing cache (no-op)
-"""
+"""Update .etf_cache.json with fresh Farside data."""
+import json, time
+from datetime import datetime
 
-import json, os, sys, time, re, math
-from datetime import datetime, timezone
+# Raw data from Farside table (date rows only)
+# Format: [date_str, IBIT, FBTC, BITB, ARKB, BTCO, EZBC, BRRR, HODL, BTCW, MSBT, GBTC, BTC, Total]
+raw_rows = [
+    ["08 Jun 2026", "(232.9)", "59.4", "14.1", "63.1", "0.0", "0.0", "0.0", "0.0", "0.0", "4.9", "0.0", "0.0", "(91.4)"],
+    ["09 Jun 2026", "(61.6)", "(20.2)", "0.0", "0.0", "0.0", "0.0", "0.0", "0.0", "0.0", "0.0", "0.0", "4.4", "(77.4)"],
+    ["10 Jun 2026", "(148.5)", "4.0", "0.0", "0.0", "0.0", "0.0", "0.0", "0.0", "1.0", "0.0", "(87.9)", "17.5", "(213.9)"],
+    ["11 Jun 2026", "30.3", "(5.5)", "(13.1)", "(27.2)", "0.0", "0.0", "0.0", "(14.8)", "0.0", "2.2", "0.0", "5.6", "(22.5)"],
+    ["12 Jun 2026", "57.7", "18.0", "5.2", "3.2", "0.0", "0.0", "0.0", "1.8", "0.0", "0.0", "0.0", "0.0", "85.9"],
+    ["15 Jun 2026", "66.4", "(8.7)", "0.0", "(6.6)", "0.0", "(5.8)", "0.0", "(6.1)", "0.0", "9.4", "(124.0)", "10.6", "(64.8)"],
+    ["16 Jun 2026", "16.4", "4.3", "0.0", "0.0", "0.0", "0.0", "0.0", "0.0", "0.0", "1.9", "(16.8)", "4.4", "10.2"],
+    ["17 Jun 2026", "(30.8)", "14.0", "0.0", "(43.5)", "(6.4)", "0.0", "0.0", "(4.1)", "0.0", "4.1", "(15.5)", "0.0", "(82.2)"],
+    ["18 Jun 2026", "(96.7)", "0.0", "0.0", "0.0", "0.0", "0.0", "0.0", "(4.4)", "0.0", "10.4", "0.0", "0.0", "(90.7)"],
+    ["22 Jun 2026", "(172.0)", "57.4", "0.0", "64.0", "0.0", "3.7", "0.0", "0.0", "3.4", "8.1", "(81.0)", "48.1", "(68.3)"],
+    ["23 Jun 2026", "(182.0)", "23.0", "0.0", "31.0", "0.0", "0.0", "0.0", "5.3", "0.0", "8.9", "0.0", "0.0", "(113.8)"],
+    ["24 Jun 2026", "(239.3)", "(120.8)", "(27.5)", "(50.7)", "0.0", "0.0", "0.0", "0.0", "0.0", "0.0", "(54.3)", "23.6", "(469.0)"],
+]
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-CACHE_FILE = os.path.join(BASE_DIR, '.etf_cache.json')
+etf_keys = ["IBIT", "FBTC", "BITB", "ARKB", "BTCO", "EZBC", "BRRR", "HODL", "BTCW", "MSBT", "GBTC", "BTC"]
 
-ETF_ORDER = ["GBTC", "IBIT", "FBTC", "ARKB", "BITB", "BTCO", "HODL",
-             "BRRR", "EZBC", "BTCW", "BTC", "MSBT"]
+def parse_val(s):
+    """Parse Farside value: '(232.9)' -> -232.9, '59.4' -> 59.4"""
+    s = s.strip()
+    if s.startswith('(') and s.endswith(')'):
+        return -float(s[1:-1])
+    return float(s)
 
-def _load_cache():
-    try:
-        with open(CACHE_FILE) as f:
-            return json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
-        return {"flows": [], "cumulative_btc": 0, "cumulative_usd": 0,
-                "last_update": None, "cached_at": 0}
+def parse_date(s):
+    """Convert '08 Jun 2026' to '2026-06-08'"""
+    months = {"Jan": "01", "Feb": "02", "Mar": "03", "Apr": "04", "May": "05", "Jun": "06",
+              "Jul": "07", "Aug": "08", "Sep": "09", "Oct": "10", "Nov": "11", "Dec": "12"}
+    parts = s.split()
+    day = parts[0].zfill(2)
+    month = months[parts[1]]
+    year = parts[2]
+    return f"{year}-{month}-{day}"
 
-def _save_cache(cache):
-    cache["cached_at"] = time.time()
-    cache["last_update"] = datetime.now(timezone.utc).isoformat()
-    with open(CACHE_FILE, "w") as f:
-        json.dump(cache, f, indent=2)
+# Load existing cache
+try:
+    with open("/home/ubuntu/sfc/.etf_cache.json", "r") as f:
+        cache = json.load(f)
+except (FileNotFoundError, json.JSONDecodeError):
+    cache = {"flows": [], "cumulative_btc": None, "cumulative_usd": None, "last_update": None, "cached_at": None}
 
-def _parse_farside_table(html):
-    """Parse Farside UK HTML table into flow data.
-    
-    The table has rows like:
-    | 17 Jun 2026 | (68.2) | (31.9) | 0.0 | ... | (125.3) |
-    Columns: Date, IBIT, FBTC, BITB, ARKB, BTCO, EZBC, BRRR, HODL, BTCW, MSBT, GBTC, BTC, Total
-    All values in USD millions.
-    """
-    flows = []
-    # Find all table rows
-    row_pattern = re.compile(
-        r'<tr[^>]*>'
-        r'\s*<t[dh][^>]*>(\d{1,2}\s+\w+\s+\d{4})</t[dh]>'  # date
-        r'(.*?)'  # cells
-        r'</tr>',
-        re.DOTALL | re.IGNORECASE
-    )
-    
-    cell_pattern = re.compile(r'<t[dh][^>]*>([^<]*)</t[dh]>')
-    
-    for match in row_pattern.finditer(html):
-        date_str = match.group(1)
-        cells_html = match.group(2)
-        cells = cell_pattern.findall(cells_html)
-        
-        if len(cells) < 13:
-            continue
-        
-        # Parse date
-        try:
-            dt = datetime.strptime(date_str, "%d %b %Y")
-            date_key = dt.strftime("%Y-%m-%d")
-        except ValueError:
-            continue
-        
-        # Parse values (all in USD millions)
-        def _parse_val(v):
-            v = v.strip().replace(",", "").replace("+", "").replace("$", "")
-            if v == "-" or v == "—" or v == "":
-                return 0.0
-            try:
-                return float(v)
-            except ValueError:
-                return 0.0
-        
-        values = [_parse_val(c) for c in cells]
-        
-        # Farside columns: Date, IBIT, FBTC, BITB, ARKB, BTCO, EZBC, BRRR, HODL, BTCW, MSBT, GBTC, BTC, Total
-        # But we need to handle mapping correctly. The columns in the HTML are:
-        # IBIT(0), FBTC(1), BITB(2), ARKB(3), BTCO(4), EZBC(5), BRRR(6), HODL(7), BTCW(8), MSBT(9), GBTC(10), BTC(11), Total(12)
-        if len(values) >= 13:
-            total = values[12]
-            etfs = {
-                "IBIT": values[0],
-                "FBTC": values[1],
-                "BITB": values[2],
-                "ARKB": values[3],
-                "BTCO": values[4],
-                "EZBC": values[5],
-                "BRRR": values[6],
-                "HODL": values[7],
-                "BTCW": values[8],
-                "MSBT": values[9],
-                "GBTC": values[10],
-                "BTC": values[11],
-            }
-            # Convert USD millions to raw USD
-            total_usd = int(total * 1_000_000) if total else 0
-            
-            flows.append({
-                "date": date_key,
-                "total_btc": None,  # Farside gives USD, not BTC
-                "total_usd": total_usd,
-                "etfs": etfs,
-            })
-    
-    return flows
+# Build index of existing flows by date
+existing_by_date = {f["date"]: f for f in cache.get("flows", [])}
 
-def _fetch_farside():
-    """Try to fetch ETF data from Farside UK.
+# Create/update flows from scraped data
+for row in raw_rows:
+    date_str = row[0]
+    iso_date = parse_date(date_str)
     
-    Returns (flows, cumulative_data) or (None, None).
-    """
-    urls = [
-        "https://farside.co.uk/btc/",
-        "https://farside.co.uk/bitcoin-etf-flow-all-data/",
-    ]
+    etfs = {}
+    for i, key in enumerate(etf_keys):
+        etfs[key] = parse_val(row[i + 1])
     
-    for url in urls:
-        try:
-            r = requests.get(
-                url,
-                headers={
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                                  "AppleWebKit/537.36 (KHTML, like Gecko) "
-                                  "Chrome/120.0.0.0 Safari/537.36",
-                    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-                    "Accept-Language": "en-US,en;q=0.5",
-                },
-                timeout=15
-            )
-            if r.status_code == 200 and "Cloudflare" not in r.text[:500]:
-                html = r.text
-                flows = _parse_farside_table(html)
-                if flows:
-                    # Also try to extract cumulative totals
-                    cum_btc = None
-                    cum_usd = None
-                    # Look for cumulative total in the summary section
-                    cum_match = re.search(r'Total.*?([\d,]+)\s*\)?\s*</td>', html)
-                    # Try to find cumulative BTC from the summary page
-                    
-                    # Sort by date descending
-                    flows.sort(key=lambda x: x["date"], reverse=True)
-                    print(f"[ETF-Updater] Farside: {len(flows)} flow days from {url}", file=sys.stderr)
-                    return flows, {"cumulative_btc": cum_btc, "cumulative_usd": cum_usd}
-        except Exception as e:
-            print(f"[ETF-Updater] Farside failed ({url}): {e}", file=sys.stderr)
+    total_val = parse_val(row[13])
+    total_usd = int(total_val * 1_000_000)
     
-    return None, None
+    flow = {
+        "date": iso_date,
+        "total_btc": None,
+        "total_usd": total_usd,
+        "etfs": etfs
+    }
+    existing_by_date[iso_date] = flow
 
+# Cumulative from Total row: 52,794 US$m
+cumulative_usd = 52794 * 1_000_000
 
-def _fetch_coinglass_via_api():
-    """Try CoinGlass API (rarely works without cookies)."""
-    try:
-        r = requests.get(
-            "https://capi.coinglass.com/api/etf/flow",
-            headers={
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-                "Referer": "https://www.coinglass.com/etf/bitcoin",
-                "Accept": "application/json",
-            },
-            timeout=10
-        )
-        if r.status_code == 200:
-            data = r.json()
-            if data.get("success") and data.get("data"):
-                return data["data"], None
-    except Exception:
-        pass
-    return None, None
+# Build final flows list sorted by date
+all_dates = sorted(existing_by_date.keys())
+flows = [existing_by_date[d] for d in all_dates]
 
+now = datetime.now()
+cache["flows"] = flows
+cache["cumulative_btc"] = None  # Farside doesn't show BTC cumulative
+cache["cumulative_usd"] = cumulative_usd
+cache["last_update"] = now.strftime("%Y-%m-%dT%H:%M:%S")
+cache["cached_at"] = time.time()
 
-def update_cache():
-    """Main entry point. Tries all sources, updates cache if new data found."""
-    cache = _load_cache()
-    existing_dates = set(f["date"] for f in cache.get("flows", []))
-    
-    new_flows = None
-    cumulative = None
-    
-    # Try Farside first
-    try:
-        new_flows, cumulative = _fetch_farside()
-    except Exception as e:
-        print(f"[ETF-Updater] Farside error: {e}", file=sys.stderr)
-    
-    # Try CoinGlass as backup
-    if not new_flows:
-        try:
-            new_flows, cumulative = _fetch_coinglass_via_api()
-        except Exception as e:
-            print(f"[ETF-Updater] CoinGlass error: {e}", file=sys.stderr)
-    
-    if not new_flows:
-        print("[ETF-Updater] No new data from any source. Cache unchanged.", file=sys.stderr)
-        return False
-    
-    # Merge: keep existing flows not in new data, add new ones
-    merged = {f["date"]: f for f in cache.get("flows", [])}
-    for f in new_flows:
-        merged[f["date"]] = f
-    
-    cache["flows"] = sorted(merged.values(), key=lambda x: x["date"], reverse=True)
-    
-    # Update cumulative if available
-    if cumulative:
-        if cumulative.get("cumulative_btc"):
-            cache["cumulative_btc"] = cumulative["cumulative_btc"]
-        if cumulative.get("cumulative_usd"):
-            cache["cumulative_usd"] = cumulative["cumulative_usd"]
-    
-    _save_cache(cache)
-    print(f"[ETF-Updater] Cache updated: {len(new_flows)} new rows, {len(cache['flows'])} total", file=sys.stderr)
-    return True
+with open("/home/ubuntu/sfc/.etf_cache.json", "w") as f:
+    json.dump(cache, f, indent=2)
 
-
-if __name__ == "__main__":
-    # For cron execution
-    import requests  # imported here for cron env
-    updated = update_cache()
-    if updated:
-        print(f"[ETF-CRON] Cache updated successfully at {datetime.now(timezone.utc).isoformat()}")
-    else:
-        print(f"[ETF-CRON] Cache unchanged at {datetime.now(timezone.utc).isoformat()}")
+print(f"Updated cache: {len(flows)} flow entries")
+print(f"Cumulative USD: ${cumulative_usd:,}")
+print(f"Last update: {cache['last_update']}")
+print(f"Cached at: {cache['cached_at']}")
