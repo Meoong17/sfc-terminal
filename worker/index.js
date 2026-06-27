@@ -93,12 +93,31 @@ export default {
     const method = request.method;
     const urls = [TUNNEL, BACKUP];
 
-    // CORS headers for all responses
-    const corsHeaders = {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-      'Access-Control-Allow-Headers': '*',
-    };
+    // Allowed origins for CORS (GitHub Pages frontend that calls worker API)
+    const ALLOWED_ORIGINS = [
+      'https://meoong17.github.io',
+      'https://sfc-terminal.meoong17.workers.dev',
+    ];
+
+    // Dynamic CORS — only respond with ACAO when Origin matches allowlist
+    function getCorsHeaders(request) {
+      const origin = request.headers.get('Origin') || '';
+      if (ALLOWED_ORIGINS.includes(origin)) {
+        return {
+          'Access-Control-Allow-Origin': origin,
+          'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+          'Access-Control-Allow-Headers': '*',
+          'Vary': 'Origin',
+        };
+      }
+      // Same-origin requests don't need CORS
+      return {};
+    }
+
+    // Session check helper — returns normalized username or null
+    function getSessionUser(request) {
+      return getCookie(request, 'sfc_session');
+    }
 
     // Security headers for HTML pages (clickjacking, MIME sniffing, HSTS, referrer)
     const securityHeaders = {
@@ -110,7 +129,7 @@ export default {
 
     // CORS preflight
     if (method === 'OPTIONS') {
-      return new Response(null, { headers: corsHeaders });
+      return new Response(null, { headers: getCorsHeaders(request) });
     }
 
     // ── SESSION AUTH GUARD ──────────────────────────────────
@@ -122,7 +141,7 @@ export default {
       const cookie = request.headers.get('Cookie') || '(none)';
       const sessionUser = getCookie(request, 'sfc_session');
       return new Response(JSON.stringify({ cookie, sessionUser, all: Object.fromEntries(request.headers) }), {
-        headers: { 'Content-Type': 'application/json', ...corsHeaders },
+        headers: { 'Content-Type': 'application/json', ...getCorsHeaders(request) },
       });
     }
 
@@ -133,6 +152,11 @@ export default {
     if (userStateMatch && method === 'GET') {
       const username = decodeURIComponent(userStateMatch[1]);
       const normalized = username.toLowerCase();
+      // Session guard: only the logged-in user can read their own state
+      const sessionUser = getSessionUser(request);
+      if (!sessionUser || sessionUser.toLowerCase() !== normalized) {
+        return new Response('Forbidden', { status: 403, headers: getCorsHeaders(request) });
+      }
       const key = `user:${normalized}:state`;
       let raw = await env.SFC_USER_STATE.get(key);
       if (!raw) {
@@ -142,7 +166,7 @@ export default {
         await env.SFC_USER_STATE.put(key, raw);
       }
       return new Response(raw, {
-        headers: { 'Content-Type': 'application/json', ...corsHeaders },
+        headers: { 'Content-Type': 'application/json', ...getCorsHeaders(request) },
       });
     }
 
@@ -150,12 +174,17 @@ export default {
     if (userStateMatch && method === 'POST') {
       const username = decodeURIComponent(userStateMatch[1]);
       const normalized = username.toLowerCase();
+      // Session guard: only the logged-in user can write their own state
+      const sessionUser = getSessionUser(request);
+      if (!sessionUser || sessionUser.toLowerCase() !== normalized) {
+        return new Response('Forbidden', { status: 403, headers: getCorsHeaders(request) });
+      }
       const key = `user:${normalized}:state`;
       let newState;
       try {
         newState = await request.json();
       } catch (e) {
-        return new Response('Invalid JSON', { status: 400, headers: corsHeaders });
+        return new Response('Invalid JSON', { status: 400, headers: getCorsHeaders(request) });
       }
       newState.user_id = username;
       newState.last_update = new Date().toISOString();
@@ -168,7 +197,7 @@ export default {
       }
       await env.SFC_USER_STATE.put(key, JSON.stringify(newState));
       return new Response(JSON.stringify({ status: 'ok' }), {
-        headers: { 'Content-Type': 'application/json', ...corsHeaders },
+        headers: { 'Content-Type': 'application/json', ...getCorsHeaders(request) },
       });
     }
 
@@ -177,10 +206,15 @@ export default {
     if (userConfigMatch && method === 'POST') {
       const username = decodeURIComponent(userConfigMatch[1]);
       const normalized = username.toLowerCase();
+      // Session guard
+      const sessionUser = getSessionUser(request);
+      if (!sessionUser || sessionUser.toLowerCase() !== normalized) {
+        return new Response('Forbidden', { status: 403, headers: getCorsHeaders(request) });
+      }
       const key = `user:${normalized}:state`;
       let existing = await env.SFC_USER_STATE.get(key);
       if (!existing) {
-        return new Response('User not found', { status: 404, headers: corsHeaders });
+        return new Response('User not found', { status: 404, headers: getCorsHeaders(request) });
       }
       const state = JSON.parse(existing);
       const configUpdate = await request.json();
@@ -188,7 +222,7 @@ export default {
       state.last_update = new Date().toISOString();
       await env.SFC_USER_STATE.put(key, JSON.stringify(state));
       return new Response(JSON.stringify({ status: 'ok' }), {
-        headers: { 'Content-Type': 'application/json', ...corsHeaders },
+        headers: { 'Content-Type': 'application/json', ...getCorsHeaders(request) },
       });
     }
 
@@ -197,11 +231,16 @@ export default {
     if (userStatusMatch && method === 'GET') {
       const username = decodeURIComponent(userStatusMatch[1]);
       const normalized = username.toLowerCase();
+      // Session guard
+      const sessionUser = getSessionUser(request);
+      if (!sessionUser || sessionUser.toLowerCase() !== normalized) {
+        return new Response('Forbidden', { status: 403, headers: getCorsHeaders(request) });
+      }
       const key = `user:${normalized}:state`;
       let raw = await env.SFC_USER_STATE.get(key);
       if (!raw) {
         return new Response(JSON.stringify({ exists: false, username }), {
-          headers: { 'Content-Type': 'application/json', ...corsHeaders },
+          headers: { 'Content-Type': 'application/json', ...getCorsHeaders(request) },
         });
       }
       const state = JSON.parse(raw);
@@ -215,7 +254,7 @@ export default {
         last_update: state.last_update,
       };
       return new Response(JSON.stringify(summary), {
-        headers: { 'Content-Type': 'application/json', ...corsHeaders },
+        headers: { 'Content-Type': 'application/json', ...getCorsHeaders(request) },
       });
     }
 
@@ -241,7 +280,7 @@ export default {
         }
         return new Response(JSON.stringify({ error: 'Invalid username. Use letters, numbers, hyphens and underscores.' }), {
           status: 400,
-          headers: { 'Content-Type': 'application/json', ...corsHeaders },
+          headers: { 'Content-Type': 'application/json', ...getCorsHeaders(request) },
         });
       }
       const normalized = username.toLowerCase();
@@ -258,7 +297,7 @@ export default {
               'Set-Cookie': setCookie('sfc_session', username),
               'Cache-Control': 'no-cache, no-store, must-revalidate',
               ...securityHeaders,
-              ...corsHeaders,
+              ...getCorsHeaders(request),
             },
           }
         );
@@ -268,7 +307,7 @@ export default {
         headers: {
           'Content-Type': 'application/json',
           'Set-Cookie': setCookie('sfc_session', username),
-          ...corsHeaders,
+          ...getCorsHeaders(request),
         },
       });
     }
@@ -280,7 +319,7 @@ export default {
         headers: {
           'Location': '/login',
           'Set-Cookie': clearCookie('sfc_session'),
-          ...corsHeaders,
+          ...getCorsHeaders(request),
         },
       });
     }
@@ -339,7 +378,7 @@ document.getElementById('loginForm').addEventListener('submit', function(e) {
 </html>`;
       return new Response(loginHtml, {
         status: 200,
-        headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache, no-store, must-revalidate', ...securityHeaders, ...corsHeaders },
+        headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache, no-store, must-revalidate', ...securityHeaders, ...getCorsHeaders(request) },
       });
     }
 
@@ -428,7 +467,7 @@ document.getElementById('loginForm').addEventListener('submit', function(e) {
           'Content-Type': 'text/event-stream',
           'Cache-Control': 'no-cache',
           'Connection': 'keep-alive',
-          ...corsHeaders,
+          ...getCorsHeaders(request),
         },
       });
     }
@@ -448,7 +487,7 @@ document.getElementById('loginForm').addEventListener('submit', function(e) {
         headers: {
           'Content-Type': 'application/json',
           'Cache-Control': 'public, max-age=30',
-          ...corsHeaders,
+          ...getCorsHeaders(request),
         },
       });
       ctx.waitUntil(cache.put(cacheKey, response.clone()));
@@ -460,7 +499,7 @@ document.getElementById('loginForm').addEventListener('submit', function(e) {
       const resp = await fetchAny(urls, '/data.json', 'application/json');
       if (!resp) return new Response('{}', {
         status: 200,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders },
+        headers: { 'Content-Type': 'application/json', ...getCorsHeaders(request) },
       });
       const data = await resp.json();
       return new Response(JSON.stringify(data), {
@@ -468,7 +507,7 @@ document.getElementById('loginForm').addEventListener('submit', function(e) {
         headers: {
           'Content-Type': 'application/json',
           'Cache-Control': 'no-cache',
-          ...corsHeaders,
+          ...getCorsHeaders(request),
         },
       });
     }
@@ -478,12 +517,12 @@ document.getElementById('loginForm').addEventListener('submit', function(e) {
       const resp = await fetchAny(urls, '/paper_history.json', 'application/json');
       if (!resp) return new Response('{"daily":[],"current":{}}', {
         status: 200,
-        headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache', ...corsHeaders },
+        headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache', ...getCorsHeaders(request) },
       });
       const data = await resp.json();
       return new Response(JSON.stringify(data), {
         status: 200,
-        headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache', ...corsHeaders },
+        headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache', ...getCorsHeaders(request) },
       });
     }
 
@@ -492,12 +531,12 @@ document.getElementById('loginForm').addEventListener('submit', function(e) {
       const resp = await fetchAny(urls, '/paper_trades.json', 'application/json');
       if (!resp) return new Response('{"capital":50000,"positions":[],"trades":[],"equity_history":[],"daily_snapshots":{}}', {
         status: 200,
-        headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache', ...corsHeaders },
+        headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache', ...getCorsHeaders(request) },
       });
       const data = await resp.json();
       return new Response(JSON.stringify(data), {
         status: 200,
-        headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache', ...corsHeaders },
+        headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache', ...getCorsHeaders(request) },
       });
     }
 
@@ -508,7 +547,7 @@ document.getElementById('loginForm').addEventListener('submit', function(e) {
       const data = await resp.json();
       return new Response(JSON.stringify(data), {
         status: 200,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders },
+        headers: { 'Content-Type': 'application/json', ...getCorsHeaders(request) },
       });
     }
 
@@ -529,7 +568,7 @@ document.getElementById('loginForm').addEventListener('submit', function(e) {
             'Set-Cookie': setCookieHeader,
             'Cache-Control': 'public, max-age=0, must-revalidate',
             ...securityHeaders,
-            ...corsHeaders,
+            ...getCorsHeaders(request),
           },
         });
       }
@@ -545,14 +584,14 @@ document.getElementById('loginForm').addEventListener('submit', function(e) {
           'Content-Type': 'text/html; charset=utf-8',
           'Cache-Control': 'public, max-age=0, must-revalidate',
           ...securityHeaders,
-          ...corsHeaders,
+          ...getCorsHeaders(request),
         },
       });
     }
 
     // Catch-all: serve dashboard for any unknown path (SPA fallback)
     const resp = await fetchAny(urls, '/', 'text/html');
-    if (!resp) return new Response('Not Found', { status: 404, headers: corsHeaders });
+    if (!resp) return new Response('Not Found', { status: 404, headers: getCorsHeaders(request) });
     const fallbackHtml = await resp.text();
     return new Response(fallbackHtml, {
       status: 200,
@@ -560,7 +599,7 @@ document.getElementById('loginForm').addEventListener('submit', function(e) {
         'Content-Type': 'text/html; charset=utf-8',
         'Cache-Control': 'public, max-age=0, must-revalidate',
         ...securityHeaders,
-        ...corsHeaders,
+        ...getCorsHeaders(request),
       },
     });
   },
