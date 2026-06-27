@@ -212,11 +212,14 @@ class CircuitBreaker:
         # ── 4. Consistency checks ──
         consistency_issues = []
 
-        # sfc_effective should be >= sfc_base (base gets adjusted up)
+        # sfc_effective can differ from sfc_base by the liq_mod adjustment
+        # (range -5 to +10pp) plus regime boost (0-15pp) and ML nudges.
+        # Only flag as inconsistent if sfc_effective is far below sfc_base
+        # (beyond the max negative liq_mod of -5pp + safety margin).
         sfc_eff = cleaned.get("sfc_effective")
         sfc_base = cleaned.get("sfc_base")
         if isinstance(sfc_eff, (int, float)) and isinstance(sfc_base, (int, float)):
-            if sfc_eff < sfc_base - 5.0:  # allow 5pp tolerance
+            if sfc_eff < sfc_base - 10.0:  # allow liq_mod (-5) + margin
                 consistency_issues.append(
                     f"sfc_effective ({sfc_eff:.1f}) < sfc_base ({sfc_base:.1f})"
                 )

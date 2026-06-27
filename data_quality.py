@@ -230,20 +230,18 @@ class DataQualityPipeline:
 
     # ── Stage 1: Outlier Detection (IsolationForest) ──
 
-    # ── M1-M6 are percentages (0-100), M7-M31 are decimals (0-1)
-    # Normalize before outlier detection to avoid false positives
-    NORMALIZE_PCT = {"m1_klr", "m2_logit", "m3_bayes", "m4_ewc", "m6_regime_score"}
+    # ── Method values can arrive either as data.json percentages (0-100)
+    # or collect.py internal decimals (0-1). Normalize adaptively.
+    NORMALIZE_PCT = {"m1_klr", "m2_logit", "m3_bayes", "m4_ewc", "m5_qreg", "m6_regime_score"}
 
     def _normalize_for_detection(self, vals: np.ndarray) -> np.ndarray:
-        """Normalize method scores to comparable scale for outlier detection."""
+        """Normalize method scores to comparable 0-1 scale for outlier detection."""
         out = vals.copy()
         for i in range(len(out)):
             if i < len(METHOD_FIELDS) and METHOD_FIELDS[i] in self.NORMALIZE_PCT:
-                # These are 0-100 → normalize to 0-1
-                out[i] = out[i] / 100.0
-            elif i < len(METHOD_FIELDS) and METHOD_FIELDS[i] == "m5_qreg":
-                # m5_qreg is 0-10
-                out[i] = out[i] / 10.0
+                # Accept both 0-100 percentages and already-normalized 0-1 decimals.
+                if abs(out[i]) > 1.0:
+                    out[i] = out[i] / 100.0
         return out
 
     def _detect_outliers(self, scores: List[Optional[float]]) -> List[bool]:

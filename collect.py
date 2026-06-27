@@ -2025,7 +2025,7 @@ else:
 
 # ── DYNAMIC ENSEMBLE BLEND ──
 # Use causal-adjusted blend: filter removes noise, boosts signal
-p_ens_original = 0.20*m1_klr + 0.25*m2_logit + 0.20*m3_bayes + 0.10*m4_ewc + 0.15*m5_qreg/100 + 0.10*m6_regime/100
+# (original equal-weight ensemble removed — superseded by causal blend below)
 
 # ── XGBOOST META-ENSEMBLE (Peningkatan 2: second-layer prediction) ──
 _xgb_pred = None
@@ -2092,11 +2092,10 @@ else:
 
 # Final ensemble
 sfc_pct = (p1 * m1m6_avg + p2 * new_avg + p3 * inst_avg_value) * 100
-# Regime-aware zone thresholds (from M2 analysis: 39.8% calm-in-crisis)
-_SFC_REGIME = regime if "regime" in dir() else "NORMAL"
-_SFC_THRESHOLD_MULT = {"CRISIS": 0.6, "BEAR": 0.72, "BULL": 1.2, "SIDEWAYS": 1.0, "NORMAL": 1.0, "STRESS": 0.8}
-_SFC_MULT = _SFC_THRESHOLD_MULT.get(str(_SFC_REGIME).upper(), 1.0)
-zone = "CRITICAL" if sfc_pct/100 > 0.75 * _SFC_MULT else "HIGH" if sfc_pct/100 > 0.50 * _SFC_MULT else "ELEVATED" if sfc_pct/100 > 0.25 * _SFC_MULT else "NORMAL"
+# NOTE: regime-aware zone thresholds are applied LATER (line ~2446) after
+# detect_regime() runs. Here we use a flat threshold; the regime multiplier
+# (CRISIS=0.6, BEAR=0.72, BULL=1.2) is applied post-regime-detection.
+zone = "CRITICAL" if sfc_pct/100 > 0.75 else "HIGH" if sfc_pct/100 > 0.50 else "ELEVATED" if sfc_pct/100 > 0.25 else "NORMAL"
 
 print(f"[SFC] Causal-filtered blend: M1-M6={p1*100:.0f}% ({len(m1m6_active)}/6) + "
       f"M7-M19={p2*100:.0f}% ({new_active}/13) + "
@@ -2440,9 +2439,12 @@ if _online_module and effective_sfc is not None:
         print(f"[EWMA] Error: {_ewma_e}", file=sys.stderr)
 
 # State and signal — use post-boost effective_sfc to stay consistent with zone/signal_type
+# Regime-aware zone thresholds (M2 analysis: 39.8% calm-in-crisis)
+# CRISIS lowers thresholds (0.6x) so lower SFC already flags ELEVATED/HIGH/CRITICAL;
+# BULL raises thresholds (1.2x) so calm markets need higher SFC to flag stress.
+_SFC_THRESHOLD_MULT = {"CRISIS": 0.6, "BEAR": 0.72, "BULL": 1.2, "SIDEWAYS": 1.0, "NORMAL": 1.0, "STRESS": 0.8}
 if effective_sfc is not None:
-    # Regime-aware zone (M2 analysis: 39.8% calm-in-crisis — use same multiplier)
-    _SFC_MULT2 = _SFC_THRESHOLD_MULT.get(str(regime).upper(), 1.0) if '_SFC_THRESHOLD_MULT' in dir() else 1.0
+    _SFC_MULT2 = _SFC_THRESHOLD_MULT.get(str(regime).upper(), 1.0)
     zone = "CRITICAL" if effective_sfc/100 > 0.75 * _SFC_MULT2 else "HIGH" if effective_sfc/100 > 0.50 * _SFC_MULT2 else "ELEVATED" if effective_sfc/100 > 0.25 * _SFC_MULT2 else "NORMAL"
 state, signal = determine_state(dvol, effective_sfc, btc, ft)
 
@@ -2824,6 +2826,8 @@ else:
 
 # Collect method scores for uncertainty estimation
 _PROB_METHOD_SCORES = []
+# m5_qreg and m6_regime_score are 0-100 (from p_quantile*100, p_regime*100);
+# normalize to 0-1 decimal to match other method scores
 for _prob_field in ["m1_klr", "m2_logit", "m3_bayes", "m4_ewc", "m5_qreg", "m6_regime_score",
                      "m7_fisher", "m8_yield", "m9_liquidity", "m10_garch", "m11_var", "m12_jump",
                      "m13_funding", "m14_skew", "m15_concentration", "m16_regime_ml", "m17_granger",
@@ -2831,7 +2835,10 @@ for _prob_field in ["m1_klr", "m2_logit", "m3_bayes", "m4_ewc", "m5_qreg", "m6_r
                      "m23_liquidity", "m24_cape", "m25_minsky", "m26_kahneman", "m27_taleb",
                      "m28_summers", "m29_debt", "m30_rajan", "m31_altman"]:
     try:
-        _PROB_METHOD_SCORES.append(float(locals().get(_prob_field, 0) or 0))
+        _prob_val = float(locals().get(_prob_field, 0) or 0)
+        if _prob_field in ("m5_qreg", "m6_regime_score"):
+            _prob_val = _prob_val / 100.0
+        _PROB_METHOD_SCORES.append(_prob_val)
     except (TypeError, ValueError):
         _PROB_METHOD_SCORES.append(0.0)
 

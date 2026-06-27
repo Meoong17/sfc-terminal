@@ -48,8 +48,8 @@ KS_P_THRESHOLD = 0.05
 # How many consecutive drift detections before flagging
 MIN_CONSECUTIVE_DRIFT = 2  # was 3 — reduced for faster shock detection
 
-# Features to normalize (same as data_quality.py)
-NORMALIZE_PCT = {"m1_klr", "m2_logit", "m3_bayes", "m4_ewc", "m6_regime_score"}
+# Features to normalize adaptively (accept both 0-100 and 0-1 inputs)
+NORMALIZE_PCT = {"m1_klr", "m2_logit", "m3_bayes", "m4_ewc", "m5_qreg", "m6_regime_score"}
 
 
 # ════════════════════════════════════════════════════════════════
@@ -204,9 +204,8 @@ class DriftDetector:
                 val = 0.0
             val = float(val)
             if i < len(METHOD_FIELDS) and METHOD_FIELDS[i] in NORMALIZE_PCT:
-                val = val / 100.0
-            elif i < len(METHOD_FIELDS) and METHOD_FIELDS[i] == "m5_qreg":
-                val = val / 10.0
+                if abs(val) > 1.0:
+                    val = val / 100.0
             result.append(val)
         return result
 
