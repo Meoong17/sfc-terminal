@@ -17,6 +17,15 @@ DATA_FILE = SCRIPT_DIR / "data.json"
 TRADES_FILE = SCRIPT_DIR / "paper_trades.json"
 HISTORY_FILE = SCRIPT_DIR / "paper_history.json"  # daily snapshots
 
+# ── Market Impact Model (optional — silent fallback) ──
+_MI_AVAILABLE = False
+_MI_CALC = None
+try:
+    from market_impact import calculate_entry_cost, calculate_exit_cost
+    _MI_AVAILABLE = True
+except ImportError:
+    pass
+
 # ── Paper Trading Engine ──
 
 class PaperTrader:
@@ -78,6 +87,7 @@ class PaperTrader:
         zone = data.get("zone", "NORMAL")
         btc = data.get("btc", 0)
         signal_type = data.get("signal_type", "CALM")
+        dvol = data.get("dvol", 0)
 
         # Decision logic (mirrors frontend PaperTrader.decide())
         is_extreme_fear = fng < 15
@@ -123,6 +133,7 @@ class PaperTrader:
             "regime": regime,
             "zone": zone,
             "signal_type": signal_type,
+            "daily_volume": dvol,
         }
 
     def execute(self, decision: dict):
@@ -132,13 +143,16 @@ class PaperTrader:
         if not price or price <= 0:
             return
 
+        # Estimate daily volume from data.json
+        daily_volume = float(decision.get("daily_volume", 0) or 0)
+
         # Close positions if signal says CASH and we have positions
         if decision["action"] == "CASH" and self.positions:
-            self._close_all_positions(price, "Signal CASH")
+            self._close_all_positions(price, "Signal CASH", daily_volume)
 
         # Open new position if signal says BUY and we're flat
         if decision["action"] == "BUY" and not self.positions and decision["size"] >= 10:
-            self._open_position(decision["size"], price, decision)
+            self._open_position(decision["size"], price, decision, daily_volume)
 
         # Update PnL for reporting (no action needed on HOLD)
         self._update_pnl(price)
@@ -149,38 +163,58 @@ class PaperTrader:
 
         self.save()
 
-    def _open_position(self, size: float, price: float, decision: dict):
+    def _open_position(self, size: float, price: float, decision: dict, daily_volume: float = 0):
+        # Compute market impact cost
+        entry_cost = 0.0
+        if _MI_AVAILABLE and daily_volume > 0:
+            entry_cost = calculate_entry_cost(size, price, daily_volume)
+            if entry_cost > size * 0.5:  # sanity: never lose >50% to slippage
+                entry_cost = size * 0.5
+        net_size = size - entry_cost
+        if net_size <= 0:
+            return  # slippage ate the whole position — skip
+
         self.positions.append({
             "type": "LONG",
             "entry_price": price,
-            "size": size,
+            "size": round(net_size, 2),
             "entry_date": datetime.now(timezone.utc).isoformat(),
             "reason": decision.get("reason", ""),
             "sfc_at_entry": decision.get("sfc_pct"),
             "confidence_at_entry": decision.get("confidence"),
+            "slippage_entry": round(entry_cost, 2),
         })
-        self.capital -= size
+        self.capital -= size  # commit full allocation, but position is smaller
         self.trades.append({
             "id": len(self.trades) + 1,
             "type": "OPEN",
             "date": datetime.now(timezone.utc).isoformat(),
             "price": price,
-            "size": size,
+            "size": round(net_size, 2),
+            "slippage": round(entry_cost, 2),
             "reason": decision.get("reason", ""),
         })
 
-    def _close_all_positions(self, price: float, reason: str):
+    def _close_all_positions(self, price: float, reason: str, daily_volume: float = 0):
         for pos in self.positions:
+            exit_cost = 0.0
+            if _MI_AVAILABLE and daily_volume > 0:
+                exit_cost = calculate_exit_cost(pos["size"], price, daily_volume)
+                if exit_cost > pos["size"] * 0.5:
+                    exit_cost = pos["size"] * 0.5
+            gross_proceeds = pos["size"]
             pnl = (price - pos["entry_price"]) / pos["entry_price"] * pos["size"]
-            self.capital += pos["size"] + pnl
+            net_pnl = pnl - exit_cost
+            self.capital += gross_proceeds + net_pnl
             self.trades.append({
                 "id": len(self.trades) + 1,
                 "type": "CLOSE",
                 "date": datetime.now(timezone.utc).isoformat(),
                 "price": price,
                 "size": pos["size"],
-                "pnl": round(pnl, 2),
+                "pnl": round(net_pnl, 2),
                 "pnl_pct": round((price - pos["entry_price"]) / pos["entry_price"] * 100, 2),
+                "slippage_exit": round(exit_cost, 2),
                 "reason": reason,
             })
         self.positions = []

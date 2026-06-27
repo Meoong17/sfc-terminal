@@ -786,9 +786,12 @@ def score_factors_from_market(btc, btc_24h, dom, dvol, fng, pc_oi, m2_yoy, dxy, 
     return factors
 
 def calculate_sfc_ensemble(factors):
-    """Calculate 6-method ensemble from factors"""
+    """Calculate 6-method ensemble from factors with Lt/St weights (33%/67%)."""
+    # Apply Lt/St weights from correlation analysis (Lt|r|=0.057, St|r|=0.114)
+    # Weights adjusted to preserve total scale (sum=5, same as equal weighting)
+    _FACTOR_WT = {"Lt": 0.66, "St": 1.34, "Rt": 1.0, "Ft": 1.0, "Sc": 1.0}
     norm = {k: v/6 for k, v in factors.items()}
-    z_score = sum(norm.values())
+    z_score = sum(norm[k] * _FACTOR_WT[k] for k in factors)
     
     # M1: KLR
     ns_r = {"Lt":0.35, "St":0.50, "Rt":0.40, "Ft":0.25, "Sc":0.80}
@@ -2754,6 +2757,47 @@ if PROBABILISTIC_AVAILABLE and _PROB_HEAD is not None:
         print(f"[SFC] Probabilistic compute failed: {_prob_e}", file=sys.stderr)
         _PROB_RESULT = {}
 
+# ════════════════════════════════════════════════════════════
+# M33c: Data Quality Pipeline — Outlier Detection + Kalman Imputation
+# ════════════════════════════════════════════════════════════
+_DQ_RESULT = {"dq_available": False}
+try:
+    from data_quality import DataQualityPipeline
+    _DQ = DataQualityPipeline()
+    _DQ_CLEANED, _DQ_FLAGS = _DQ.process(_PROB_METHOD_SCORES)
+    _DQ_RESULT = {
+        "dq_available": True,
+        "dq_outliers": _DQ_FLAGS["outliers"],
+        "dq_imputed": _DQ_FLAGS["imputed"],
+        "dq_missing": _DQ_FLAGS["missing"],
+        "dq_outlier_pct": _DQ_FLAGS["outlier_pct"],
+        "dq_imputed_pct": _DQ_FLAGS["imputed_pct"],
+        "dq_active": _DQ_FLAGS["active"],
+    }
+except Exception as _dq_e:
+    print(f"[DQ] Data quality pipeline failed: {_dq_e}", file=sys.stderr)
+    _DQ_RESULT = {"dq_available": False}
+
+# ════════════════════════════════════════════════════════════
+# M33d: Drift Detection — KS-test monitoring
+# ════════════════════════════════════════════════════════════
+_DRIFT_RESULT = {"drift_available": False}
+try:
+    from drift_detection import DriftDetector
+    _DRIFT = DriftDetector()
+    _DRIFT_RESULT_RAW = _DRIFT.check(_PROB_METHOD_SCORES)
+    _DRIFT_RESULT = {
+        "drift_available": True,
+        "drift_detected": _DRIFT_RESULT_RAW.get("drift_detected", False),
+        "drift_fields": _DRIFT_RESULT_RAW.get("drifted_fields", []),
+        "drift_index": _DRIFT_RESULT_RAW.get("overall_drift_index", 0.0),
+        "drift_consecutive": _DRIFT_RESULT_RAW.get("consecutive_drift", 0),
+        "drift_stable": _DRIFT_RESULT_RAW.get("stable", True),
+    }
+except Exception as _drift_e:
+    print(f"[Drift] Drift detection failed: {_drift_e}", file=sys.stderr)
+    _DRIFT_RESULT = {"drift_available": False}
+
 # Build output
 out = {
     "ts": datetime.now(timezone.utc).isoformat(),
@@ -2881,7 +2925,7 @@ out = {
     "m31_altman": round(inst_results.get("m31_altman", 0), 3) if "m31_altman" in inst_results else None,
     "m31_detail": inst_details.get("m31_detail"),
     # Stablecoin liquidity (M76-M80) with details
-    "m76_supply_growth": round(_sc_results.get("m76_supply_growth", 0), 3) if _sc_results else None,
+    "m76_supply_growth": None,  # redundant: r=-1.00 with m80, removed from output
     "m76_detail": sc_details.get("m76_detail"),
     "m77_ssr": round(_sc_results.get("m77_ssr", 0), 3) if _sc_results else None,
     "m77_detail": sc_details.get("m77_detail"),
@@ -2973,7 +3017,7 @@ out = {
     "afe_rsi_7": float(round(_adv_features.get("rsi_7", 0), 2)) if _adv_features else None,
     "afe_macd_signal": float(round(_adv_features.get("macd_signal", 0), 4)) if _adv_features else None,
     "afe_bb_width": float(round(_adv_features.get("bb_width", 0), 4)) if _adv_features else None,
-    "afe_atr": float(round(_adv_features.get("atr", 0), 4)) if _adv_features else None,
+    "afe_atr": None,  # redundant: r=+0.965 with m2_logit
     "afe_vwap": float(round(_adv_features.get("vwap", 0), 2)) if _adv_features else None,
     "afe_obv_norm": float(round(_adv_features.get("obv", 0), 4)) if _adv_features else None,
     "afe_available": bool(_adv_features),
@@ -3086,6 +3130,21 @@ out = {
     "prob_sharpe": _PROB_RESULT.get("sharpe_ratio") if _PROB_RESULT else None,
     "prob_sortino": _PROB_RESULT.get("sortino_ratio") if _PROB_RESULT else None,
     "prob_uncertainty_breakdown": _PROB_RESULT.get("uncertainty_breakdown") if _PROB_RESULT else None,
+    # ── Data Quality status ──
+    "dq_available": _DQ_RESULT.get("dq_available", False),
+    "dq_outliers": _DQ_RESULT.get("dq_outliers", 0),
+    "dq_imputed": _DQ_RESULT.get("dq_imputed", 0),
+    "dq_missing": _DQ_RESULT.get("dq_missing", 0),
+    "dq_outlier_pct": _DQ_RESULT.get("dq_outlier_pct", 0.0),
+    "dq_imputed_pct": _DQ_RESULT.get("dq_imputed_pct", 0.0),
+    "dq_active": _DQ_RESULT.get("dq_active", 0),
+    # ── Drift Detection status ──
+    "drift_available": _DRIFT_RESULT.get("drift_available", False),
+    "drift_detected": _DRIFT_RESULT.get("drift_detected", False),
+    "drift_fields": _DRIFT_RESULT.get("drift_fields", []),
+    "drift_index": _DRIFT_RESULT.get("drift_index", 0.0),
+    "drift_consecutive": _DRIFT_RESULT.get("drift_consecutive", 0),
+    "drift_stable": _DRIFT_RESULT.get("drift_stable", True),
     # ── Circuit Breaker status ──
     "cb_available": CB_AVAILABLE,
     "cb_tripped": _CIRCUIT_BREAKER.get_stats().get("tripped", False) if CB_AVAILABLE and _CIRCUIT_BREAKER else False,
