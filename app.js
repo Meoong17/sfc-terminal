@@ -1529,7 +1529,7 @@ function updateRegimeDisplay(d) {
   var el = document.getElementById('regimeDisplay_xyz');
   if (!el) return;
   var val = typeof d.regime === 'string' && isNaN(d.regime) ? d.regime : (d.adv_regime || 'NORMAL');
-  var color = val === 'CAPITULATION' ? 'var(--red)' : val === 'STRESS' ? 'var(--amber)' : 'var(--green)';
+  var color = val === 'CAPITULATION' || val === 'CRISIS' ? 'var(--red)' : val === 'STRESS' || val === 'BEAR' ? 'var(--amber)' : 'var(--green)';
   el.textContent = val;
   el.style.color = color;
 }
