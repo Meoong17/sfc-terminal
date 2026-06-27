@@ -2592,6 +2592,17 @@ function render(d) {
       <span class="footer-link" onclick="fetchLiveData()">Refresh</span>
     </div>
   </footer>
+
+  <!-- ─── Donation widget ─── -->
+  <div class="donate-card">
+    <div class="donate-card__label">Support This Project</div>
+    <div class="donate-card__network">EVM — ETH / USDT / USDC / ERC-20</div>
+    <div class="donate-card__row">
+      <span class="donate-card__address" id="donateAddress">0x631b14cff7ea193820383381ffa1a52dec48675c</span>
+      <button class="donate-card__copy-btn" id="donateCopyBtn" onclick="copyDonateAddress()">COPY</button>
+    </div>
+    <div class="donate-card__note">BTC / SOL coming soon</div>
+  </div>
 </div>
   `;
 
@@ -3545,6 +3556,34 @@ render = function(d) {
   // Delay observer until DOM is painted
   setTimeout(initLazyCards, 100);
 };
+
+// ── Donation: copy wallet address ──
+function copyDonateAddress() {
+  var addressEl = document.getElementById('donateAddress');
+  var btn = document.getElementById('donateCopyBtn');
+  if (!addressEl || !btn) return;
+  var address = addressEl.textContent.trim();
+  function showCopied() {
+    btn.textContent = 'COPIED';
+    btn.classList.add('copied');
+    setTimeout(function() { btn.textContent = 'COPY'; btn.classList.remove('copied'); }, 1500);
+  }
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(address).then(showCopied).catch(function() {
+      var ta = document.createElement('textarea');
+      ta.value = address; ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy'); } catch (e) { console.error(e); }
+      document.body.removeChild(ta); showCopied();
+    });
+  } else {
+    var ta = document.createElement('textarea');
+    ta.value = address; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); } catch (e) { console.error(e); }
+    document.body.removeChild(ta); showCopied();
+  }
+}
 
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js').catch(e => console.log('SW failed:', e));
