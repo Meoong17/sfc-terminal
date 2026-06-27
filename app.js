@@ -480,7 +480,7 @@ function render(d) {
 
   <!-- STATUS BAND -->
   <div class="status-band">
-    <div class="s-chip"><span class="s-dot ${d.regime === 'CAPITULATION' ? 'dot-r' : d.regime === 'STRESS' ? 'dot-a' : 'dot-g'}"></span>${d.regime || 'NORMAL'} · ${d.zone || 'NORMAL'} Zone</div>
+    <div class="s-chip"><span class="s-dot ${d.regime === 'CAPITULATION' || d.regime === 'CRISIS' ? 'dot-r' : d.regime === 'STRESS' || d.regime === 'BEAR' ? 'dot-a' : 'dot-g'}"></span>${d.regime || 'NORMAL'} · ${d.zone || 'NORMAL'} Zone</div>
     <div class="s-chip"><span class="s-dot ${d.liq_pressure === 'LONG_SQUEEZE' ? 'dot-r' : d.liq_pressure === 'SHORT_SQUEEZE' ? 'dot-g' : 'dot-a'}"></span>${liqLabel}</div>
     <div class="s-chip"><span class="s-dot ${(d.sopr_signal||'').includes('CAPITULATION') ? 'dot-g' : (d.sopr_signal||'').includes('DISTRIBUTION') ? 'dot-r' : 'dot-a'}"></span>SOPR: ${(d.sopr_signal||'UNKNOWN').replace(/_/g,' ')}</div>
     <div class="s-chip"><span class="s-dot dot-b"></span>RSI ${fmtNum(rsi,1)}${rsi<=30?' · Oversold':rsi>=70?' · Overbought':''}</div>
@@ -511,7 +511,7 @@ function render(d) {
       <div class="kpi">
         <div class="kpi-label">SFC Stress</div>
         <div class="kpi-num" style="color:${sfcColor(sfcEff)}">${sfcEff.toFixed(1)}%</div>
-        <span class="kpi-badge ${sfcEff>=50?'kb-r':sfcEff>=25?'kb-a':'kb-g'}">${d.zone||'NORMAL'}</span>
+        <span class="kpi-badge ${sfcEff>=50*_arcMult?'kb-r':sfcEff>=25*_arcMult?'kb-a':'kb-g'}">${d.zone||'NORMAL'}</span>
       </div>
 
       <div class="kpi">
