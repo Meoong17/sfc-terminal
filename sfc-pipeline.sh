@@ -62,8 +62,10 @@ log "Running paper trader..."
 $PYTHON paper_trader.py 2>>sfc-pipeline.log || log "⚠ Paper trader skipped (no data)"
 
 
-# ── Inject data into HTML (skipped: data.json loaded via fetch for smaller page size) ──
-log "data.json is fetched async by frontend (no HTML injection needed)"
+# ── Inject fresh data into index.html (instant display before live fetch) + update .bak ──
+$PYTHON inject_data.py data.json index.html 2>>sfc-pipeline.log && \
+  cp index.html index.html.bak && \
+  log "Injected fresh data into index.html + .bak"
 
 # ── Commit & push ──
 log "Committing..."
