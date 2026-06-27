@@ -1544,7 +1544,7 @@ setInterval(function() {
   // If it contains a $ sign or a number with decimal, overwrite
   if (/^\$?[\d,]+\.?\d*$/.test(txt.trim())) {
     el.textContent = val;
-    el.style.color = val === 'CAPITULATION' ? 'var(--red)' : val === 'STRESS' ? 'var(--amber)' : 'var(--green)';
+    el.style.color = val === 'CAPITULATION' || val === 'CRISIS' ? 'var(--red)' : val === 'STRESS' || val === 'BEAR' ? 'var(--amber)' : 'var(--green)';
   }
 }, 200);
 
