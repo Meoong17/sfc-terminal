@@ -1142,6 +1142,88 @@ body::before {
   .kpi-row { gap: 6px; }
   .kpi { padding: 10px; }
 }
+
+/* ─── Donation widget ─── */
+.donate-card {
+  background: var(--bg-raise);
+  border: 1px solid var(--border-2);
+  border-radius: 8px;
+  padding: 14px 18px;
+  max-width: 340px;
+  margin: 10px auto;
+  text-align: left;
+}
+.donate-card__label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--purple);
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.donate-card__label::before {
+  content: "\25CF";
+  color: var(--purple);
+  font-size: 9px;
+}
+.donate-card__network {
+  color: var(--text-3);
+  font-size: 9px;
+  margin-bottom: 10px;
+  letter-spacing: 0.05em;
+}
+.donate-card__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg-void);
+  border: 1px solid var(--border-1);
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+.donate-card__address {
+  color: var(--purple);
+  font-size: 11px;
+  font-family: 'JetBrains Mono', monospace;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  user-select: all;
+}
+.donate-card__copy-btn {
+  background: transparent;
+  border: 1px solid var(--purple-border);
+  color: var(--purple);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: 'Space Grotesk', sans-serif;
+  transition: background 0.15s, color 0.15s;
+  flex-shrink: 0;
+}
+.donate-card__copy-btn:hover {
+  background: var(--purple-dim);
+  color: #fff;
+}
+.donate-card__copy-btn.copied {
+  background: var(--purple);
+  color: #fff;
+  border-color: var(--purple);
+}
+.donate-card__note {
+  color: var(--text-3);
+  font-size: 9px;
+  margin-top: 8px;
+  text-align: center;
+  letter-spacing: 0.03em;
+}
 </style>
 </head>
 <body>
