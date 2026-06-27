@@ -2,13 +2,19 @@
 """
 Paper Trading Engine — Server-side execution for SFC Terminal
 =============================================================
-Reads data.json, evaluates signal, executes simulated trades,
+Reads data.json, evaluates signal, executes simulated trades (LONG & SHORT),
 saves track record to paper_trades.json.
 
 Run: python3 paper_trader.py
 Called by: cron every 5 minutes (same cycle as data collection)
+
+Supports:
+  - LONG positions (BUY signal, sfc low)
+  - SHORT positions (SELL signal, sfc high)
+  - Time slippage simulation (execution price != signal price)
+  - Market impact cost (Almgren-Chriss via market_impact.py)
 """
-import json, os, math, sys, time
+import json, os, math, sys, time, random
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -16,6 +22,14 @@ SCRIPT_DIR = Path(__file__).parent
 DATA_FILE = SCRIPT_DIR / "data.json"
 TRADES_FILE = SCRIPT_DIR / "paper_trades.json"
 HISTORY_FILE = SCRIPT_DIR / "paper_history.json"  # daily snapshots
+
+# ── Time Slippage Config ──
+# Simulates real-time execution delay by adding random price jitter.
+# TIME_SLIPPAGE_STD = standard deviation of fractional price change between
+# signal and execution (e.g. 0.001 = 0.1% random slippage)
+TIME_SLIPPAGE_STD = 0.001
+# Seed for reproducibility when running in same cycle
+_TIME_SLIPPAGE_RNG = random.Random(42)
 
 # ── Market Impact Model (optional — silent fallback) ──
 _MI_AVAILABLE = False
@@ -26,10 +40,15 @@ try:
 except ImportError:
     pass
 
+
 # ── Paper Trading Engine ──
 
 class PaperTrader:
-    """Server-side paper trader with persistent state."""
+    """Server-side paper trader with persistent state.
+
+    Supports LONG and SHORT positions. Only one position at a time.
+    Uses time slippage to simulate realistic execution delays.
+    """
 
     INITIAL_CAPITAL = 50000.0
     MAX_POSITION_PCT = 0.25  # max 25% of capital per position
@@ -37,7 +56,7 @@ class PaperTrader:
     def __init__(self):
         self.capital = self.INITIAL_CAPITAL
         self.peak_capital = self.INITIAL_CAPITAL
-        self.positions = []       # open positions
+        self.positions = []       # open positions (max 1)
         self.trades = []          # all closed trades
         self.equity_history = []  # [(timestamp, equity), ...]
         self.daily_snapshots = {} # date -> {equity, return, sharpe, win_rate, max_dd}
@@ -76,8 +95,26 @@ class PaperTrader:
         try: return float(v)
         except (TypeError, ValueError): return default
 
+    def _get_execution_price(self, signal_price: float) -> float:
+        """Apply time slippage to simulate execution delay.
+
+        Returns a slightly different price than the signal price,
+        representing the real-world delay between signal generation
+        and order execution.
+        """
+        slippage = _TIME_SLIPPAGE_RNG.gauss(0, TIME_SLIPPAGE_STD)
+        # Clamp to [-3*sigma, +3*sigma] to avoid extreme outliers
+        slippage = max(-3 * TIME_SLIPPAGE_STD, min(3 * TIME_SLIPPAGE_STD, slippage))
+        exec_price = signal_price * (1.0 + slippage)
+        return max(exec_price, signal_price * 0.95)  # cap 5% adverse move
+
     def evaluate_signal(self, data: dict) -> dict:
-        """Evaluate SFC data and return trading decision."""
+        """Evaluate SFC data and return trading decision.
+
+        Supports both LONG (BUY) and SHORT (SELL) signals.
+        LONG: sfc low, kelly > 0
+        SHORT: sfc high, kelly > 0 (bearish confidence)
+        """
         sfc = PaperTrader._safe_float(data.get("sfc_effective", 0), 0) / 100.0
         conf = PaperTrader._safe_float(data.get("composite_confidence", 0.3), 0.3)
         kelly = PaperTrader._safe_float(data.get("kelly_fraction", 0), 0)
@@ -88,11 +125,12 @@ class PaperTrader:
         btc = data.get("btc", 0)
         signal_type = data.get("signal_type", "CALM")
         dvol = data.get("dvol", 0)
+        bear_conf = PaperTrader._safe_float(data.get("prob_stress", 0), 0)
 
-        # Decision logic (mirrors frontend PaperTrader.decide())
         is_extreme_fear = fng < 15
         has_cascade = cascade > 0.5
 
+        # Determine action
         if kelly <= 0:
             action = "CASH"
             reason = "No edge"
@@ -105,6 +143,10 @@ class PaperTrader:
         elif sfc < 0.25 and conf > 0.15:
             action = "BUY"
             reason = f"SFC {sfc*100:.0f}% · Conf {conf*100:.0f}%"
+        elif sfc >= 0.45 and bear_conf > 0.4:
+            # Strong bearish signal + bearish confidence → SHORT
+            action = "SELL"
+            reason = f"SFC {sfc*100:.0f}% · Bear {bear_conf*100:.0f}%"
         elif sfc >= 0.45:
             action = "CASH"
             reason = f"SFC {sfc*100:.0f}% · Stress too high"
@@ -114,7 +156,7 @@ class PaperTrader:
 
         # Position sizing
         size_pct = 0
-        if action == "BUY":
+        if action in ("BUY", "SELL"):
             # Use Kelly fraction capped at MAX_POSITION_PCT
             size_pct = min(kelly, self.MAX_POSITION_PCT)
             # Scale down with confidence
@@ -122,11 +164,17 @@ class PaperTrader:
 
         size = round(self.capital * size_pct, 2)
 
+        # Apply time slippage to execution price
+        signal_price = btc
+        exec_price = self._get_execution_price(signal_price)
+
         return {
             "action": action,
-            "size": size if action == "BUY" else 0,
+            "size": size if action in ("BUY", "SELL") else 0,
             "reason": reason,
             "btc_price": btc,
+            "execution_price": round(exec_price, 2),
+            "time_slippage_pct": round((exec_price - signal_price) / signal_price * 100, 3),
             "sfc_pct": round(sfc * 100, 1),
             "confidence": round(conf * 100, 0),
             "kelly_pct": round(kelly * 100, 1),
@@ -134,27 +182,35 @@ class PaperTrader:
             "zone": zone,
             "signal_type": signal_type,
             "daily_volume": dvol,
+            "is_short": action == "SELL",
         }
 
     def execute(self, decision: dict):
         """Execute a trading decision against current state."""
         now = datetime.now(timezone.utc).isoformat()
-        price = decision.get("btc_price", 0)
+        price = decision.get("execution_price", decision.get("btc_price", 0))
         if not price or price <= 0:
             return
+
+        is_short = decision.get("is_short", False)
 
         # Estimate daily volume from data.json
         daily_volume = float(decision.get("daily_volume", 0) or 0)
 
-        # Close positions if signal says CASH and we have positions
-        if decision["action"] == "CASH" and self.positions:
-            self._close_all_positions(price, "Signal CASH", daily_volume)
+        # Close positions if signal says CASH or opposite direction
+        if self.positions and (
+            decision["action"] == "CASH"
+            or (decision["action"] == "BUY" and self.positions[0]["type"] == "SHORT")
+            or (decision["action"] == "SELL" and self.positions[0]["type"] == "LONG")
+        ):
+            self._close_all_positions(price, decision["reason"], daily_volume)
 
-        # Open new position if signal says BUY and we're flat
-        if decision["action"] == "BUY" and not self.positions and decision["size"] >= 10:
-            self._open_position(decision["size"], price, decision, daily_volume)
+        # Open new position if signal says BUY/SELL and we're flat
+        if decision["action"] in ("BUY", "SELL") and not self.positions and decision["size"] >= 10:
+            pos_type = "SHORT" if is_short else "LONG"
+            self._open_position(pos_type, decision["size"], price, decision, daily_volume)
 
-        # Update PnL for reporting (no action needed on HOLD)
+        # Update PnL for reporting
         self._update_pnl(price)
         self._update_peak()
 
@@ -163,7 +219,7 @@ class PaperTrader:
 
         self.save()
 
-    def _open_position(self, size: float, price: float, decision: dict, daily_volume: float = 0):
+    def _open_position(self, pos_type: str, size: float, price: float, decision: dict, daily_volume: float = 0):
         # Compute market impact cost
         entry_cost = 0.0
         if _MI_AVAILABLE and daily_volume > 0:
@@ -175,7 +231,7 @@ class PaperTrader:
             return  # slippage ate the whole position — skip
 
         self.positions.append({
-            "type": "LONG",
+            "type": pos_type,
             "entry_price": price,
             "size": round(net_size, 2),
             "entry_date": datetime.now(timezone.utc).isoformat(),
@@ -183,15 +239,18 @@ class PaperTrader:
             "sfc_at_entry": decision.get("sfc_pct"),
             "confidence_at_entry": decision.get("confidence"),
             "slippage_entry": round(entry_cost, 2),
+            "time_slippage_pct": decision.get("time_slippage_pct", 0),
         })
-        self.capital -= size  # commit full allocation, but position is smaller
+        self.capital -= size  # commit full allocation
         self.trades.append({
             "id": len(self.trades) + 1,
             "type": "OPEN",
+            "direction": pos_type,
             "date": datetime.now(timezone.utc).isoformat(),
             "price": price,
             "size": round(net_size, 2),
             "slippage": round(entry_cost, 2),
+            "time_slippage_pct": decision.get("time_slippage_pct", 0),
             "reason": decision.get("reason", ""),
         })
 
@@ -202,18 +261,26 @@ class PaperTrader:
                 exit_cost = calculate_exit_cost(pos["size"], price, daily_volume)
                 if exit_cost > pos["size"] * 0.5:
                     exit_cost = pos["size"] * 0.5
+
             gross_proceeds = pos["size"]
-            pnl = (price - pos["entry_price"]) / pos["entry_price"] * pos["size"]
+            if pos["type"] == "LONG":
+                pnl = (price - pos["entry_price"]) / pos["entry_price"] * pos["size"]
+                pnl_pct = (price - pos["entry_price"]) / pos["entry_price"] * 100
+            else:  # SHORT
+                pnl = (pos["entry_price"] - price) / pos["entry_price"] * pos["size"]
+                pnl_pct = (pos["entry_price"] - price) / pos["entry_price"] * 100
+
             net_pnl = pnl - exit_cost
             self.capital += gross_proceeds + net_pnl
             self.trades.append({
                 "id": len(self.trades) + 1,
                 "type": "CLOSE",
+                "direction": pos["type"],
                 "date": datetime.now(timezone.utc).isoformat(),
                 "price": price,
                 "size": pos["size"],
                 "pnl": round(net_pnl, 2),
-                "pnl_pct": round((price - pos["entry_price"]) / pos["entry_price"] * 100, 2),
+                "pnl_pct": round(pnl_pct, 2),
                 "slippage_exit": round(exit_cost, 2),
                 "reason": reason,
             })
@@ -224,6 +291,8 @@ class PaperTrader:
         for pos in self.positions:
             if pos["type"] == "LONG":
                 unrealized += (price - pos["entry_price"]) / pos["entry_price"] * pos["size"]
+            else:  # SHORT
+                unrealized += (pos["entry_price"] - price) / pos["entry_price"] * pos["size"]
         self._unrealized = unrealized
         equity = self.capital + sum(pos["size"] for pos in self.positions) + unrealized
         self.equity_history.append({
@@ -349,6 +418,9 @@ def main():
     print(json.dumps({
         "action": decision["action"],
         "price": decision["btc_price"],
+        "execution_price": decision.get("execution_price"),
+        "time_slippage_pct": decision.get("time_slippage_pct", 0),
+        "is_short": decision.get("is_short", False),
         "size": decision["size"],
         "reason": decision["reason"],
         "equity": perf["equity"],

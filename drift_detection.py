@@ -46,7 +46,7 @@ REFERENCE_WINDOW = 30     # last 30 cycles
 KS_P_THRESHOLD = 0.05
 
 # How many consecutive drift detections before flagging
-MIN_CONSECUTIVE_DRIFT = 3
+MIN_CONSECUTIVE_DRIFT = 2  # was 3 — reduced for faster shock detection
 
 # Features to normalize (same as data_quality.py)
 NORMALIZE_PCT = {"m1_klr", "m2_logit", "m3_bayes", "m4_ewc", "m6_regime_score"}
@@ -369,17 +369,23 @@ def main() -> None:
                     f"drifted={score['drifted']}"
                 )
 
-    # Test with injected drift
-    print(f"\n── Test: Injected Drift (M1 set to 99.9) ──")
+    # Test with injected drift (3 consecutive cycles to trigger MIN_CONSECUTIVE_DRIFT=2)
+    print(f"\n── Test: Injected Drift (M1 set to 99.9 × 3 cycles) ──")
     injected = list(base_scores)
     if len(injected) > 0:
         injected[0] = 99.9  # M1 extremely high
-    result2 = dd.check(injected)
-    m1_info = result2["drift_scores"].get("m1_klr", {})
+    result2 = None
+    for cycle_idx in range(3):
+        result2 = dd.check(injected)
+        if cycle_idx < 2:
+            # Don't print intermediate cycles
+            pass
+    m1_info = result2["drift_scores"].get("m1_klr", {}) if result2 else {}
     print(f"  M1 p_value: {m1_info.get('p_value', 'N/A')}")
+    print(f"  M1 consecutive: {m1_info.get('consecutive', 'N/A')}")
     print(f"  M1 drifted: {m1_info.get('drifted', 'N/A')}")
-    print(f"  Overall drifted: {result2['drifted_fields']}")
-    print(f"  Detected: {'YES' if result2['drift_detected'] else 'NO'}")
+    print(f"  Overall drifted: {result2['drifted_fields'] if result2 else 'N/A'}")
+    print(f"  Detected: {'YES' if result2 and result2['drift_detected'] else 'NO'}")
 
     print(f"\nStats: {dd.get_stats()}")
     print("\n✓ Drift detection test complete")

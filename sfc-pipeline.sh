@@ -80,16 +80,28 @@ else
     git commit -m "auto: SFC data $(date -u '+%Y-%m-%d %H:%M:%S')"
 
     # Pull remote changes before pushing (handles GH Actions concurrent pushes)
+    log "Backing up trade history before git pull..."
+    cp paper_trades.json .paper_trades.pullbak 2>/dev/null || true
+    cp paper_history.json .paper_history.pullbak 2>/dev/null || true
     log "Syncing with remote..."
     if git pull --rebase --autostash -X theirs origin main 2>&1; then
         # ⚠ Git pull may override index.html with remote's corrupted version.
         # Re-check and restore from .bak if needed.
-        # Note: render() is now in app.js, not index.html — check index.html size + integrity.
-        if [ -f "index.html.bak" ] && ( [ "$(wc -c < index.html)" -lt 5000 ] || grep -q 'loginForm' index.html 2>/dev/null || ! grep -q 'app.js' index.html 2>/dev/null ); then
+        # Note: render() is now in app.js, not index.html — check <!-- b=1 --> marker.
+        if [ -f "index.html.bak" ] && ( [ "$(wc -c < index.html)" -lt 5000 ] || grep -q 'loginForm' index.html 2>/dev/null || ! grep -q '<!-- b=1 -->' index.html 2>/dev/null ); then
           log "⚠ index.html was corrupted during pull — restoring from .bak"
           cp index.html.bak index.html
           log "Restored ($(wc -c < index.html) bytes)"
         fi
+        # Restore trade history if git pull overwrote it with stale remote version
+        if [ -f ".paper_trades.pullbak" ] && [ "$(wc -l < paper_trades.json 2>/dev/null || echo 0)" -lt "$(wc -l < .paper_trades.pullbak 2>/dev/null || echo 0)" ]; then
+          log "⚠ paper_trades.json was replaced with smaller remote version — restoring local"
+          cp .paper_trades.pullbak paper_trades.json
+        fi
+        if [ -f ".paper_history.pullbak" ] && [ "$(wc -l < paper_history.json 2>/dev/null || echo 0)" -lt "$(wc -l < .paper_history.pullbak 2>/dev/null || echo 0)" ]; then
+          cp .paper_history.pullbak paper_history.json
+        fi
+        rm -f .paper_trades.pullbak .paper_history.pullbak
         log "Pushing..."
         if git push origin main 2>&1; then
             log "✅ Pushed — Pages deploying..."
@@ -111,7 +123,7 @@ else
     fi
 
     # Final guard — ensure index.html is the real dashboard even after failed/pushed git ops
-    if [ -f "index.html.bak" ] && ( [ "$(wc -c < index.html)" -lt 5000 ] || grep -q 'loginForm' index.html 2>/dev/null || ! grep -q 'app.js' index.html 2>/dev/null ); then
+    if [ -f "index.html.bak" ] && ( [ "$(wc -c < index.html)" -lt 5000 ] || grep -q 'loginForm' index.html 2>/dev/null || ! grep -q '<!-- b=1 -->' index.html 2>/dev/null ); then
       log "⚠ Final guard: index.html corrupted — restoring from .bak"
       cp index.html.bak index.html
     fi
