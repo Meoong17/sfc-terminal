@@ -2535,9 +2535,14 @@ if DYNAMIC_WEIGHTING_AVAILABLE:
         print(f"[DW] Error: {_dw_e}", file=sys.stderr)
 
 # Apply regime boost from advanced HMM detection to effective SFC
+# NOTE: DW already adjusts for regime (+0.9pp CRISIS). XGBoost meta-ensemble
+# also factors in regime context. So regime boost needs to be REDUCED to
+# avoid double-adjustment. Cap at +2pp when DW is active.
 if (ADVANCED_AVAILABLE is None or ADVANCED_AVAILABLE) and adv_regime_boost > 0 and effective_sfc is not None:
     old_sfc = effective_sfc
-    effective_sfc = min(effective_sfc + adv_regime_boost, 100.0)
+    # Capped boost: full boost if DW unavailable, otherwise max +2pp
+    _eff_regime_boost = min(adv_regime_boost, 2.0) if DYNAMIC_WEIGHTING_AVAILABLE else adv_regime_boost
+    effective_sfc = min(effective_sfc + _eff_regime_boost, 100.0)
     zone = "CRITICAL" if effective_sfc/100 > 0.75 else "HIGH" if effective_sfc/100 > 0.5 else "ELEVATED" if effective_sfc/100 > 0.25 else "NORMAL"
     print(f"  [Advanced] SFC boosted by regime: {old_sfc:.1f}% → {effective_sfc:.1f}% (+{adv_regime_boost}) | Zone: {zone}", file=sys.stderr)
 
