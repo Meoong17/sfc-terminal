@@ -1659,7 +1659,7 @@ function render(d) {
   if (sigClass === 'sp-buy')  { topPillClass = 'pill-buy';  topPillText = 'BUY'; }
   else if (sigClass === 'sp-cash') { topPillClass = 'pill-cash'; topPillText = 'CASH'; }
 
-  const regimeColor = d.regime === 'CAPITULATION' ? 'var(--red)' : d.regime === 'STRESS' ? 'var(--amber)' : 'var(--green)';
+  const regimeColor = d.regime === 'CAPITULATION' || d.regime === 'CRISIS' ? 'var(--red)' : d.regime === 'STRESS' || d.regime === 'BEAR' ? 'var(--amber)' : 'var(--green)';
   const liqLabel = d.liq_pressure === 'LONG_SQUEEZE' ? 'Long Squeeze' : d.liq_pressure === 'SHORT_SQUEEZE' ? 'Short Squeeze' : 'Balanced';
   const liqColor = d.liq_pressure === 'LONG_SQUEEZE' ? 'var(--red)' : d.liq_pressure === 'SHORT_SQUEEZE' ? 'var(--green)' : 'var(--amber)';
 
