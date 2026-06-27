@@ -66,7 +66,7 @@ $PYTHON paper_trader.py 2>>sfc-pipeline.log || log "⚠ Paper trader skipped (no
 $PYTHON inject_data.py data.json index.html 2>>sfc-pipeline.log && \
   cp index.html index.html.bak && \
   log "Injected fresh data into index.html + .bak" && \
-  $PYTHON post_process.py 2>>sfc-pipeline.log && \
+  $PYTHON post_process.py >>sfc-pipeline.log 2>&1 && \
   log "Tab redesign applied"
 
 # ── Commit & push ──
