@@ -3314,7 +3314,7 @@ out = {
     "afe_rsi_7": float(round(_adv_features.get("rsi_7", 0), 2)) if _adv_features else None,
     "afe_macd_signal": float(round(_adv_features.get("macd_signal", 0), 4)) if _adv_features else None,
     "afe_bb_width": float(round(_adv_features.get("bb_width", 0), 4)) if _adv_features else None,
-    "afe_atr": None,  # redundant: r=+0.965 with m2_logit
+    # REMOVED: afe_atr (redundant, always None)
     "afe_vwap": float(round(_adv_features.get("vwap", 0), 2)) if _adv_features else None,
     "afe_obv_norm": float(round(_adv_features.get("obv", 0), 4)) if _adv_features else None,
     "afe_available": bool(_adv_features),
