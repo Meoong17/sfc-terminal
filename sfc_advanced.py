@@ -361,63 +361,107 @@ class UncertaintyQuantifier:
         self._platt_fit(scores, labels)
         return self
     
-    def predict_with_uncertainty(self, scores):
+    def predict_with_uncertainty(self, scores, regime_info=None):
         """
-        Predict with confidence intervals.
-        
+        Predict with confidence intervals — multi-dimensional, regime-aware.
+
+        Mathematical approach:
+        ──────────────────────────────────────────────────
+        1. Primary Platt-calibrated score  (sfc_pct/100)
+        2. Dimensional bootstrap: resample feature dimensions with replacement,
+           weighted by importance. If N features disagree, bootstrap variance
+           is wide → high uncertainty → LOW_CONFIDENCE.
+           If N features agree, bootstrap variance is narrow → reliable.
+        3. Dynamic thresholds adjusted by regime crisis probability:
+           calm_threshold  = 0.30 * max(0.01, 1 - 2*P(crisis))
+           stress_threshold = 0.70 * max(0.25, 1 - 0.4*P(crisis))
+        4. Safety override: never return CALM when regime strongly CRISIS
+
         Args:
-            scores: array of raw scores (e.g., SFC stress % / 100)
-            
+            scores: 1D array where scores[0] = primary SFC stress (0-1),
+                    scores[1:] = auxiliary stress features.
+            regime_info: dict with 'crisis_probability', 'regime'.
+
         Returns:
-            dict with prediction, lower/upper bounds, uncertainty, reliability
+            dict with prediction, bounds, uncertainty, action.
         """
         scores = np.array(scores, dtype=float)
-        
-        # Point prediction (calibrated)
+        if len(scores) == 0:
+            return {'prediction': 0.5, 'lower_bound': 0.0, 'upper_bound': 1.0,
+                    'uncertainty': 1.0, 'is_reliable': False, 'recommended_action': 'LOW_CONFIDENCE'}
+
+        primary = float(scores[0])
+        n_feats = len(scores)
+
+        # ── 1. Platt-calibrated point prediction ──
         if self.a != 0 or self.b != 0:
-            pred = self._platt_predict(scores)
+            pred = float(self._platt_predict(np.array([primary]))[0])
         else:
-            # No calibration available — use raw score as probability
-            pred = np.clip(scores, 0, 1)
-        
-        # Bootstrap confidence intervals
-        boot_preds = []
-        for _ in range(self.n_bootstrap):
-            idx = np.random.choice(len(scores) if len(scores) > 1 else 1, 
-                                  len(scores) if len(scores) > 1 else 1, 
-                                  replace=True)
-            boot_scores = scores[idx] if len(scores) > 1 else scores
+            pred = float(np.clip(primary, 0, 1))
+
+        # ── 2. Dimensional bootstrap ──
+        #    Resample features with replacement, weighted by importance.
+        #    Primary score gets 2× weight; aux features get equal weight.
+        w = np.ones(n_feats)
+        w[0] = 2.0  # primary feature double-weighted
+        w = w / w.sum()
+
+        n_boot = max(self.n_bootstrap, 50)
+        boot_preds = np.empty(n_boot)
+        for i in range(n_boot):
+            idx = np.random.choice(n_feats, size=n_feats, replace=True)
+            w_sub = w[idx]
+            w_sub = w_sub / w_sub.sum()
+            # Apply Platt if calibrated, else clip
             if self.a != 0 or self.b != 0:
-                bp = self._platt_predict(boot_scores)
+                calibrated = self._platt_predict(scores[idx])
             else:
-                bp = boot_scores
-            boot_preds.append(bp.mean())
-        
-        boot_preds = np.array(boot_preds)
+                calibrated = np.clip(scores[idx], 0, 1)
+            boot_preds[i] = float(np.dot(w_sub, calibrated))
+
         alpha = 1.0 - self.confidence_level
-        lower = float(np.percentile(boot_preds, alpha * 50))
-        upper = float(np.percentile(boot_preds, (1.0 + self.confidence_level) * 50))
+        lower = float(np.percentile(boot_preds, 50 * alpha))
+        upper = float(np.percentile(boot_preds, 100 - 50 * alpha))
         uncertainty = upper - lower
-        
-        pred_val = float(np.mean(pred)) if hasattr(pred, '__len__') else float(pred)
-        
-        # Reliability judgment
-        is_reliable = uncertainty < 0.2
-        if pred_val > 0.7 and is_reliable:
+        is_reliable = uncertainty < 0.30
+
+        # ── 3. Regime context ──
+        regime_crisis_prob = 0.0
+        regime_label = 'NORMAL'
+        if regime_info and isinstance(regime_info, dict):
+            regime_crisis_prob = float(regime_info.get('crisis_probability', 0))
+            regime_label = str(regime_info.get('regime', 'NORMAL'))
+
+        # ── 4. Dynamic thresholds ──
+        #    P(crisis)=1   → calm_threshold ≈ 0.01 (virtually unreachable)
+        #    P(crisis)=0   → calm_threshold ≈ 0.30 (original)
+        #    P(crisis)=1   → stress_threshold ≈ 0.42 (easier to trigger)
+        #    P(crisis)=0   → stress_threshold ≈ 0.70 (original)
+        calm_t = 0.30 * max(0.01, 1.0 - 2.0 * regime_crisis_prob)
+        stress_t = 0.70 * max(0.25, 1.0 - 0.4 * regime_crisis_prob)
+
+        # ── 5. Action selection with safety override ──
+        if pred > stress_t and is_reliable:
             action = "HIGH_CONFIDENCE_STRESS"
-        elif pred_val < 0.3 and is_reliable:
+        elif pred < calm_t and is_reliable:
             action = "HIGH_CONFIDENCE_CALM"
         elif uncertainty < 0.15:
             action = "MEDIUM_CONFIDENCE"
         else:
             action = "LOW_CONFIDENCE"
-        
+
+        # Safety override: never say CALM when regime is CRISIS
+        if action == "HIGH_CONFIDENCE_CALM" and regime_crisis_prob > 0.5:
+            action = "MEDIUM_CONFIDENCE"
+        if action in ("HIGH_CONFIDENCE_CALM", "MEDIUM_CONFIDENCE") and regime_crisis_prob > 0.85:
+            action = "LOW_CONFIDENCE"
+
         return {
-            'prediction': round(pred_val, 4),
-            'lower_bound': round(lower, 4),
-            'upper_bound': round(upper, 4),
-            'uncertainty': round(uncertainty, 4),
-            'is_reliable': is_reliable,
+            'prediction': round(float(pred), 4),
+            'lower_bound': round(float(lower), 4),
+            'upper_bound': round(float(upper), 4),
+            'uncertainty': round(float(uncertainty), 4),
+            'is_reliable': bool(is_reliable),
             'recommended_action': action,
         }
 

@@ -2216,10 +2216,24 @@ if ADVANCED_AVAILABLE is None or ADVANCED_AVAILABLE:
         try:
             UncertaintyQuantifier_ = adv["uncertainty"]
             uq = UncertaintyQuantifier_(n_bootstrap=50)
-            uq_result = uq.predict_with_uncertainty(np.array([sfc_pct / 100.0 if sfc_pct else 0.5]))
+            # Multi-dimensional feature vector:
+            #   [sfc_base/100, regime_crisis_prob, method_agreement, dvol/100, fng/100]
+            # Regime info provides context for dynamic threshold adjustment
+            _mq_scores = [m1_klr, m2_logit, m3_bayes, m4_ewc/100, m5_qreg/100, m6_regime/100]
+            _mq_scores = [s for s in _mq_scores if s is not None]
+            _method_disagreement = float(np.std(_mq_scores)) if len(_mq_scores) >= 2 else 0.5
+            _uq_features = np.array([
+                sfc_pct / 100.0 if sfc_pct else 0.5,           # primary SFC stress
+                adv_regime.get('crisis_probability', 0.0),      # regime crisis prob
+                min(1.0, _method_disagreement),                  # method disagreement (std)
+                (dvol / 100.0) if dvol else 0.5,                # volume stress
+                1.0 - (fng / 100.0) if fng else 0.5,            # inverted FNG (low fear = high stress)
+            ], dtype=float)
+            uq_result = uq.predict_with_uncertainty(_uq_features, regime_info=adv_regime)
             adv_uncertainty = uq_result
             print(f"  [Advanced] Uncertainty: {uq_result.get('uncertainty',0):.3f} | "
-                  f"Reliable: {uq_result.get('is_reliable',False)}", file=sys.stderr)
+                  f"Action: {uq_result.get('recommended_action','?')} | "
+                  f"Feat: {[f'{x:.3f}' for x in _uq_features]}", file=sys.stderr)
         except Exception as e:
             print(f"[Advanced] Uncertainty error: {e}", file=sys.stderr)
         
