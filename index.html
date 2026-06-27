@@ -2277,46 +2277,8 @@ function render(d) {
       </div>
     </div>` : ''}
 
-    <!-- XAI -->
-    ${d.xai_top_features && d.xai_top_features.length ? `
-    <div class="card span-full mb-16">
-      <div class="card-head">
-        <div class="card-title">
-          <div class="card-icon">
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-              <circle cx="6" cy="3" r="2" stroke="#9d7af8" stroke-width="1.2"/>
-              <circle cx="2" cy="9" r="1.5" stroke="#9d7af8" stroke-width="1.2"/>
-              <circle cx="10" cy="9" r="1.5" stroke="#9d7af8" stroke-width="1.2"/>
-              <path d="M4.5 4.5L3 7.5M7.5 4.5L9 7.5" stroke="rgba(157,122,248,0.5)" stroke-width="1"/>
-            </svg>
-          </div>
-          QLSTM Feature Importance
-        </div>
-        <div class="card-badge">Permutation importance · XAI</div>
-      </div>
-      <div class="card-body">
-        ${d.xai_top_features.map(f => {
-          const barColor = f.direction === 'positive' ? 'var(--red)' : 'var(--green)';
-          const dirIcon  = f.direction === 'positive' ? '↑' : f.direction === 'negative' ? '↓' : '→';
-          return `
-          <div class="xai-bar-row">
-            <div class="xai-name">${f.name}</div>
-            <div class="xai-track">
-              <div class="xai-fill" style="width:${f.importance_pct}%;background:${f.direction==='positive'?'var(--red)':'var(--green)'}"></div>
-            </div>
-            <div class="xai-pct" style="color:${barColor}">${f.importance_pct}%</div>
-            <div class="xai-dir" style="color:${barColor}">${dirIcon}</div>
-          </div>`;
-        }).join('')}
-        <div class="xai-note">
-          QLSTM hybrid SFC: <strong>${d.m32_hybrid_pred!=null?d.m32_hybrid_pred.toFixed(2)+'%':'—'}</strong>
-          &nbsp;·&nbsp; ProAdapt weight: <strong>${d.m32_proadapt_weight!=null?(d.m32_proadapt_weight*100).toFixed(0)+'% QLSTM':'—'}</strong> vs ${d.m32_proadapt_weight!=null?((1-d.m32_proadapt_weight)*100).toFixed(0)+'% GARCH':'—'}.
-          Features with high importance are the dominant risk drivers in the quantum model.
-        </div>
-      </div>
-    </div>` : ''}
-
-    <!-- PAPER TRADING -->
+    <!-- XAI REMOVED -->
+<!-- PAPER TRADING -->
     <div class="card span-full mb-16" id="paperSection">
       <div class="card-head">
         <div class="card-title">
@@ -2433,7 +2395,7 @@ function render(d) {
         </div>
       </div>
 
-      <div class="card">
+      <div class="card" style="display:none">
         <div class="card-head">
           <div class="card-title">Behavioral</div>
         </div>
