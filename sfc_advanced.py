@@ -51,9 +51,9 @@ class RegimeDetector:
         if n < self.n_regimes * 5:
             return self
         
-        # 1. K-means clustering
+        # 1. K-means clustering (fixed seed = deterministic)
         centroid, labels = kmeans2(features, self.n_regimes, minit='points',
-                                    iter=50, seed=self.rng.randint(0, 99999))
+                                    iter=50, seed=42)
         self.centroids = centroid
         
         # 2. Compute covariance per cluster

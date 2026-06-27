@@ -2168,45 +2168,74 @@ if ADVANCED_AVAILABLE is None or ADVANCED_AVAILABLE:
     if adv.get("regime"):
         try:
             RegimeDetector_ = adv["regime"]
-            # Build feature matrix from all current method scores for regime detection
-            feat_dict = {
-                'sfc_stress': sfc_pct / 100.0 if sfc_pct else 0.5,
-                'dvol': dvol / 100.0 if dvol else 0.5,
-                'fng': fng / 100.0 if fng else 0.5,
-                'btc_momentum': (chg / 10.0 + 1) / 2 if chg is not None else 0.5,
-                'news_stress': 0.5,
-            }
             
-            # Use historical data for regime fitting
-            all_feats = []
+            # ── Cache regime detector: re-fit max every 6h ──
+            _regime_cache_path = os.path.join(os.path.dirname(__file__), ".regime_cache.json")
+            _regime_needs_refit = True
             try:
-                with open(os.path.join(os.path.dirname(__file__), "data_collection.json")) as f:
-                    hist = json.load(f)
-                feat_list = hist.get("features", [])
-                if len(feat_list) > 20:
-                    for obs in feat_list:
-                        row = [
-                            float(obs[i]) if i < len(obs) and obs[i] is not None else 0.5
-                            for i in range(min(5, len(obs)))
-                        ]
-                        all_feats.append(row)
-            except:
-                all_feats = [list(feat_dict.values())] * 30
+                with open(_regime_cache_path) as _rcf:
+                    _rc = json.load(_rcf)
+                _cache_age = time.time() - _rc.get("_ts", 0)
+                if _cache_age < 21600:  # 6 hours
+                    adv_regime = _rc.get("regime_status", {})
+                    adv_regime_boost = _rc.get("regime_boost", 0)
+                    _regime_needs_refit = False
+                    print(f"  [Advanced] Regime from cache: {adv_regime.get('regime','?')} "
+                          f"(age={_cache_age/3600:.1f}h boost=+{adv_regime_boost})", file=sys.stderr)
+            except (FileNotFoundError, json.JSONDecodeError):
+                _regime_needs_refit = True
             
-            if len(all_feats) >= 20:
-                # Fit regime detector
-                regime_detector = RegimeDetector_(n_regimes=4)
-                regime_detector.fit(np.array(all_feats))
+            if _regime_needs_refit:
+                # Build feature matrix from all current method scores for regime detection
+                feat_dict = {
+                    'sfc_stress': sfc_pct / 100.0 if sfc_pct else 0.5,
+                    'dvol': dvol / 100.0 if dvol else 0.5,
+                    'fng': fng / 100.0 if fng else 0.5,
+                    'btc_momentum': (chg / 10.0 + 1) / 2 if chg is not None else 0.5,
+                    'news_stress': 0.5,
+                }
                 
-                # Current regime prediction
-                current_feat = np.array([list(feat_dict.values())])
-                adv_regime = regime_detector.get_regime_status(current_feat)
-                regime_boost, _ = regime_detector.score_stress_boost(current_feat)
-                adv_regime_boost = regime_boost
+                # Use historical data for regime fitting
+                all_feats = []
+                try:
+                    with open(os.path.join(os.path.dirname(__file__), "data_collection.json")) as f:
+                        hist = json.load(f)
+                    feat_list = hist.get("features", [])
+                    if len(feat_list) > 20:
+                        for obs in feat_list:
+                            row = [
+                                float(obs[i]) if i < len(obs) and obs[i] is not None else 0.5
+                                for i in range(min(5, len(obs)))
+                            ]
+                            all_feats.append(row)
+                except:
+                    all_feats = [list(feat_dict.values())] * 30
                 
-                print(f"  [Advanced] Regime: {adv_regime.get('regime','?')} | "
-                      f"Crisis prob: {adv_regime.get('crisis_probability',0):.0%} | "
-                      f"Boost: +{regime_boost}", file=sys.stderr)
+                if len(all_feats) >= 20:
+                    # Fit regime detector
+                    regime_detector = RegimeDetector_(n_regimes=4)
+                    regime_detector.fit(np.array(all_feats))
+                    
+                    # Current regime prediction
+                    current_feat = np.array([list(feat_dict.values())])
+                    adv_regime = regime_detector.get_regime_status(current_feat)
+                    regime_boost, _ = regime_detector.score_stress_boost(current_feat)
+                    adv_regime_boost = regime_boost
+                    
+                    # Save to cache
+                    try:
+                        with open(_regime_cache_path, 'w') as _rcf:
+                            json.dump({
+                                "_ts": time.time(),
+                                "regime_status": adv_regime,
+                                "regime_boost": adv_regime_boost,
+                            }, _rcf)
+                    except Exception:
+                        pass
+                    
+                    print(f"  [Advanced] Regime: {adv_regime.get('regime','?')} | "
+                          f"Crisis prob: {adv_regime.get('crisis_probability',0):.0%} | "
+                          f"Boost: +{regime_boost}", file=sys.stderr)
         except Exception as e:
             print(f"[Advanced] Regime detection error: {e}", file=sys.stderr)
             adv_regime = {'regime': 'NORMAL', 'crisis_probability': 0.0, 'stability': 0.9}
