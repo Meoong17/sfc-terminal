@@ -579,18 +579,24 @@ def _compute_dxy_btc_correlation():
         if len(cache) < 15:
             return None
         
-        # Extract daily DXY and BTC returns
-        dxy_vals = []
-        btc_vals = []
+        # Extract daily DXY and BTC returns (fix: use pct change, not levels — spurious correlation)
+        dxy_levels = []
+        btc_levels = []
         for entry in cache:
             dxy = entry.get("dxy")
-            btc = entry.get("btc_24h")
+            btc = entry.get("btc")
             if dxy is not None and btc is not None:
-                dxy_vals.append(dxy)
-                btc_vals.append(btc)
+                dxy_levels.append(dxy)
+                btc_levels.append(btc)
         
-        if len(dxy_vals) < 15:
+        if len(dxy_levels) < 15:
             return None
+        
+        # Convert to daily returns
+        dxy_vals = [(dxy_levels[i] - dxy_levels[i-1]) / dxy_levels[i-1]
+                     for i in range(1, len(dxy_levels))]
+        btc_vals = [(btc_levels[i] - btc_levels[i-1]) / btc_levels[i-1]
+                     for i in range(1, len(btc_levels))]
         
         # Compute Pearson correlation
         n = len(dxy_vals)
@@ -797,7 +803,7 @@ def calculate_sfc_ensemble(factors):
     ns_r = {"Lt":0.35, "St":0.50, "Rt":0.40, "Ft":0.25, "Sc":0.80}
     w = {k:1/v for k,v in ns_r.items()}
     sig = sum((1.0 if norm[k]<-2 else 0.7 if norm[k]<-1 else 0.3 if norm[k]<0 else 0) * w[k] for k in factors)
-    p_klr = sig / sum(w.values())
+    p_klr = max(0.0, min(1.0, sig / sum(w.values())))  # clamp to [0,1]
     
     # M2: Logit
     zc = [-1.0, -2.0, -3.0, -4.0, -8.0]
@@ -812,7 +818,7 @@ def calculate_sfc_ensemble(factors):
     p_logit = 1/(1+math.exp(-z_l))
     
     # M3: Bayesian
-    prior = 0.04
+    prior = 0.08  # raised from 0.04 — BTC historically crashes 8-15% of years
     odds = prior/(1-prior)
     bayes_mult = [2.5, 2.0, 2.0, 3.0, 1.5]
     for i, k in enumerate(factors):
@@ -856,8 +862,8 @@ def calculate_sfc_ensemble(factors):
     p_regime = min(p_baseline + p_extremity + coherence_bonus + tail_contribution, 0.99)
     p_regime = max(p_regime, 0.01)
     
-    # Ensemble
-    p_ens = 0.19*p_klr + 0.16*p_logit + 0.12*p_bayes + 0.16*p_ewc + 0.24*p_quantile + 0.14*p_regime
+    # Ensemble (sum = 1.0 after fix 0.24→0.23)
+    p_ens = 0.19*p_klr + 0.16*p_logit + 0.12*p_bayes + 0.16*p_ewc + 0.23*p_quantile + 0.14*p_regime
     
     # Method agreement
     method_probs = [p_klr, p_logit, p_bayes, p_ewc, p_quantile, p_regime]
@@ -1117,7 +1123,7 @@ def calculate_m12_jump(ohlcv):
     if not ohlcv or len(ohlcv) < 5: return None, None
     import numpy as np
     closes = [c["close"] for c in ohlcv]
-    opens = [c.get("close", closes[i]) for i, c in enumerate(ohlcv)]  # approximate
+    opens = [c.get("open", closes[i-1] if i > 0 else closes[i]) for i, c in enumerate(ohlcv)]  # fix: use 'open' key
     gaps = []
     for i in range(1, len(closes)):
         gap = abs(opens[i] - closes[i-1]) / closes[i-1] if closes[i-1] > 0 else 0
@@ -1197,7 +1203,7 @@ def calculate_m15_concentration():
 # ── TIER 4: MACHINE LEARNING ──
 
 def calculate_m16_regime_switch(rets):
-    """M16: Markov Regime Switching — crisis probability"""
+    """M16: Volatility Regime Heuristic — crisis probability (simplified, not full Markov)"""
     if rets is None or len(rets) < 30: return None, None
     import numpy as np
     recent = rets[-30:]
@@ -1210,7 +1216,7 @@ def calculate_m16_regime_switch(rets):
     return p_crisis, {"p_crisis": round(p_crisis,3), "recent_mean": round(r_mean,4), "recent_std": round(r_std,4)}
 
 def calculate_m17_granger(series_x, series_y, label="X→Y"):
-    """M17: Granger Causality — does X predict Y?"""
+    """M17: Lag Correlation — Pearson + cross-correlation (not full Granger F-test)"""
     if series_x is None or series_y is None or len(series_x) < 10 or len(series_y) < 10: return None, None
     import numpy as np
     n = min(len(series_x), len(series_y))
@@ -1385,18 +1391,22 @@ def calculate_m33_global_liquidity():
 # ── MACRO LIQUIDITY (M72-M75 / Layer 1) ─────────────────────────────
 _MACRO_CACHE = {"score": None, "details": {}, "ts": 0}
 
-def calculate_m72_m2_growth():
+def calculate_m72_m2_growth(m2_yoy_input=None):
     """M72: Global M2 Growth — YoY % change in US M2 money supply.
     
-    Uses existing m2_yoy variable. Higher M2 growth = more liquidity = bullish.
+    Uses existing m2_yoy_input if provided, else fetches from FRED.
+    Higher M2 growth = more liquidity = bullish.
     """
-    m2 = _fred("M2SL", 13)  # 13 monthly = 1 year
-    if not m2 or len(m2) < 2:
-        return None, {"m2_yoy": None, "status": "unavailable"}
-    
-    m2_yoy_val = (m2[0] - m2[12]) / m2[12] * 100 if len(m2) >= 13 else None
-    if m2_yoy_val is None and len(m2) >= 2:
-        m2_yoy_val = (m2[0] - m2[-1]) / m2[-1] * 100
+    # Prefer pre-fetched m2_yoy from get_m2_data() to avoid duplicate API call
+    if m2_yoy_input is not None:
+        m2_yoy_val = m2_yoy_input
+    else:
+        m2 = _fred("M2SL", 13)
+        if not m2 or len(m2) < 2:
+            return None, {"m2_yoy": None, "status": "unavailable"}
+        m2_yoy_val = (m2[0] - m2[12]) / m2[12] * 100 if len(m2) >= 13 else None
+        if m2_yoy_val is None and len(m2) >= 2:
+            m2_yoy_val = (m2[0] - m2[-1]) / m2[-1] * 100
     
     # Score: M2 growth 2-7% = normal, <0% = contraction (bearish), >10% = overheating
     if m2_yoy_val < 0:

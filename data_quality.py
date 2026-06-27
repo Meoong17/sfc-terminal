@@ -281,9 +281,16 @@ class DataQualityPipeline:
                     contamination=OUTLIER_CONTAMINATION,
                     random_state=42,
                 )
-                # Fit on first call (data shape matters)
-                self._isolation_forest.fit(vals_norm.reshape(1, -1))
-                self._forest_ready = True
+                # Fit on history if available (fix: need >1 sample for IF)
+                if len(self._history) >= 5:
+                    hist_norm = np.array([self._normalize_for_detection(row)
+                                          for row in self._history[-50:]])
+                    train_data = np.vstack([hist_norm, vals_norm.reshape(1, -1)])
+                    self._isolation_forest.fit(train_data)
+                else:
+                    # Fallback: use z-score until enough history
+                    self._forest_ready = False
+                    self._isolation_forest = None
             else:
                 # Incremental: refit occasionally
                 if len(self._history) % 20 == 0 or not self._forest_ready:

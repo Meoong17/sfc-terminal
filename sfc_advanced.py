@@ -627,7 +627,8 @@ TRENDS_CACHE_TTL = 3600  # 1 hour
 def fetch_google_trends(keywords=None, timeout=10):
     """
     Fetch Google Trends interest data for keywords.
-    Uses the unofficial Trends API directly.
+    Note: Tokenless Trends API always blocked. Using FnG proxy instead
+    (same info already captured in Rt factor — kept for backward compat).
     Returns dict of {keyword: score (0-100)}.
     """
     global GOOGLE_TRENDS_CACHE, GOOGLE_TRENDS_CACHE_TIME
@@ -639,38 +640,19 @@ def fetch_google_trends(keywords=None, timeout=10):
     if GOOGLE_TRENDS_CACHE and (now - GOOGLE_TRENDS_CACHE_TIME) < TRENDS_CACHE_TTL:
         return GOOGLE_TRENDS_CACHE
     
-    results = {}
-    for kw in keywords:
-        try:
-            # Tokenless Trends API
-            url = (
-                "https://trends.google.com/trends/api/dailytrends?"
-                "hl=en-US&tz=300&geo=US&ns=15"
-            )
-            headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-            }
-            r = requests.get(url, headers=headers, timeout=timeout)
-            
-            # Even if it fails, use a reasonable default
-            # The Trends API often blocks without auth tokens
-            results[kw] = None
-        except:
-            results[kw] = None
-    
-    # Fallback: use search volume proxy via Alternative.me
+    # Direct Trends API always blocks without auth — use FnG proxy
+    # Note: (100 - FnG)/100 is already available as Rt factor, so this is info-duplicating
     try:
         r = requests.get("https://api.alternative.me/fng/?limit=1", timeout=timeout)
         fng_data = r.json()
         fng_val = int(fng_data['data'][0]['value'])
-        # Invert: high fear = high recession search
-        results['recession'] = round((100 - fng_val) / 100.0, 3)
-        results['bitcoin crash'] = round((100 - fng_val) / 100.0, 3)
-        results['inflation'] = round(fng_val / 100.0, 3)
+        results = {
+            'recession': round((100 - fng_val) / 100.0, 3),
+            'bitcoin crash': round((100 - fng_val) / 100.0, 3),
+            'inflation': round(fng_val / 100.0, 3),
+        }
     except:
-        for kw in keywords:
-            if results.get(kw) is None:
-                results[kw] = 0.5
+        results = {kw: 0.5 for kw in keywords}
     
     GOOGLE_TRENDS_CACHE = results
     GOOGLE_TRENDS_CACHE_TIME = now

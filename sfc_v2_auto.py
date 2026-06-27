@@ -118,7 +118,7 @@ def run_sfc_no_llm(btc=None, btc_24h=None, dom=None, dvol=None, fng=None, pc_oi=
     p_regime = min(p_baseline + p_extremity + coherence_bonus + tail_contribution, 0.99)
     p_regime = max(p_regime, 0.01)
     
-    p_ens = 0.19*p_klr + 0.16*p_logit + 0.12*p_bayes + 0.16*p_ewc + 0.24*p_quantile + 0.14*p_regime
+    p_ens = 0.19*p_klr + 0.16*p_logit + 0.12*p_bayes + 0.16*p_ewc + 0.23*p_quantile + 0.14*p_regime  # sum=1.0
     
     method_probs = [p_klr, p_logit, p_bayes, p_ewc, p_quantile, p_regime]
     mean_p = sum(method_probs) / len(method_probs)

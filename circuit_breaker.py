@@ -35,7 +35,8 @@ MAX_CONSECUTIVE_FAILURES = 5
 COOLDOWN_SECONDS = 3600  # 1 hour
 
 # Max allowed SFC jump (percentage points) between consecutive runs
-MAX_SFC_JUMP_PP = 40.0
+# Reduced from 40pp to 20pp — 40pp swing can flip NORMAL→CRITICAL in 5min
+MAX_SFC_JUMP_PP = 20.0
 
 # ── Field validation rules ──
 # Each entry: (min, max) or None for no check
