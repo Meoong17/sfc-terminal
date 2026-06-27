@@ -3316,7 +3316,7 @@ out = {
     "q10_available": whale_pressure is not None and onchain_value is not None and buying_power is not None,
     "q10_details": onchain_scores.get("details", {}) if whale_pressure is not None else {},
     # ── Advanced Feature Engineering (Peningkatan 1) ──
-    "afe_rsi_7": float(round(_adv_features.get("rsi_7", 0), 2)) if _adv_features else None,
+    # REMOVED: afe_rsi_7 (RSI-7 dihapus dari feature_engineering)
     "afe_macd_signal": float(round(_adv_features.get("macd_signal", 0), 4)) if _adv_features else None,
     "afe_bb_width": float(round(_adv_features.get("bb_width", 0), 4)) if _adv_features else None,
     # REMOVED: afe_atr (redundant, always None)

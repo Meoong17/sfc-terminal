@@ -4,8 +4,8 @@ feature_engineering.py — Fetches daily BTCUSDT klines from Binance and compute
 All prints go to stderr. The module is importable from collect.py and exposes:
     get_features() -> dict[str, float]  (empty dict on any failure)
 
-Indicators computed (reduced from 25+ to ~17 quality features):
-    Momentum:   RSI-7, RSI-14, Stochastic K/D
+Indicators computed (reduced from 25+ to ~14 quality features):
+    Momentum:   RSI-14
     Trend:      MACD line/signal/histogram, EMA21, EMA21-EMA200 crossover, EMA200 slope
     Volatility: ATR, Bollinger Band Width, %B, Realized Volatility (30d)
     Volume:     VWAP, OBV, Chaikin Money Flow
@@ -142,23 +142,10 @@ def _compute_features(df: pd.DataFrame) -> dict[str, float]:
             _eprint(f"[feature_engineering] Indicator '{key}' failed: {exc}")
         features[key] = 0.0
 
-    # ---- Momentum (4) ----
-    # RSI-7: short-term momentum
-    _safe("rsi_7", lambda: _normalize_01(float(
-        ta.momentum.RSIIndicator(close=c, window=7).rsi().iloc[-1])))
+    # ---- Momentum (1) ----
     # RSI-14: medium-term momentum
     _safe("rsi_14", lambda: _normalize_01(float(
         ta.momentum.RSIIndicator(close=c, window=14).rsi().iloc[-1])))
-
-    # Stochastic K/D: overbought/oversold with different sensitivity
-    _safe("stoch_k", lambda: _normalize_01(float(
-        ta.momentum.StochasticOscillator(
-            high=h, low=l, close=c, window=14, smooth_window=3
-        ).stoch().iloc[-1])))
-    _safe("stoch_d", lambda: _normalize_01(float(
-        ta.momentum.StochasticOscillator(
-            high=h, low=l, close=c, window=14, smooth_window=3
-        ).stoch_signal().iloc[-1])))
 
     # ---- Trend (5) ----
     macd_obj = ta.trend.MACD(close=c, window_slow=26, window_fast=12, window_sign=9)
