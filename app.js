@@ -480,7 +480,7 @@ function render(d) {
 
   <!-- STATUS BAND -->
   <div class="status-band">
-    <div class="s-chip"><span class="s-dot ${d.regime === 'CAPITULATION' || d.regime === 'CRISIS' ? 'dot-r' : d.regime === 'STRESS' || d.regime === 'BEAR' ? 'dot-a' : 'dot-g'}"></span>${d.regime || 'NORMAL'} · ${d.zone || 'NORMAL'} Zone</div>
+    <div class="s-chip"><span class="s-dot ${d.regime === 'CAPITULATION' || d.regime === 'CRISIS' ? 'dot-r' : d.regime === 'STRESS' || d.regime === 'BEAR' ? 'dot-a' : 'dot-g'}"></span><span style="color:${regimeColor}">${d.regime || 'NORMAL'}</span> · ${d.zone || 'NORMAL'} Zone</div>
     <div class="s-chip"><span class="s-dot ${d.liq_pressure === 'LONG_SQUEEZE' ? 'dot-r' : d.liq_pressure === 'SHORT_SQUEEZE' ? 'dot-g' : 'dot-a'}"></span>${liqLabel}</div>
     <div class="s-chip"><span class="s-dot ${(d.sopr_signal||'').includes('CAPITULATION') ? 'dot-g' : (d.sopr_signal||'').includes('DISTRIBUTION') ? 'dot-r' : 'dot-a'}"></span>SOPR: ${(d.sopr_signal||'UNKNOWN').replace(/_/g,' ')}</div>
     <div class="s-chip"><span class="s-dot dot-b"></span>RSI ${fmtNum(rsi,1)}${rsi<=30?' · Oversold':rsi>=70?' · Overbought':''}</div>
