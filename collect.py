@@ -156,6 +156,41 @@ except ImportError as e:
     print(f"[SFC] Fiscal liquidity module unavailable: {e}", file=sys.stderr)
     def compute_fiscal_liquidity_metrics(*a, **k): return 0.5, 0.5, 0.5, {"status": "unavailable"}
 
+# ── NEW: Global Liquidity Engine (GLF — consolidated liquidity factor) ──
+try:
+    from global_liquidity_engine import compute_global_liquidity_factor, get_glf_for_factors, get_glf_weight_by_regime
+    GLOBAL_LIQUIDITY_AVAILABLE = True
+except ImportError as e:
+    GLOBAL_LIQUIDITY_AVAILABLE = False
+    print(f"[SFC] Global Liquidity Engine unavailable: {e}", file=sys.stderr)
+    def compute_global_liquidity_factor(*a, **k): return 50.0, 0.5, {"error": "unavailable", "status": "fallback"}
+    def get_glf_for_factors(*a, **k): return 0.0
+    def get_glf_weight_by_regime(*a, **k): return 0.35
+
+# ── NEW: Stablecoin Intelligence (enhanced composite index) ──
+try:
+    from stablecoin_intelligence import compute_stablecoin_liquidity_index
+    STABLECOIN_INTEL_AVAILABLE = True
+except ImportError as e:
+    STABLECOIN_INTEL_AVAILABLE = False
+    print(f"[SFC] Stablecoin Intelligence unavailable: {e}", file=sys.stderr)
+    def compute_stablecoin_liquidity_index(*a, **k): return 50.0, 0.5, {"error": "unavailable", "status": "fallback"}
+
+# ── NEW: Dynamic Feature Weighting (regime-adaptive weights) ──
+try:
+    from dynamic_feature_weighting import (
+        get_regime_weights, apply_dynamic_weights,
+        get_feature_group_weights, get_sfc_effective_with_dynamic_weights,
+    )
+    DYNAMIC_WEIGHTING_AVAILABLE = True
+except ImportError as e:
+    DYNAMIC_WEIGHTING_AVAILABLE = False
+    print(f"[SFC] Dynamic Feature Weighting unavailable: {e}", file=sys.stderr)
+    def get_regime_weights(*a, **k): return {"Lt":0.25,"St":0.20,"Rt":0.20,"Ft":0.20,"Sc":0.15}
+    def apply_dynamic_weights(*a, **k): return {}, 0.5, {}
+    def get_feature_group_weights(*a, **k): return {}
+    def get_sfc_effective_with_dynamic_weights(*a, **k): return None, 0.0
+
 # Import causal inference
 try:
     from causal_inference import CausalFilter
@@ -1830,6 +1865,27 @@ if STABLECOIN_AVAILABLE:
     except Exception as e:
         print(f"[SFC] Stablecoin metrics failed: {e}", file=sys.stderr)
 
+# ── NEW: Stablecoin Liquidity Index (SLI) ──
+_sli_score = None
+_sli_sfc_stress = None
+_sli_details = {}
+if STABLECOIN_INTEL_AVAILABLE:
+    try:
+        _sli_score, _sli_sfc_stress, _sli_details = compute_stablecoin_liquidity_index(
+            existing_sc_results=_sc_results if _sc_results else None,
+            existing_sc_details=sc_details if sc_details else None,
+            btc_price=btc,
+            btc_mcap=mcap,
+            btc_dominance_pct=dom if dom else 58.3,
+            onchain_details=onchain_scores.get("details", {}) if onchain_scores else {},
+            force_refresh=False,
+        )
+        print(f"[SLI] Score={_sli_score:.1f}/100 stress={_sli_sfc_stress:.3f} label={_sli_details.get('label','?')} "
+              f"components={_sli_details.get('n_components',0)}", file=sys.stderr)
+    except Exception as _sli_e:
+        print(f"[SLI] Error: {_sli_e}", file=sys.stderr)
+        _sli_score, _sli_sfc_stress, _sli_details = 50.0, 0.5, {"error": str(_sli_e), "status": "fallback"}
+
 # ── ETF FLOW (M81-M82) ──
 _etf_results = None
 _etf_m81_score = 0.5
@@ -1931,10 +1987,30 @@ print("[SFC] Computing M33 Global Liquidity Index...", file=sys.stderr)
 m33_glo_score, m33_glo_detail = calculate_m33_global_liquidity()
 print(f"[SFC] GLO score={m33_glo_score:.3f} label={m33_glo_detail.get('glo_label','N/A')} fed_yoy={m33_glo_detail.get('fed_yoy','N/A')}%", file=sys.stderr)
 
+# ── NEW: Global Liquidity Factor (GLF) — consolidated liquidity engine ──
+_glf_score = None
+_glf_sfc_stress = None
+_glf_details = {}
+if GLOBAL_LIQUIDITY_AVAILABLE:
+    try:
+        _glf_score, _glf_sfc_stress, _glf_details = compute_global_liquidity_factor()
+        print(f"[GLF] Score={_glf_score:.1f}/100 stress={_glf_sfc_stress:.3f} regime={_glf_details.get('regime','?')} "
+              f"components={_glf_details.get('active_components',0)}", file=sys.stderr)
+    except Exception as _glf_e:
+        print(f"[GLF] Error: {_glf_e}", file=sys.stderr)
+        _glf_score, _glf_sfc_stress, _glf_details = 50.0, 0.5, {"error": str(_glf_e), "status": "fallback"}
+
 # Apply GLO to Lt factor (post-hoc adjustment)
 glo_val = m33_glo_detail.get("glo_score", 50)
 glo_adj = 6 / (1 + math.exp(-0.08 * (glo_val - 50))) - 3
 factors["Lt"] += glo_adj
+
+# Apply GLF to Lt factor (if available, supplements GLO)
+if _glf_sfc_stress is not None:
+    glf_factor_adj = get_glf_for_factors(_glf_sfc_stress)
+    factors["Lt"] += glf_factor_adj
+    print(f"[GLF] Lt adjustment: {glf_factor_adj:+.3f} (glf_stress={_glf_sfc_stress:.3f}) Lt={factors['Lt']:.3f}", file=sys.stderr)
+
 factors["Lt"] = max(-3.0, min(3.0, factors["Lt"]))
 print(f"[SFC] GLO Lt adjustment: {glo_adj:+.3f} (glo={glo_val:.1f}) Lt={factors['Lt']:.3f}", file=sys.stderr)
 
@@ -2401,6 +2477,34 @@ if _hmm_module:
             print(f"[HMM] Regime={_hmm_regime} crisis_prob={_hmm_crisis:.2f} override={regime}", file=sys.stderr)
     except Exception as _hmm_e:
         print(f"[HMM] Error: {_hmm_e}", file=sys.stderr)
+
+# ── NEW: Dynamic Feature Weighting (regime-adaptive factor weights) ──
+_dw_norm_factors = {}
+_dw_z_score = 0.5
+_dw_weights = {}
+_dw_sfc_adjustment = 0.0
+_dw_adjusted_sfc = None
+if DYNAMIC_WEIGHTING_AVAILABLE:
+    try:
+        # Get regime name from HMM or fallback to detect_regime result
+        _dw_regime = _hmm_result.get('regime', regime) if _hmm_result else regime
+        _dw_norm_factors, _dw_z_score, _dw_weights = apply_dynamic_weights(factors, _dw_regime)
+        # Apply dynamic SFC adjustment based on regime
+        _dw_adjusted_sfc, _dw_sfc_adjustment = get_sfc_effective_with_dynamic_weights(
+            factors, effective_sfc, _dw_regime
+        )
+        if _dw_adjusted_sfc is not None and _dw_sfc_adjustment != 0:
+            _old_sfc = effective_sfc
+            effective_sfc = _dw_adjusted_sfc
+            effective_sfc = max(0.0, min(100.0, effective_sfc))
+            zone = "CRITICAL" if effective_sfc/100 > 0.75 else "HIGH" if effective_sfc/100 > 0.5 else "ELEVATED" if effective_sfc/100 > 0.25 else "NORMAL"
+            print(f"[DW] Dynamic weighting: regime={_dw_regime} adj={_dw_sfc_adjustment:+.1f}pp "
+                  f"{_old_sfc:.1f}% → {effective_sfc:.1f}% | weights={_dw_weights}", file=sys.stderr)
+        else:
+            print(f"[DW] Dynamic weighting: regime={_dw_regime} no adjustment | "
+                  f"z_score={_dw_z_score:.3f} weights={_dw_weights}", file=sys.stderr)
+    except Exception as _dw_e:
+        print(f"[DW] Error: {_dw_e}", file=sys.stderr)
 
 # Apply regime boost from advanced HMM detection to effective SFC
 if (ADVANCED_AVAILABLE is None or ADVANCED_AVAILABLE) and adv_regime_boost > 0 and effective_sfc is not None:

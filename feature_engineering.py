@@ -1,15 +1,26 @@
 """
-feature_engineering.py — Fetches daily BTCUSDT klines from Binance and computes 25+ technical indicators.
+feature_engineering.py — Fetches daily BTCUSDT klines from Binance and computes technical indicators.
 
 All prints go to stderr. The module is importable from collect.py and exposes:
     get_features() -> dict[str, float]  (empty dict on any failure)
 
-Indicators computed:
-    Momentum: RSI-7, RSI-14, Stochastic K/D, Williams %R, Ultimate Oscillator
-    Trend:    MACD line/signal/histogram, EMA 9/21/50, SMA 200, Aroon Up/Down, CCI
-    Volatility: ATR, Bollinger Bands (width, %B), Donchian Channel width
-    Volume:   VWAP, OBV, Chaikin Money Flow, Ease of Movement (scaled)
-    Candlestick: high/low ratio, close/open ratio, upper/lower shadow, body size
+Indicators computed (reduced from 25+ to ~17 quality features):
+    Momentum:   RSI-7, RSI-14, Stochastic K/D
+    Trend:      MACD line/signal/histogram, EMA21, EMA200, EMA21-EMA200 crossover,
+                SMA200, Aroon Up/Down
+    Volatility: ATR, Bollinger Band Width, %B, Donchian Channel Width,
+                Realized Volatility (30d)
+    Volume:     VWAP, OBV, Chaikin Money Flow
+    Pattern:    Body size
+
+REMOVED (redundant — per review recommendation):
+    Williams %R     → redundant with RSI/Stochastic (same OB/OS info)
+    CCI             → high multicollinearity with RSI + MACD
+    Ultimate Osc   → composite oscillator, marginal info
+    EOM             → weak signal for BTC, noisy
+    High/Low Ratio  → captured by volatility measures
+    Close/Open Ratio → unstable, low marginal info
+    Upper/Lower Shadow → candlestick noise, not for ML models
 """
 
 import sys
@@ -122,7 +133,7 @@ def _get_data() -> pd.DataFrame | None:
 
 
 def _compute_features(df: pd.DataFrame) -> dict[str, float]:
-    """Compute all technical indicators and return a normalized feature dict."""
+    """Compute technical indicators (reduced set — 17 quality features)."""
     features: dict[str, float] = {}
 
     o = df["open"].astype(float)
@@ -143,12 +154,15 @@ def _compute_features(df: pd.DataFrame) -> dict[str, float]:
             _eprint(f"[feature_engineering] Indicator '{key}' failed: {exc}")
         features[key] = 0.0
 
-    # ---- Momentum (6) ----
+    # ---- Momentum (4) ----
+    # RSI-7: short-term momentum
     _safe("rsi_7", lambda: _normalize_01(float(
         ta.momentum.RSIIndicator(close=c, window=7).rsi().iloc[-1])))
+    # RSI-14: medium-term momentum
     _safe("rsi_14", lambda: _normalize_01(float(
         ta.momentum.RSIIndicator(close=c, window=14).rsi().iloc[-1])))
 
+    # Stochastic K/D: overbought/oversold with different sensitivity
     _safe("stoch_k", lambda: _normalize_01(float(
         ta.momentum.StochasticOscillator(
             high=h, low=l, close=c, window=14, smooth_window=3
@@ -158,19 +172,10 @@ def _compute_features(df: pd.DataFrame) -> dict[str, float]:
             high=h, low=l, close=c, window=14, smooth_window=3
         ).stoch_signal().iloc[-1])))
 
-    _safe("williams_r", lambda: (
-        float(ta.momentum.WilliamsRIndicator(
-            high=h, low=l, close=c, lbp=14
-        ).williams_r().iloc[-1]) + 100.0) / 100.0 * 2.0 - 1.0)
+    # REMOVED: Williams %R (redundant with RSI/Stochastic)
+    # REMOVED: Ultimate Oscillator (redundant composite)
 
-    _safe("ultimate_oscillator", lambda: _normalize_01(float(
-        ta.momentum.UltimateOscillator(
-            high=h, low=l, close=c,
-            window1=7, window2=14, window3=28,
-            weight1=4.0, weight2=2.0, weight3=1.0,
-        ).ultimate_oscillator().iloc[-1])))
-
-    # ---- Trend (10) ----
+    # ---- Trend (7) ----
     macd_obj = ta.trend.MACD(close=c, window_slow=26, window_fast=12, window_sign=9)
     _safe("macd_line", lambda: _normalize_n11(
         float(macd_obj.macd().iloc[-1]), _symmetric_bound(macd_obj.macd())))
@@ -179,11 +184,26 @@ def _compute_features(df: pd.DataFrame) -> dict[str, float]:
     _safe("macd_histogram", lambda: _normalize_n11(
         float(macd_obj.macd_diff().iloc[-1]), _symmetric_bound(macd_obj.macd_diff())))
 
-    for period in (9, 21, 50):
-        _safe(f"ema_{period}", lambda p=period: max(0.0, min(1.0, (
-            float(ta.trend.EMAIndicator(close=c, window=p).ema_indicator().iloc[-1])
-            / last_c - 0.8) / 0.4)) if last_c > 0 else 0.5)
+    # EMA21 (short-term trend) + EMA21-EMA200 crossover
+    ema21 = ta.trend.EMAIndicator(close=c, window=21).ema_indicator()
+    ema200 = ta.trend.EMAIndicator(close=c, window=min(200, len(c))).ema_indicator()
 
+    _safe("ema21_price_ratio", lambda: max(0.0, min(1.0, (
+        float(ema21.iloc[-1]) / last_c - 0.8) / 0.4)) if last_c > 0 else 0.5)
+
+    # EMA21-EMA200 crossover: positive = bullish trend, negative = bearish
+    _safe("ema_crossover", lambda: max(-1.0, min(1.0, (
+        float(ema21.iloc[-1]) - float(ema200.iloc[-1])) / last_c * 10.0)) if last_c > 0 else 0.0)
+
+    # EMA200 slope (rate of change over 5 periods): 0 to 1, high = steep uptrend
+    if len(ema200.dropna()) >= 6:
+        ema200_vals = ema200.dropna().values
+        slope = (ema200_vals[-1] - ema200_vals[-6]) / ema200_vals[-6] * 100 if ema200_vals[-6] > 0 else 0
+        _safe("ema200_slope", lambda: max(0.0, min(1.0, (slope + 2.0) / 4.0)))
+    else:
+        features["ema200_slope"] = 0.5
+
+    # SMA200 (long-term reference)
     _safe("sma_200", lambda: max(0.0, min(1.0, (
         float(ta.trend.SMAIndicator(
             close=c, window=min(200, len(c))
@@ -194,13 +214,10 @@ def _compute_features(df: pd.DataFrame) -> dict[str, float]:
     _safe("aroon_down", lambda: _normalize_01(float(
         ta.trend.AroonIndicator(high=h, low=l, window=25).aroon_down().iloc[-1])))
 
-    cci_series = ta.trend.CCIIndicator(
-        high=h, low=l, close=c, window=20, constant=0.015
-    ).cci()
-    _safe("cci", lambda: _normalize_n11(
-        float(cci_series.iloc[-1]), _symmetric_bound(cci_series, 95.0)))
+    # REMOVED: CCI (redundant with RSI + MACD + Aroon)
+    # REMOVED: Extra EMAs (condensed to EMA21, EMA200, crossover, slope)
 
-    # ---- Volatility (4) ----
+    # ---- Volatility (5) ----
     _safe("atr", lambda: max(0.0, min(1.0,
         float(ta.volatility.AverageTrueRange(
             high=h, low=l, close=c, window=14
@@ -216,7 +233,16 @@ def _compute_features(df: pd.DataFrame) -> dict[str, float]:
         float(dc.donchian_channel_hband().iloc[-1])
         - float(dc.donchian_channel_lband().iloc[-1])) / last_c * 20.0)) if last_c > 0 else 0.0)
 
-    # ---- Volume (4) ----
+    # Realized Volatility (30-day rolling std of daily returns)
+    returns = c.pct_change().dropna()
+    if len(returns) >= 30:
+        realized_vol = returns.tail(30).std() * np.sqrt(365)  # annualized
+        _safe("realized_vol", lambda: max(0.0, min(1.0,
+            float(realized_vol) / 2.0)))  # 100% annualized → 0.5, 200% → 1.0
+    else:
+        features["realized_vol"] = 0.5
+
+    # ---- Volume (3) ----
     _safe("vwap", lambda: max(0.0, min(1.0, (
         last_c / float(ta.volume.VolumeWeightedAveragePrice(
             high=h, low=l, close=c, volume=v, window=14
@@ -234,32 +260,16 @@ def _compute_features(df: pd.DataFrame) -> dict[str, float]:
             high=h, low=l, close=c, volume=v, window=20
         ).chaikin_money_flow().iloc[-1]))))
 
-    eom_series = ta.volume.EaseOfMovementIndicator(
-        high=h, low=l, volume=v, window=14
-    ).ease_of_movement()
-    _safe("eom", lambda: _normalize_n11(
-        float(eom_series.iloc[-1]), _symmetric_bound(eom_series, 95.0)))
+    # REMOVED: EOM (weak signal for BTC, noisy at daily resolution)
 
-    # ---- Candlestick (5) ----
-    hl_ratio_series = h / l
-    _safe("hl_ratio", lambda: max(0.0, min(1.0,
-        (float(hl_ratio_series.iloc[-1]) - 1.0) / 0.1)))
-
-    co_ratio_series = c / o
-    _safe("co_ratio", lambda: max(0.0, min(1.0,
-        float(co_ratio_series.iloc[-1]) / 2.0)))
-
-    upper_shadow_series = (h - np.maximum(o, c)) / (h - l + 1e-12)
-    _safe("upper_shadow", lambda: max(0.0, min(1.0,
-        float(upper_shadow_series.iloc[-1]))))
-
-    lower_shadow_series = (np.minimum(o, c) - l) / (h - l + 1e-12)
-    _safe("lower_shadow", lambda: max(0.0, min(1.0,
-        float(lower_shadow_series.iloc[-1]))))
-
+    # ---- Pattern (1) ----
     body_series = np.abs(c - o) / (h - l + 1e-12)
     _safe("body_size", lambda: max(0.0, min(1.0,
         float(body_series.iloc[-1]))))
+
+    # REMOVED: High/Low Ratio (captured by ATR/volatility)
+    # REMOVED: Close/Open Ratio (unstable, low marginal info)
+    # REMOVED: Upper/Lower Shadow (candlestick noise, not for ML)
 
     return features
 
@@ -269,7 +279,7 @@ def _compute_features(df: pd.DataFrame) -> dict[str, float]:
 
 def get_features() -> dict[str, float]:
     """
-    Fetch BTCUSDT data and compute 25+ normalized technical indicators.
+    Fetch BTCUSDT data and compute quality technical indicators.
 
     Returns:
         dict[str, float]: Feature name -> normalized value.
@@ -290,7 +300,7 @@ def get_features() -> dict[str, float]:
 
 
 def main():
-    """Fetch compute and print features (to stderr), then print a summary to stderr."""
+    """Fetch, compute, and print features (to stderr), then print a summary to stderr."""
     features = get_features()
     count = len(features)
     _eprint(f"[feature_engineering] Computed {count} features")
