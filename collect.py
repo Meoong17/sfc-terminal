@@ -191,6 +191,34 @@ except ImportError as e:
     def get_feature_group_weights(*a, **k): return {}
     def get_sfc_effective_with_dynamic_weights(*a, **k): return None, 0.0
 
+# ── NEW: Market Positioning Index (MPI) ──
+try:
+    from market_positioning_index import compute_market_positioning_index
+    MPI_AVAILABLE = True
+except ImportError as e:
+    MPI_AVAILABLE = False
+    print(f"[SFC] MPI unavailable: {e}", file=sys.stderr)
+    def compute_market_positioning_index(*a, **k): return 50.0, 0.5, {"error": "unavailable", "status": "fallback"}
+
+# ── NEW: Liquidity Momentum (LM) ──
+try:
+    from liquidity_momentum import compute_liquidity_momentum
+    LM_AVAILABLE = True
+except ImportError as e:
+    LM_AVAILABLE = False
+    print(f"[SFC] Liquidity Momentum unavailable: {e}", file=sys.stderr)
+    def compute_liquidity_momentum(*a, **k): return 0.0, 0.0, {"status": "fallback"}
+
+# ── NEW: Dynamic Feature Selector (DFS) ──
+try:
+    from dynamic_feature_selector import DynamicFeatureSelector
+    _DFS_SELECTOR = DynamicFeatureSelector()
+    DFS_AVAILABLE = True
+except ImportError as e:
+    DFS_AVAILABLE = False
+    print(f"[SFC] Dynamic Feature Selector unavailable: {e}", file=sys.stderr)
+    _DFS_SELECTOR = None
+
 # Import causal inference
 try:
     from causal_inference import CausalFilter
@@ -2697,6 +2725,38 @@ cascade_risk = 0.1
 liq_total_24h = None
 liq_long_vol = None
 liq_short_vol = None
+
+# ── NEW: Market Positioning Index (MPI) ──
+_mpi_score = None
+_mpi_stress = None
+_mpi_details = {}
+if MPI_AVAILABLE:
+    try:
+        _mpi_score, _mpi_stress, _mpi_details = compute_market_positioning_index(
+            liq_long_vol=liq_long_vol, liq_short_vol=liq_short_vol,
+            liq_total_24h=liq_total_24h,
+            funding_rate=_m13_detail.get("funding_rate") if m13_d and isinstance(m13_d, dict) else None,
+            pc_oi=pc_oi,
+        )
+        print(f"[MPI] Score={_mpi_score:.1f}/100 stress={_mpi_stress:.3f} label={_mpi_details.get('label','?')} "
+              f"components={_mpi_details.get('n_components',0)}", file=sys.stderr)
+    except Exception as _mpi_e:
+        print(f"[MPI] Error: {_mpi_e}", file=sys.stderr)
+
+# ── NEW: Liquidity Momentum (LM) ──
+_lm_score = None
+_lm_stress_adj = None
+_lm_details = {}
+if LM_AVAILABLE and _glf_score is not None:
+    try:
+        _lm_score, _lm_stress_adj, _lm_details = compute_liquidity_momentum(
+            current_glf=_glf_score,
+            current_glf_stress=_glf_sfc_stress,
+        )
+        print(f"[LM] Score={_lm_score:+.2f} adj={_lm_stress_adj:+.3f} "
+              f"pts={_lm_details.get('n_points',0)} label={_lm_details.get('label','?')}", file=sys.stderr)
+    except Exception as _lm_e:
+        print(f"[LM] Error: {_lm_e}", file=sys.stderr)
 
 try:
     from liquidation_client import get_liquidation_data

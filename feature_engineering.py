@@ -4,14 +4,11 @@ feature_engineering.py — Fetches daily BTCUSDT klines from Binance and compute
 All prints go to stderr. The module is importable from collect.py and exposes:
     get_features() -> dict[str, float]  (empty dict on any failure)
 
-Indicators computed (reduced from 25+ to ~17 quality features):
+Indicators computed (reduced from 25+ to ~16 quality features):
     Momentum:   RSI-7, RSI-14, Stochastic K/D
-    Trend:      MACD line/signal/histogram, EMA21, EMA200, EMA21-EMA200 crossover,
-                SMA200, Aroon Up/Down
-    Volatility: ATR, Bollinger Band Width, %B, Donchian Channel Width,
-                Realized Volatility (30d)
+    Trend:      MACD line/signal/histogram, EMA21, EMA21-EMA200 crossover, EMA200 slope
+    Volatility: ATR, Bollinger Band Width, %B, Realized Volatility (30d)
     Volume:     VWAP, OBV, Chaikin Money Flow
-    Pattern:    Body size
 
 REMOVED (redundant — per review recommendation):
     Williams %R     → redundant with RSI/Stochastic (same OB/OS info)
@@ -21,6 +18,10 @@ REMOVED (redundant — per review recommendation):
     High/Low Ratio  → captured by volatility measures
     Close/Open Ratio → unstable, low marginal info
     Upper/Lower Shadow → candlestick noise, not for ML models
+    Aroon Up/Down   → redundant with EMA crossover + MACD
+    SMA200          → nearly identical to EMA200
+    Donchian Width  → redundant with ATR + BB Width + Realized Vol
+    Body Size       → candlestick noise, low value for macro horizon
 """
 
 import sys
@@ -175,7 +176,7 @@ def _compute_features(df: pd.DataFrame) -> dict[str, float]:
     # REMOVED: Williams %R (redundant with RSI/Stochastic)
     # REMOVED: Ultimate Oscillator (redundant composite)
 
-    # ---- Trend (7) ----
+    # ---- Trend (5) ----
     macd_obj = ta.trend.MACD(close=c, window_slow=26, window_fast=12, window_sign=9)
     _safe("macd_line", lambda: _normalize_n11(
         float(macd_obj.macd().iloc[-1]), _symmetric_bound(macd_obj.macd())))
@@ -203,21 +204,13 @@ def _compute_features(df: pd.DataFrame) -> dict[str, float]:
     else:
         features["ema200_slope"] = 0.5
 
-    # SMA200 (long-term reference)
-    _safe("sma_200", lambda: max(0.0, min(1.0, (
-        float(ta.trend.SMAIndicator(
-            close=c, window=min(200, len(c))
-        ).sma_indicator().iloc[-1]) / last_c - 0.8) / 0.4)) if last_c > 0 else 0.5)
-
-    _safe("aroon_up", lambda: _normalize_01(float(
-        ta.trend.AroonIndicator(high=h, low=l, window=25).aroon_up().iloc[-1])))
-    _safe("aroon_down", lambda: _normalize_01(float(
-        ta.trend.AroonIndicator(high=h, low=l, window=25).aroon_down().iloc[-1])))
+    # REMOVED: SMA200 (nearly identical to EMA200)
+    # REMOVED: Aroon Up/Down (redundant with EMA crossover + MACD)
 
     # REMOVED: CCI (redundant with RSI + MACD + Aroon)
     # REMOVED: Extra EMAs (condensed to EMA21, EMA200, crossover, slope)
 
-    # ---- Volatility (5) ----
+    # ---- Volatility (4) ----
     _safe("atr", lambda: max(0.0, min(1.0,
         float(ta.volatility.AverageTrueRange(
             high=h, low=l, close=c, window=14
@@ -228,10 +221,7 @@ def _compute_features(df: pd.DataFrame) -> dict[str, float]:
         float(bb.bollinger_wband().iloc[-1]) / last_c * 20.0)) if last_c > 0 else 0.0)
     _safe("bb_pct_b", lambda: _normalize_01(float(bb.bollinger_pband().iloc[-1])))
 
-    dc = ta.volatility.DonchianChannel(high=h, low=l, close=c, window=20)
-    _safe("donchian_width", lambda: max(0.0, min(1.0, (
-        float(dc.donchian_channel_hband().iloc[-1])
-        - float(dc.donchian_channel_lband().iloc[-1])) / last_c * 20.0)) if last_c > 0 else 0.0)
+    # REMOVED: Donchian Width (redundant with ATR + BB Width + Realized Vol)
 
     # Realized Volatility (30-day rolling std of daily returns)
     returns = c.pct_change().dropna()
@@ -262,11 +252,7 @@ def _compute_features(df: pd.DataFrame) -> dict[str, float]:
 
     # REMOVED: EOM (weak signal for BTC, noisy at daily resolution)
 
-    # ---- Pattern (1) ----
-    body_series = np.abs(c - o) / (h - l + 1e-12)
-    _safe("body_size", lambda: max(0.0, min(1.0,
-        float(body_series.iloc[-1]))))
-
+    # REMOVED: Body Size (candlestick noise, low value for macro horizon)
     # REMOVED: High/Low Ratio (captured by ATR/volatility)
     # REMOVED: Close/Open Ratio (unstable, low marginal info)
     # REMOVED: Upper/Lower Shadow (candlestick noise, not for ML)
