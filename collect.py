@@ -2726,38 +2726,6 @@ liq_total_24h = None
 liq_long_vol = None
 liq_short_vol = None
 
-# ── NEW: Market Positioning Index (MPI) ──
-_mpi_score = None
-_mpi_stress = None
-_mpi_details = {}
-if MPI_AVAILABLE:
-    try:
-        _mpi_score, _mpi_stress, _mpi_details = compute_market_positioning_index(
-            liq_long_vol=liq_long_vol, liq_short_vol=liq_short_vol,
-            liq_total_24h=liq_total_24h,
-            funding_rate=_m13_detail.get("funding_rate") if m13_d and isinstance(m13_d, dict) else None,
-            pc_oi=pc_oi,
-        )
-        print(f"[MPI] Score={_mpi_score:.1f}/100 stress={_mpi_stress:.3f} label={_mpi_details.get('label','?')} "
-              f"components={_mpi_details.get('n_components',0)}", file=sys.stderr)
-    except Exception as _mpi_e:
-        print(f"[MPI] Error: {_mpi_e}", file=sys.stderr)
-
-# ── NEW: Liquidity Momentum (LM) ──
-_lm_score = None
-_lm_stress_adj = None
-_lm_details = {}
-if LM_AVAILABLE and _glf_score is not None:
-    try:
-        _lm_score, _lm_stress_adj, _lm_details = compute_liquidity_momentum(
-            current_glf=_glf_score,
-            current_glf_stress=_glf_sfc_stress,
-        )
-        print(f"[LM] Score={_lm_score:+.2f} adj={_lm_stress_adj:+.3f} "
-              f"pts={_lm_details.get('n_points',0)} label={_lm_details.get('label','?')}", file=sys.stderr)
-    except Exception as _lm_e:
-        print(f"[LM] Error: {_lm_e}", file=sys.stderr)
-
 try:
     from liquidation_client import get_liquidation_data
     liq_data = get_liquidation_data()
@@ -2811,6 +2779,50 @@ if liq_total_24h is None:
         else:
             liq_pressure = "BALANCED"
 
+# ── NEW: Market Positioning Index (MPI) ──
+_mpi_score = None
+_mpi_stress = None
+_mpi_details = {}
+if MPI_AVAILABLE:
+    try:
+        _mpi_score, _mpi_stress, _mpi_details = compute_market_positioning_index(
+            liq_long_vol=liq_long_vol, liq_short_vol=liq_short_vol,
+            liq_total_24h=liq_total_24h,
+            funding_rate=m13_d.get("funding_rate") if m13_d and isinstance(m13_d, dict) else None,
+            pc_oi=pc_oi,
+        )
+        print(f"[MPI] Score={_mpi_score:.1f}/100 stress={_mpi_stress:.3f} label={_mpi_details.get('label','?')} "
+              f"components={_mpi_details.get('n_components',0)}", file=sys.stderr)
+    except Exception as _mpi_e:
+        print(f"[MPI] Error: {_mpi_e}", file=sys.stderr)
+
+# ── NEW: Liquidity Momentum (LM) ──
+_lm_score = None
+_lm_stress_adj = None
+_lm_details = {}
+if LM_AVAILABLE and _glf_score is not None:
+    try:
+        _lm_score, _lm_stress_adj, _lm_details = compute_liquidity_momentum(
+            current_glf=_glf_score,
+            current_glf_stress=_glf_sfc_stress,
+        )
+        print(f"[LM] Score={_lm_score:+.2f} adj={_lm_stress_adj:+.3f} "
+              f"pts={_lm_details.get('n_points',0)} label={_lm_details.get('label','?')}", file=sys.stderr)
+    except Exception as _lm_e:
+        print(f"[LM] Error: {_lm_e}", file=sys.stderr)
+
+# ── NEW: Dynamic Feature Selector (DFS) — regime-aware feature subset ──
+_dfs_profile = None
+if DFS_AVAILABLE and _DFS_SELECTOR is not None:
+    try:
+        _dfs_regime = _hmm_result.get('regime', regime) if _hmm_result else regime
+        _dfs_profile = _DFS_SELECTOR.get_regime_profile(_dfs_regime)
+        print(f"[DFS] Regime={_dfs_regime} selected {_dfs_profile['n_groups']} groups, "
+              f"{_dfs_profile['n_features']} features: {', '.join(_dfs_profile['active_groups'])}", file=sys.stderr)
+    except Exception as _dfs_e:
+        print(f"[DFS] Error: {_dfs_e}", file=sys.stderr)
+        _dfs_profile = None
+
 # Composite confidence — multi-factor penalized model
 # Base: method agreement + market calmness
 cc_base = 0.30
@@ -2819,6 +2831,12 @@ cc_base += max(0, 1.0 - (effective_sfc/100)) * 0.08  # low stress → more relia
 
 # Penalties — reduce confidence when conditions contradict SFC signal
 cc_penalty = 0.0
+
+# MPI confidence penalty (needs cc_penalty defined first)
+if _mpi_stress is not None:
+    _mpi_conf_penalty = (_mpi_stress - 0.5) * 0.08
+    cc_penalty += max(0, _mpi_conf_penalty)
+    print(f"[MPI] CC penalty: {_mpi_conf_penalty:+.3f} (mpi_stress={_mpi_stress:.3f})", file=sys.stderr)
 
 # Cascade risk — high cascade = signal less reliable
 if cascade_risk > 0.5:
@@ -3316,6 +3334,25 @@ out = {
     "dw_factors": {k: round(v, 3) for k, v in (_dw_norm_factors or {}).items()} if _dw_norm_factors else None,
     "dw_sfc_adjustment": round(_dw_sfc_adjustment, 2) if '_dw_sfc_adjustment' in dir() and _dw_sfc_adjustment else 0.0,
     "dw_available": DYNAMIC_WEIGHTING_AVAILABLE,
+    # ── NEW: Market Positioning Index (MPI) ──
+    "mpi_score": round(_mpi_score, 1) if _mpi_score is not None else None,
+    "mpi_stress": round(_mpi_stress, 3) if _mpi_stress is not None else None,
+    "mpi_label": _mpi_details.get("label") if _mpi_details else None,
+    "mpi_available": MPI_AVAILABLE,
+    "mpi_components": _mpi_details.get("components") if _mpi_details else None,
+    # ── NEW: Liquidity Momentum (LM) ──
+    "lm_score": round(_lm_score, 2) if _lm_score is not None else None,
+    "lm_stress_adj": round(_lm_stress_adj, 3) if _lm_stress_adj is not None else None,
+    "lm_label": _lm_details.get("label") if _lm_details else None,
+    "lm_n_points": _lm_details.get("n_points", 0) if _lm_details else 0,
+    "lm_available": LM_AVAILABLE,
+    # ── NEW: Dynamic Feature Selector (DFS) ──
+    "dfs_regime": _dfs_profile.get("regime") if _dfs_profile else None,
+    "dfs_n_groups": _dfs_profile.get("n_groups", 0) if _dfs_profile else 0,
+    "dfs_n_features": _dfs_profile.get("n_features", 0) if _dfs_profile else 0,
+    "dfs_active_groups": _dfs_profile.get("active_groups", []) if _dfs_profile else [],
+    "dfs_group_weights": _dfs_profile.get("group_weights") if _dfs_profile else None,
+    "dfs_available": DFS_AVAILABLE,
     # ── Multi-Timeframe Fusion (Peningkatan 4) ──
     "mtf_alignment_score": float(round(_mtf_result.get('alignment_score', 0), 3)) if _mtf_result else None,
     "mtf_divergence": bool(_mtf_result.get('divergence_detected', False)) if _mtf_result else None,
