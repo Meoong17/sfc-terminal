@@ -1437,11 +1437,18 @@ function render(d) {
   </footer>
 
   <!-- ─── Donation widget ─── -->
-  <div class="donate-card">
-    <div class="donate-card__label">Support This Project</div>
-    <div class="donate-card__network">EVM — ETH / USDT / USDC / ERC-20</div>
-    <div class="donate-card__row">
-      <span class="donate-card__address" id="donateAddress">0x631b14cff7ea193820383381ffa1a52dec48675c</span>
+  <div class="donate-wrapper">
+    <div class="donate-label">Support This Project</div>
+    <div class="donate-card">
+      <div class="donate-card__icon">
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15l-5-5 1.41-1.41L11 14.17l7.59-7.59L20 8l-9 9z"/>
+        </svg>
+      </div>
+      <div class="donate-card__info">
+        <div class="donate-card__network">EVM — ETH / USDT / USDC / ERC-20</div>
+        <span class="donate-card__address" id="donateAddress">0x631b14cff7ea193820383381ffa1a52dec48675c</span>
+      </div>
       <button class="donate-card__copy-btn" id="donateCopyBtn" onclick="copyDonateAddress()">COPY</button>
     </div>
     <div class="donate-card__note">BTC / SOL coming soon</div>

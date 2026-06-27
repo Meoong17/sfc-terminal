@@ -82,11 +82,11 @@ else
     if git pull --rebase --autostash -X theirs origin main 2>&1; then
         # ⚠ Git pull may override index.html with remote's corrupted version.
         # Re-check and restore from .bak if needed.
-        if [ -f "index.html.bak" ] && ( [ "$(wc -c < index.html)" -lt 50000 ] || grep -q 'loginForm' index.html 2>/dev/null || ! grep -q 'render(' index.html 2>/dev/null ); then
+        # Note: render() is now in app.js, not index.html — check index.html size + integrity.
+        if [ -f "index.html.bak" ] && ( [ "$(wc -c < index.html)" -lt 5000 ] || grep -q 'loginForm' index.html 2>/dev/null || ! grep -q 'app.js' index.html 2>/dev/null ); then
           log "⚠ index.html was corrupted during pull — restoring from .bak"
           cp index.html.bak index.html
           log "Restored ($(wc -c < index.html) bytes)"
-          git add index.html
         fi
         log "Pushing..."
         if git push origin main 2>&1; then
@@ -109,12 +109,9 @@ else
     fi
 
     # Final guard — ensure index.html is the real dashboard even after failed/pushed git ops
-    if [ -f "index.html.bak" ] && ( [ "$(wc -c < index.html)" -lt 50000 ] || grep -q 'loginForm' index.html 2>/dev/null || ! grep -q 'render(' index.html 2>/dev/null ); then
+    if [ -f "index.html.bak" ] && ( [ "$(wc -c < index.html)" -lt 5000 ] || grep -q 'loginForm' index.html 2>/dev/null || ! grep -q 'app.js' index.html 2>/dev/null ); then
       log "⚠ Final guard: index.html corrupted — restoring from .bak"
       cp index.html.bak index.html
-      git add index.html
-      git commit -m "fix: restore dashboard from .bak" --no-verify 2>/dev/null || true
-      git push origin main 2>&1 || true
     fi
 fi
 
