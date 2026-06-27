@@ -3138,6 +3138,15 @@ out = {
     "m79_detail": sc_details.get("m79_detail"),
     "m80_dominance": round(_sc_results.get("m80_dominance", 0), 3) if _sc_results else None,
     "m80_detail": sc_details.get("m80_detail"),
+    # ── NEW: Stablecoin Liquidity Index (SLI — enhanced composite) ──
+    "sli_score": round(_sli_score, 1) if _sli_score is not None else None,
+    "sli_stress": round(_sli_sfc_stress, 3) if _sli_sfc_stress is not None else None,
+    "sli_label": _sli_details.get("label") if _sli_details else None,
+    "sli_available": STABLECOIN_INTEL_AVAILABLE,
+    "sli_components": _sli_details.get("components") if _sli_details else None,
+    "sli_usdt_growth": _sli_details.get("usdt_growth_pct") if _sli_details else None,
+    "sli_usdc_growth": _sli_details.get("usdc_growth_pct") if _sli_details else None,
+    "sli_growth_divergence": _sli_details.get("growth_divergence_pct") if _sli_details else None,
     # Microstructure change detection (M20-M23 cross-run deltas)
     "micro_change_flags": micro_change_flags,
     "micro_trend_score": round(micro_trend_score, 3) if micro_change_flags else None,
@@ -3164,6 +3173,13 @@ out = {
     # M33 — Global Liquidity Index
     "m33_glo_score": round(m33_glo_score, 3) if m33_glo_score is not None else None,
     "m33_glo_detail": m33_glo_detail if m33_glo_detail else None,
+    # ── NEW: Global Liquidity Factor (GLF — consolidated liquidity engine) ──
+    "glf_score": round(_glf_score, 1) if _glf_score is not None else None,
+    "glf_stress": round(_glf_sfc_stress, 3) if _glf_sfc_stress is not None else None,
+    "glf_regime": _glf_details.get("regime") if _glf_details else None,
+    "glf_active_components": _glf_details.get("active_components", 0) if _glf_details else 0,
+    "glf_available": GLOBAL_LIQUIDITY_AVAILABLE,
+    "glf_component_detail": _glf_details.get("components") if _glf_details else None,
     # Macro liquidity (M72-M75 / Layer 1)
     "macro_methods_active": _macro_active,
     "macro_methods_avg": _macro_avg if _macro_active > 0 else None,
@@ -3233,6 +3249,13 @@ out = {
     "hmm_regime": str(_hmm_result.get('regime')) if _hmm_result else None,
     "hmm_crisis_prob": float(round(_hmm_result.get('crisis_probability', 0), 3)) if _hmm_result else None,
     "hmm_available": bool(_hmm_available),
+    # ── NEW: Dynamic Feature Weighting ──
+    "dw_regime": str(_dw_regime) if '_dw_regime' in dir() and _dw_regime else None,
+    "dw_z_score": round(_dw_z_score, 3) if '_dw_z_score' in dir() else None,
+    "dw_weights": _dw_weights if _dw_weights else None,
+    "dw_factors": {k: round(v, 3) for k, v in (_dw_norm_factors or {}).items()} if _dw_norm_factors else None,
+    "dw_sfc_adjustment": round(_dw_sfc_adjustment, 2) if '_dw_sfc_adjustment' in dir() and _dw_sfc_adjustment else 0.0,
+    "dw_available": DYNAMIC_WEIGHTING_AVAILABLE,
     # ── Multi-Timeframe Fusion (Peningkatan 4) ──
     "mtf_alignment_score": float(round(_mtf_result.get('alignment_score', 0), 3)) if _mtf_result else None,
     "mtf_divergence": bool(_mtf_result.get('divergence_detected', False)) if _mtf_result else None,
