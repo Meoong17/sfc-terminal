@@ -212,16 +212,23 @@ class CircuitBreaker:
         # ── 4. Consistency checks ──
         consistency_issues = []
 
-        # sfc_effective can differ from sfc_base by the liq_mod adjustment
-        # (range -5 to +10pp) plus regime boost (0-15pp) and ML nudges.
-        # Only flag as inconsistent if sfc_effective is far below sfc_base
-        # (beyond the max negative liq_mod of -5pp + safety margin).
+        # sfc_effective = sfc_base + liq_mod (-5 to +10) + regime boost + ML nudges.
+        # Only flag if sfc_effective dropped below what the actual liq_mod explains,
+        # plus a small margin (1pp) for other adjustments.
         sfc_eff = cleaned.get("sfc_effective")
         sfc_base = cleaned.get("sfc_base")
         if isinstance(sfc_eff, (int, float)) and isinstance(sfc_base, (int, float)):
-            if sfc_eff < sfc_base - 10.0:  # allow liq_mod (-5) + margin
+            # Use actual liq_mod value if available, else assume max negative (-5)
+            liq_mod_val = cleaned.get("liq_mod")
+            if isinstance(liq_mod_val, (int, float)):
+                min_expected = sfc_base + liq_mod_val - 1.0  # 1pp margin for rounding/nudges
+            else:
+                min_expected = sfc_base - 6.0  # max negative liq_mod (-5) + 1pp margin
+
+            if sfc_eff < min_expected:
                 consistency_issues.append(
-                    f"sfc_effective ({sfc_eff:.1f}) < sfc_base ({sfc_base:.1f})"
+                    f"sfc_effective ({sfc_eff:.1f}) < expected min ({min_expected:.1f}) "
+                    f"(base={sfc_base:.1f}, liq_mod={liq_mod_val if isinstance(liq_mod_val, (int, float)) else 'N/A'})"
                 )
                 all_ok = False
 
@@ -477,6 +484,22 @@ def main() -> None:
         f"Should increment failures, got {cb3._consecutive_failures}"
     )
     print("  ✓ PASS (consistency violation detected, failures incremented)")
+
+    # ── Scenario 7: liq_mod-aware consistency — no false alarm ──
+    print("\n── Scenario 7: liq_mod-aware consistency — no false alarm ──")
+    cb7 = CircuitBreaker()
+    cb7.validate(normal)
+    with_liq = dict(normal)
+    with_liq["sfc_base"] = 19.0
+    with_liq["sfc_effective"] = 14.0   # base + liq_mod = 19 + (-5) = 14
+    with_liq["liq_mod"] = -5.0         # M2 tight → legitimate reduction
+    cleaned7, ok7, warns7 = cb7.validate(with_liq)
+    print(f"  Valid: {ok7}")
+    print(f"  Warnings: {warns7 if warns7 else 'None'}")
+    # With liq_mod=-5, min_expected = 19 + (-5) - 1 = 13, sfc_eff=14 >= 13 → no consistency issue
+    cons7 = [w for w in warns7 if "Consistency" in w]
+    assert not cons7, f"Should NOT trigger consistency with liq_mod=-5: {cons7}"
+    print("  ✓ PASS (liq_mod=-5, sfc_eff=14: no false alarm)")
 
     print("\n" + "=" * 60)
     print("All circuit breaker tests passed!")

@@ -2450,7 +2450,7 @@ state, signal = determine_state(dvol, effective_sfc, btc, ft)
 
 # ── BACKTEST METRICS (Estimated — NOT walk-forward validated) ──
 # NOTE: These are heuristic estimates based on method agreement, accuracy, and vol.
-# NOT real walk-forward backtest results. Calibrated ECE = 0.422 (miscalibrated).
+# NOT real walk-forward backtest results. Raw (pre-calibration) ECE ≈ 0.422 —
 # Implement proper WalkForwardBacktest for validated metrics.
 bt_sharpe = None
 bt_max_dd = None
@@ -3148,7 +3148,7 @@ out = {
     "adv_reddit_sentiment": round(adv_alt.get('reddit_sentiment', 0), 3) if adv_alt else None,
     "adv_reddit_label": adv_alt.get('reddit_label', 'NONE') if adv_alt else 'NONE',
     "adv_cg_dd_ath": round(adv_alt.get('cg_ath_dd', 0), 3) if adv_alt else None,
-    # Backtest metrics — ESTIMATED, not walk-forward validated (ECE=0.422 miscalibrated)
+    # Backtest metrics — ESTIMATED, not walk-forward validated (raw pre-cal ECE≈0.422)
     "bt_sharpe": bt_sharpe,
     "bt_sharpe_low": bt_sharpe_low,
     "bt_sharpe_high": bt_sharpe_high,

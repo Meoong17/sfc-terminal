@@ -14,7 +14,7 @@ Method:
   4. Build a calibration mapping curve (uses price-outcome by default)
   5. Apply mapping at inference time
 
-Currently ECE = 0.422 (very poor). Target: ECE < 0.05.
+Currently raw (pre-calibration) ECE ≈ 0.422. Target post-calibration ECE < 0.05.
 
 Usage:
     from confidence_calibration import recalibrate
