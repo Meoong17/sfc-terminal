@@ -589,6 +589,21 @@ document.getElementById('loginForm').addEventListener('submit', function(e) {
       });
     }
 
+    // Static assets — proxy to actual path on backend
+    if (path === '/app.js' || path === '/sw.js' || path === '/manifest.json') {
+      const resp = await fetchAny(urls, path, 'application/javascript');
+      if (!resp) return new Response('Not Found', { status: 404 });
+      const data = await resp.text();
+      const contentType = path.endsWith('.js') ? 'application/javascript' : path.endsWith('.json') ? 'application/json' : 'text/html';
+      return new Response(data, {
+        status: 200,
+        headers: {
+          'Content-Type': contentType + '; charset=utf-8',
+          'Cache-Control': 'public, max-age=3600',
+        },
+      });
+    }
+
     // Catch-all: serve dashboard for any unknown path (SPA fallback)
     const resp = await fetchAny(urls, '/', 'text/html');
     if (!resp) return new Response('Not Found', { status: 404, headers: getCorsHeaders(request) });
