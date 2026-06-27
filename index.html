@@ -1645,9 +1645,15 @@ function render(d) {
   }
 
   // Determine signal class
+  // Regime-aware signal thresholds (same multiplier as zone)
+  const _SIG_MULT = {CRISIS: 0.6, BEAR: 0.72, BULL: 1.2, SIDEWAYS: 1.0, NORMAL: 1.0, STRESS: 0.8};
+  const _sigMult = _SIG_MULT[String(d.regime).toUpperCase()] || 1.0;
+  const _buyThreshold = 25 * _sigMult;
+  const _cashThreshold = 50 * _sigMult;
+
   let sigClass = 'sp-watch';
-  if ((d.kelly_fraction || 0) > 0 && sfcEff < 25) sigClass = 'sp-buy';
-  else if (sfcEff >= 50 || (d.kelly_fraction || 0) <= 0) sigClass = 'sp-cash';
+  if ((d.kelly_fraction || 0) > 0 && sfcEff < _buyThreshold) sigClass = 'sp-buy';
+  else if (sfcEff >= _cashThreshold || (d.kelly_fraction || 0) <= 0) sigClass = 'sp-cash';
 
   let topPillClass = 'pill-watch', topPillText = 'WATCH';
   if (sigClass === 'sp-buy')  { topPillClass = 'pill-buy';  topPillText = 'BUY'; }
