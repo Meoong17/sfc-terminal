@@ -301,9 +301,15 @@ class DataQualityPipeline:
                                               for row in self._history[-50:]])
                         train_data = np.vstack([hist_norm, vals_norm.reshape(1, -1)])
                         self._isolation_forest.fit(train_data)
+                        self._forest_ready = True
                     else:
-                        self._isolation_forest.fit(vals_norm.reshape(1, -1))
-                    self._forest_ready = True
+                        # Not enough history yet — skip IF, rely on z-score fallback
+                        self._isolation_forest = None
+                        self._forest_ready = False
+
+            if self._isolation_forest is None:
+                # No IF available — use z-score fallback
+                raise ValueError("IF not fitted, use z-score fallback")
 
             preds = self._isolation_forest.predict(vals_norm.reshape(1, -1))
             # -1 = outlier, 1 = inlier

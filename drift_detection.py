@@ -72,6 +72,8 @@ class DriftDetector:
     def __init__(self):
         self._raw_history: List[List[float]] = []
         self._drift_count: Dict[str, int] = {}  # field -> consecutive drift count
+        self._consecutive_drift: int = 0  # fix: init in __init__, not hasattr
+        self._drift_free_streak: int = 0  # fix: init in __init__, not hasattr
         self._load_state()
 
     # ── Public API ──
@@ -161,13 +163,18 @@ class DriftDetector:
         # Consecutive drift tracking (any drift = +1, no drift = reset)
         total_drifted = len(drifted_fields)
         if total_drifted > 0:
-            result["consecutive_drift"] = self._consecutive_drift + 1 if hasattr(self, '_consecutive_drift') else 1
+            self._consecutive_drift += 1
+            result["consecutive_drift"] = self._consecutive_drift
         else:
             self._consecutive_drift = 0
             result["consecutive_drift"] = 0
 
         # Stable = no drift for 10+ cycles
-        result["stable"] = self._drift_free_streak >= 10 if hasattr(self, '_drift_free_streak') else True
+        if total_drifted == 0:
+            self._drift_free_streak += 1
+        else:
+            self._drift_free_streak = 0
+        result["stable"] = self._drift_free_streak >= 10
 
         # Append to history
         self._append(scores)

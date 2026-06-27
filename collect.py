@@ -28,61 +28,90 @@ except Exception:
     _CIRCUIT_BREAKER = None
     CB_AVAILABLE = False
 
-# ── 5 Advanced Modules (Model.docx) ──
+# ── 5 Advanced Modules (Model.docx) with retry — fix: dead imports never retry
 _ADV_FEATURES_MODULE = None
 _ADV_ENSEMBLE_MODULE = None
 _ADV_HMM_MODULE = None
 _ADV_MTF_MODULE = None
 _ADV_ONLINE_MODULE = None
+_ADV_RETRY_TIME = {}  # module_name -> timestamp of last failed attempt
+
+_ADV_RETRY_DELAY = 3600  # retry after 1 hour instead of never
 
 def _get_adv_features():
     global _ADV_FEATURES_MODULE
-    if _ADV_FEATURES_MODULE is None:
+    if _ADV_FEATURES_MODULE is False:
+        # Retry after delay if previously failed
+        last_fail = _ADV_RETRY_TIME.get('features', 0)
+        if time.time() - last_fail < _ADV_RETRY_DELAY:
+            return None
+    if _ADV_FEATURES_MODULE is None or _ADV_FEATURES_MODULE is False:
         try:
             import feature_engineering as m
             _ADV_FEATURES_MODULE = m
         except Exception:
             _ADV_FEATURES_MODULE = False
+            _ADV_RETRY_TIME['features'] = time.time()
     return _ADV_FEATURES_MODULE if _ADV_FEATURES_MODULE else None
 
 def _get_adv_ensemble():
     global _ADV_ENSEMBLE_MODULE
-    if _ADV_ENSEMBLE_MODULE is None:
+    if _ADV_ENSEMBLE_MODULE is False:
+        last_fail = _ADV_RETRY_TIME.get('ensemble', 0)
+        if time.time() - last_fail < _ADV_RETRY_DELAY:
+            return None
+    if _ADV_ENSEMBLE_MODULE is None or _ADV_ENSEMBLE_MODULE is False:
         try:
             import ensemble_meta as m
             _ADV_ENSEMBLE_MODULE = m
         except Exception:
             _ADV_ENSEMBLE_MODULE = False
+            _ADV_RETRY_TIME['ensemble'] = time.time()
     return _ADV_ENSEMBLE_MODULE if _ADV_ENSEMBLE_MODULE else None
 
 def _get_adv_hmm():
     global _ADV_HMM_MODULE
-    if _ADV_HMM_MODULE is None:
+    if _ADV_HMM_MODULE is False:
+        last_fail = _ADV_RETRY_TIME.get('hmm', 0)
+        if time.time() - last_fail < _ADV_RETRY_DELAY:
+            return None
+    if _ADV_HMM_MODULE is None or _ADV_HMM_MODULE is False:
         try:
             import hmm_regime as m
             _ADV_HMM_MODULE = m
         except Exception:
             _ADV_HMM_MODULE = False
+            _ADV_RETRY_TIME['hmm'] = time.time()
     return _ADV_HMM_MODULE if _ADV_HMM_MODULE else None
 
 def _get_adv_mtf():
     global _ADV_MTF_MODULE
-    if _ADV_MTF_MODULE is None:
+    if _ADV_MTF_MODULE is False:
+        last_fail = _ADV_RETRY_TIME.get('mtf', 0)
+        if time.time() - last_fail < _ADV_RETRY_DELAY:
+            return None
+    if _ADV_MTF_MODULE is None or _ADV_MTF_MODULE is False:
         try:
             import multi_timeframe as m
             _ADV_MTF_MODULE = m
         except Exception:
             _ADV_MTF_MODULE = False
+            _ADV_RETRY_TIME['mtf'] = time.time()
     return _ADV_MTF_MODULE if _ADV_MTF_MODULE else None
 
 def _get_adv_online():
     global _ADV_ONLINE_MODULE
-    if _ADV_ONLINE_MODULE is None:
+    if _ADV_ONLINE_MODULE is False:
+        last_fail = _ADV_RETRY_TIME.get('online', 0)
+        if time.time() - last_fail < _ADV_RETRY_DELAY:
+            return None
+    if _ADV_ONLINE_MODULE is None or _ADV_ONLINE_MODULE is False:
         try:
             import online_learning as m
             _ADV_ONLINE_MODULE = m
         except Exception:
             _ADV_ONLINE_MODULE = False
+            _ADV_RETRY_TIME['online'] = time.time()
     return _ADV_ONLINE_MODULE if _ADV_ONLINE_MODULE else None
 
 load_dotenv()
@@ -2358,7 +2387,14 @@ if _hmm_module:
             _hmm_regime = _hmm_result['regime']
             _hmm_crisis = _hmm_result.get('crisis_probability', 0)
             _hmm_available = True
-            # Override regime with HMM if it's more specific
+            # ════════════════════════════════════════════════════════════════
+            # REGIME MERGE: 3 systems (detect_regime + HMM + adv_regime_boost)
+            # Priority chain: detect_regime (baseline) → HMM (override if CRISIS/BEAR)
+            #   → adv_regime_boost (numeric boost). This is intentional:
+            #   - detect_regime always gives a default
+            #   - HMM only overrides on non-NORMAL (keeps default otherwise)
+            #   - adv_regime_boost only adds numeric boost (doesn't change label)
+            # ════════════════════════════════════════════════════════════════
             if _hmm_regime in ('CRISIS', 'BEAR') and regime == 'NORMAL':
                 regime = _hmm_regime
                 regime_prob = max(regime_prob or 0, _hmm_crisis)
@@ -2410,7 +2446,10 @@ if effective_sfc is not None:
     zone = "CRITICAL" if effective_sfc/100 > 0.75 * _SFC_MULT2 else "HIGH" if effective_sfc/100 > 0.50 * _SFC_MULT2 else "ELEVATED" if effective_sfc/100 > 0.25 * _SFC_MULT2 else "NORMAL"
 state, signal = determine_state(dvol, effective_sfc, btc, ft)
 
-# ── BACKTEST METRICS (Priority 3) with Realistic Confidence Bounds ──
+# ── BACKTEST METRICS (Estimated — NOT walk-forward validated) ──
+# NOTE: These are heuristic estimates based on method agreement, accuracy, and vol.
+# NOT real walk-forward backtest results. Calibrated ECE = 0.422 (miscalibrated).
+# Implement proper WalkForwardBacktest for validated metrics.
 bt_sharpe = None
 bt_max_dd = None
 bt_win_rate = None
@@ -3102,7 +3141,7 @@ out = {
     "adv_reddit_sentiment": round(adv_alt.get('reddit_sentiment', 0), 3) if adv_alt else None,
     "adv_reddit_label": adv_alt.get('reddit_label', 'NONE') if adv_alt else 'NONE',
     "adv_cg_dd_ath": round(adv_alt.get('cg_ath_dd', 0), 3) if adv_alt else None,
-    # Backtest metrics (Priority 3)
+    # Backtest metrics — ESTIMATED, not walk-forward validated (ECE=0.422 miscalibrated)
     "bt_sharpe": bt_sharpe,
     "bt_sharpe_low": bt_sharpe_low,
     "bt_sharpe_high": bt_sharpe_high,
@@ -3114,7 +3153,7 @@ out = {
     "bt_periods": bt_periods,
     "bt_stability": bt_stability,
     "bt_calibration_note": bt_calibration_note,
-    "bt_label": "WALK-FORWARD VALIDATED" if bt_sharpe and bt_sharpe > 1.0 and bt_win_rate and bt_win_rate > 0.7 else "UPPER-BOUND ESTIMATE",
+    "bt_label": "ESTIMATED (heuristic formula, not walk-forward validated)",
     # — Kelly Criterion Position Sizing (Gap 2 dari Reality Check) —
     "kelly_p_win": round(composite_confidence, 3),
     "kelly_b_payoff": 2.0,  # default risk/reward ratio
