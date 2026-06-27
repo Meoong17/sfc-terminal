@@ -2287,7 +2287,7 @@ if ADVANCED_AVAILABLE is None or ADVANCED_AVAILABLE:
             # Multi-dimensional feature vector:
             #   [sfc_base/100, regime_crisis_prob, method_agreement, dvol/100, fng/100]
             # Regime info provides context for dynamic threshold adjustment
-            _mq_scores = [m1_klr, m2_logit, m3_bayes, m4_ewc/100, m5_qreg/100, m6_regime/100]
+            _mq_scores = [m1_klr, m2_logit, m3_bayes, m4_ewc, m5_qreg/100, m6_regime/100]
             _mq_scores = [s for s in _mq_scores if s is not None]
             _method_disagreement = float(np.std(_mq_scores)) if len(_mq_scores) >= 2 else 0.5
             _uq_features = np.array([
@@ -2320,7 +2320,7 @@ if ADVANCED_AVAILABLE is None or ADVANCED_AVAILABLE:
 print("[SFC] Computing ML ensemble prediction...", file=sys.stderr)
 # Build feature vector from all available methods
 all_method_scores = []
-for s in [m1_klr, m2_logit, m3_bayes, m4_ewc/100, m5_qreg/100, m6_regime/100,
+for s in [m1_klr, m2_logit, m3_bayes, m4_ewc, m5_qreg/100, m6_regime/100,
           m7_s, m9_s, m10_s, m11_s, m12_s, m13_s, m14_s, m15_s, m16_s, m17_s, m18_s, m19_s]:
     all_method_scores.append(s if s is not None else 0.5)
 # Add institutional method scores
