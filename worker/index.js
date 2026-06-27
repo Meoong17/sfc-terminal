@@ -100,6 +100,14 @@ export default {
       'Access-Control-Allow-Headers': '*',
     };
 
+    // Security headers for HTML pages (clickjacking, MIME sniffing, HSTS, referrer)
+    const securityHeaders = {
+      'X-Frame-Options': 'DENY',
+      'X-Content-Type-Options': 'nosniff',
+      'Strict-Transport-Security': 'max-age=31536000; includeSubDomains; preload',
+      'Referrer-Policy': 'no-referrer',
+    };
+
     // CORS preflight
     if (method === 'OPTIONS') {
       return new Response(null, { headers: corsHeaders });
@@ -249,6 +257,7 @@ export default {
               'Content-Type': 'text/html; charset=utf-8',
               'Set-Cookie': setCookie('sfc_session', username),
               'Cache-Control': 'no-cache, no-store, must-revalidate',
+              ...securityHeaders,
               ...corsHeaders,
             },
           }
@@ -330,7 +339,7 @@ document.getElementById('loginForm').addEventListener('submit', function(e) {
 </html>`;
       return new Response(loginHtml, {
         status: 200,
-        headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache, no-store, must-revalidate', ...corsHeaders },
+        headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache, no-store, must-revalidate', ...securityHeaders, ...corsHeaders },
       });
     }
 
@@ -519,21 +528,23 @@ document.getElementById('loginForm').addEventListener('submit', function(e) {
             'Content-Type': 'text/html; charset=utf-8',
             'Set-Cookie': setCookieHeader,
             'Cache-Control': 'public, max-age=0, must-revalidate',
+            ...securityHeaders,
             ...corsHeaders,
           },
         });
       }
-      
+
       // Serve dashboard for everyone (no auth required — frontend handles login)
       const resp = await fetchAny(urls, '/', 'text/html');
       if (!resp) return new Response('Backend unreachable', { status: 502 });
       let html = await resp.text();
-      
+
       return new Response(html, {
         status: 200,
         headers: {
           'Content-Type': 'text/html; charset=utf-8',
           'Cache-Control': 'public, max-age=0, must-revalidate',
+          ...securityHeaders,
           ...corsHeaders,
         },
       });
@@ -548,6 +559,7 @@ document.getElementById('loginForm').addEventListener('submit', function(e) {
       headers: {
         'Content-Type': 'text/html; charset=utf-8',
         'Cache-Control': 'public, max-age=0, must-revalidate',
+        ...securityHeaders,
         ...corsHeaders,
       },
     });
