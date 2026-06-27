@@ -2050,7 +2050,11 @@ else:
 
 # Final ensemble
 sfc_pct = (p1 * m1m6_avg + p2 * new_avg + p3 * inst_avg_value) * 100
-zone = "CRITICAL" if sfc_pct/100 > 0.75 else "HIGH" if sfc_pct/100 > 0.5 else "ELEVATED" if sfc_pct/100 > 0.25 else "NORMAL"
+# Regime-aware zone thresholds (from M2 analysis: 39.8% calm-in-crisis)
+_SFC_REGIME = regime if "regime" in dir() else "NORMAL"
+_SFC_THRESHOLD_MULT = {"CRISIS": 0.6, "BEAR": 0.72, "BULL": 1.2, "SIDEWAYS": 1.0, "NORMAL": 1.0, "STRESS": 0.8}
+_SFC_MULT = _SFC_THRESHOLD_MULT.get(str(_SFC_REGIME).upper(), 1.0)
+zone = "CRITICAL" if sfc_pct/100 > 0.75 * _SFC_MULT else "HIGH" if sfc_pct/100 > 0.50 * _SFC_MULT else "ELEVATED" if sfc_pct/100 > 0.25 * _SFC_MULT else "NORMAL"
 
 print(f"[SFC] Causal-filtered blend: M1-M6={p1*100:.0f}% ({len(m1m6_active)}/6) + "
       f"M7-M19={p2*100:.0f}% ({new_active}/13) + "
@@ -2345,7 +2349,9 @@ if _online_module and effective_sfc is not None:
 
 # State and signal — use post-boost effective_sfc to stay consistent with zone/signal_type
 if effective_sfc is not None:
-    zone = "CRITICAL" if effective_sfc/100 > 0.75 else "HIGH" if effective_sfc/100 > 0.5 else "ELEVATED" if effective_sfc/100 > 0.25 else "NORMAL"
+    # Regime-aware zone (M2 analysis: 39.8% calm-in-crisis — use same multiplier)
+    _SFC_MULT2 = _SFC_THRESHOLD_MULT.get(str(regime).upper(), 1.0) if '_SFC_THRESHOLD_MULT' in dir() else 1.0
+    zone = "CRITICAL" if effective_sfc/100 > 0.75 * _SFC_MULT2 else "HIGH" if effective_sfc/100 > 0.50 * _SFC_MULT2 else "ELEVATED" if effective_sfc/100 > 0.25 * _SFC_MULT2 else "NORMAL"
 state, signal = determine_state(dvol, effective_sfc, btc, ft)
 
 # ── BACKTEST METRICS (Priority 3) with Realistic Confidence Bounds ──
@@ -2701,6 +2707,26 @@ _m71_lime_features = _xai_result.get("m71_lime_features", [])
 # ════════════════════════════════════════════════════════════
 # M33b: Probabilistic Output — distribution, VaR, ES, quantiles
 # ════════════════════════════════════════════════════════════
+# Confidence calibration & reliability (M2 analysis)
+try:
+    from confidence_calibration import recalibrate as _calib_recalibrate, get_calibration_info as _calib_info
+    _CALIB_AVAILABLE = True
+    _CALIBRATED_CONF = _calib_recalibrate(float(composite_confidence or 0.5))
+except Exception:
+    _CALIB_AVAILABLE = False
+    _CALIBRATED_CONF = float(composite_confidence or 0.5)
+
+# Reliability: based on method_agreement (M2 finding: >0.85 = groupthink, <0.50 = noise)
+_METHOD_AGREE = float(method_agreement) if 'method_agreement' in dir() and method_agreement is not None else 0.5
+if _METHOD_AGREE > 0.85:
+    _RELIABILITY = "LOW"       # groupthink — all methods agree on same (potentially stale) pattern
+elif _METHOD_AGREE < 0.50:
+    _RELIABILITY = "LOW"       # noise — no consensus
+elif _METHOD_AGREE > 0.70:
+    _RELIABILITY = "HIGH"      # healthy debate
+else:
+    _RELIABILITY = "MEDIUM"
+
 # Collect method scores for uncertainty estimation
 _PROB_METHOD_SCORES = []
 for _prob_field in ["m1_klr", "m2_logit", "m3_bayes", "m4_ewc", "m5_qreg", "m6_regime_score",
@@ -3000,8 +3026,14 @@ out = {
     "kelly_quarter": round(max(0, (composite_confidence * 2.0 - (1 - composite_confidence)) / 8.0) * _kelly_override, 4),
     "kelly_override_reason": _kelly_override_reason,
     # — Signal Timing (alert window estimation, monthly timeframe) —
-    "signal_type": "STRESS_TRANSITION" if transition_risk > 0.60 else "STRESS" if effective_sfc and effective_sfc > 25 else "CALM",
+    "signal_type": "STRESS_TRANSITION" if transition_risk > 0.60 else "STRESS" if effective_sfc and effective_sfc > 25 * (_SFC_MULT if '_SFC_MULT' in dir() else 1.0) else "CALM",
     "signal_strength": round(min(effective_sfc / 50.0 if effective_sfc else 0, 1.0), 3),
+    "calibrated_confidence": _CALIBRATED_CONF,
+    "reliability": _RELIABILITY,
+    "reliability_reason": ("HIGH agreement (>0.85) — possible groupthink" if _RELIABILITY == "LOW" and _METHOD_AGREE > 0.85 else
+                           "LOW agreement (<0.50) — no consensus" if _RELIABILITY == "LOW" and _METHOD_AGREE < 0.50 else
+                           "Moderate agreement — healthy signal" if _RELIABILITY == "HIGH" else
+                           "Adequate agreement"),
     "timing_precision": "LOW" if composite_confidence < 0.3 else "MEDIUM" if composite_confidence < 0.6 else "HIGH",
     "alert_window_days": round(7 + 30 * (1 - composite_confidence), 1),  # wider window = lower confidence (monthly TF)
     "timeframe": "MONTHLY",
