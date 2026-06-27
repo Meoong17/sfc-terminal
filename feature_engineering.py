@@ -4,24 +4,11 @@ feature_engineering.py — Fetches daily BTCUSDT klines from Binance and compute
 All prints go to stderr. The module is importable from collect.py and exposes:
     get_features() -> dict[str, float]  (empty dict on any failure)
 
-Indicators computed (reduced from 25+ to ~16 quality features):
+Indicators computed (reduced from 25+ to ~17 quality features):
     Momentum:   RSI-7, RSI-14, Stochastic K/D
     Trend:      MACD line/signal/histogram, EMA21, EMA21-EMA200 crossover, EMA200 slope
     Volatility: ATR, Bollinger Band Width, %B, Realized Volatility (30d)
     Volume:     VWAP, OBV, Chaikin Money Flow
-
-REMOVED (redundant — per review recommendation):
-    Williams %R     → redundant with RSI/Stochastic (same OB/OS info)
-    CCI             → high multicollinearity with RSI + MACD
-    Ultimate Osc   → composite oscillator, marginal info
-    EOM             → weak signal for BTC, noisy
-    High/Low Ratio  → captured by volatility measures
-    Close/Open Ratio → unstable, low marginal info
-    Upper/Lower Shadow → candlestick noise, not for ML models
-    Aroon Up/Down   → redundant with EMA crossover + MACD
-    SMA200          → nearly identical to EMA200
-    Donchian Width  → redundant with ATR + BB Width + Realized Vol
-    Body Size       → candlestick noise, low value for macro horizon
 """
 
 import sys
@@ -173,9 +160,6 @@ def _compute_features(df: pd.DataFrame) -> dict[str, float]:
             high=h, low=l, close=c, window=14, smooth_window=3
         ).stoch_signal().iloc[-1])))
 
-    # REMOVED: Williams %R (redundant with RSI/Stochastic)
-    # REMOVED: Ultimate Oscillator (redundant composite)
-
     # ---- Trend (5) ----
     macd_obj = ta.trend.MACD(close=c, window_slow=26, window_fast=12, window_sign=9)
     _safe("macd_line", lambda: _normalize_n11(
@@ -204,12 +188,6 @@ def _compute_features(df: pd.DataFrame) -> dict[str, float]:
     else:
         features["ema200_slope"] = 0.5
 
-    # REMOVED: SMA200 (nearly identical to EMA200)
-    # REMOVED: Aroon Up/Down (redundant with EMA crossover + MACD)
-
-    # REMOVED: CCI (redundant with RSI + MACD + Aroon)
-    # REMOVED: Extra EMAs (condensed to EMA21, EMA200, crossover, slope)
-
     # ---- Volatility (4) ----
     _safe("atr", lambda: max(0.0, min(1.0,
         float(ta.volatility.AverageTrueRange(
@@ -220,8 +198,6 @@ def _compute_features(df: pd.DataFrame) -> dict[str, float]:
     _safe("bb_width", lambda: max(0.0, min(1.0,
         float(bb.bollinger_wband().iloc[-1]) / last_c * 20.0)) if last_c > 0 else 0.0)
     _safe("bb_pct_b", lambda: _normalize_01(float(bb.bollinger_pband().iloc[-1])))
-
-    # REMOVED: Donchian Width (redundant with ATR + BB Width + Realized Vol)
 
     # Realized Volatility (30-day rolling std of daily returns)
     returns = c.pct_change().dropna()
@@ -249,13 +225,6 @@ def _compute_features(df: pd.DataFrame) -> dict[str, float]:
         ta.volume.ChaikinMoneyFlowIndicator(
             high=h, low=l, close=c, volume=v, window=20
         ).chaikin_money_flow().iloc[-1]))))
-
-    # REMOVED: EOM (weak signal for BTC, noisy at daily resolution)
-
-    # REMOVED: Body Size (candlestick noise, low value for macro horizon)
-    # REMOVED: High/Low Ratio (captured by ATR/volatility)
-    # REMOVED: Close/Open Ratio (unstable, low marginal info)
-    # REMOVED: Upper/Lower Shadow (candlestick noise, not for ML)
 
     return features
 
