@@ -67,7 +67,9 @@ log "data.json is fetched async by frontend (no HTML injection needed)"
 
 # ── Commit & push ──
 log "Committing..."
-git add data.json index.html paper_trades.json paper_history.json
+# IMPORTANT: Do NOT add index.html or app.js — they're static now.
+# Only commit data files that change every pipeline run.
+git add data.json paper_trades.json paper_history.json
 git add -u 2>/dev/null || true  # add any tracked file changes
 if git diff --staged --quiet; then
     log "No changes — skipping push"
