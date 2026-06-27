@@ -11,6 +11,23 @@ from datetime import datetime, timezone
 from dotenv import load_dotenv
 from onchain_fetch import fetch_all_onchain
 
+# ── Probabilistic Output + Circuit Breaker (M1.docx Priority) ──
+try:
+    from probabilistic_output import ProbabilisticHead
+    _PROB_HEAD = ProbabilisticHead()
+    PROBABILISTIC_AVAILABLE = True
+except Exception:
+    _PROB_HEAD = None
+    PROBABILISTIC_AVAILABLE = False
+
+try:
+    from circuit_breaker import CircuitBreaker
+    _CIRCUIT_BREAKER = CircuitBreaker()
+    CB_AVAILABLE = True
+except Exception:
+    _CIRCUIT_BREAKER = None
+    CB_AVAILABLE = False
+
 # ── 5 Advanced Modules (Model.docx) ──
 _ADV_FEATURES_MODULE = None
 _ADV_ENSEMBLE_MODULE = None
@@ -2681,6 +2698,36 @@ _xai_result = run_all_xai() if XAI_AVAILABLE else {"m70_shap_ok": False, "m71_li
 _m70_shap_features = _xai_result.get("m70_shap_features", [])
 _m71_lime_features = _xai_result.get("m71_lime_features", [])
 
+# ════════════════════════════════════════════════════════════
+# M33b: Probabilistic Output — distribution, VaR, ES, quantiles
+# ════════════════════════════════════════════════════════════
+# Collect method scores for uncertainty estimation
+_PROB_METHOD_SCORES = []
+for _prob_field in ["m1_klr", "m2_logit", "m3_bayes", "m4_ewc", "m5_qreg", "m6_regime_score",
+                     "m7_fisher", "m8_yield", "m9_liquidity", "m10_garch", "m11_var", "m12_jump",
+                     "m13_funding", "m14_skew", "m15_concentration", "m16_regime_ml", "m17_granger",
+                     "m18_entropy", "m19_mutual_info", "m20_obi", "m21_trade_flow", "m22_spread",
+                     "m23_liquidity", "m24_cape", "m25_minsky", "m26_kahneman", "m27_taleb",
+                     "m28_summers", "m29_debt", "m30_rajan", "m31_altman"]:
+    try:
+        _PROB_METHOD_SCORES.append(float(locals().get(_prob_field, 0) or 0))
+    except (TypeError, ValueError):
+        _PROB_METHOD_SCORES.append(0.0)
+
+_PROB_RESULT = {}
+if PROBABILISTIC_AVAILABLE and _PROB_HEAD is not None:
+    try:
+        _PROB_RESULT = _PROB_HEAD.compute(
+            sfc_score=float(effective_sfc or sfc_pct or 0),
+            method_scores=_PROB_METHOD_SCORES,
+            composite_confidence=float(composite_confidence or 0.5),
+            regime=str(regime) if "regime" in dir() else "NORMAL",
+            zone=str(zone) if "zone" in dir() else "NORMAL",
+        )
+    except Exception as _prob_e:
+        print(f"[SFC] Probabilistic compute failed: {_prob_e}", file=sys.stderr)
+        _PROB_RESULT = {}
+
 # Build output
 out = {
     "ts": datetime.now(timezone.utc).isoformat(),
@@ -2991,7 +3038,46 @@ out = {
     "m71_lime_top_1": _m71_lime_features[0]["name"] if len(_m71_lime_features) > 0 else None,
     "m71_lime_top_1_pct": _m71_lime_features[0]["importance_pct"] if len(_m71_lime_features) > 0 else None,
     "m71_lime_top_3": ", ".join(f["name"] for f in _m71_lime_features[:3]) if _m71_lime_features else None,
+    # ── M33b: Probabilistic Output (distribution, VaR, ES) ──
+    "prob_dist_available": PROBABILISTIC_AVAILABLE and bool(_PROB_RESULT),
+    "predicted_mean": _PROB_RESULT.get("predicted_mean") if _PROB_RESULT else None,
+    "predicted_std": _PROB_RESULT.get("predicted_std") if _PROB_RESULT else None,
+    "var_95": _PROB_RESULT.get("var_95") if _PROB_RESULT else None,
+    "es_975": _PROB_RESULT.get("es_975") if _PROB_RESULT else None,
+    "ci_90_lower": _PROB_RESULT.get("ci_90_lower") if _PROB_RESULT else None,
+    "ci_90_upper": _PROB_RESULT.get("ci_90_upper") if _PROB_RESULT else None,
+    "prob_stress": _PROB_RESULT.get("prob_stress") if _PROB_RESULT else None,
+    "prob_critical": _PROB_RESULT.get("prob_critical") if _PROB_RESULT else None,
+    "prob_crash_10pct": _PROB_RESULT.get("prob_crash_10pct") if _PROB_RESULT else None,
+    "prob_calm": _PROB_RESULT.get("prob_calm") if _PROB_RESULT else None,
+    "prob_quantiles": _PROB_RESULT.get("quantiles") if _PROB_RESULT else None,
+    "prob_sharpe": _PROB_RESULT.get("sharpe_ratio") if _PROB_RESULT else None,
+    "prob_sortino": _PROB_RESULT.get("sortino_ratio") if _PROB_RESULT else None,
+    "prob_uncertainty_breakdown": _PROB_RESULT.get("uncertainty_breakdown") if _PROB_RESULT else None,
+    # ── Circuit Breaker status ──
+    "cb_available": CB_AVAILABLE,
+    "cb_tripped": _CIRCUIT_BREAKER.get_stats().get("tripped", False) if CB_AVAILABLE and _CIRCUIT_BREAKER else False,
+    "cb_failures": _CIRCUIT_BREAKER.get_stats().get("consecutive_failures", 0) if CB_AVAILABLE and _CIRCUIT_BREAKER else 0,
+    "cb_total_failures": _CIRCUIT_BREAKER.get_stats().get("total_failures", 0) if CB_AVAILABLE and _CIRCUIT_BREAKER else 0,
 }
+
+# ── Circuit Breaker: validate output before writing ──
+_CB_OUT = out
+_CB_WARNINGS = []
+if CB_AVAILABLE and _CIRCUIT_BREAKER is not None:
+    try:
+        _CB_OUT, _CB_OK, _CB_WARNINGS = _CIRCUIT_BREAKER.validate(out)
+        if _CB_WARNINGS:
+            for _cb_msg in _CB_WARNINGS:
+                print(f"[CB] {_cb_msg}", file=sys.stderr)
+        if _CB_OK or not _CB_OUT:
+            # OK or tripped — use validated output
+            pass
+        else:
+            # Warning-level issues only — still print cleaned data
+            out = _CB_OUT
+    except Exception as _cb_e:
+        print(f"[CB] Validation error: {_cb_e}", file=sys.stderr)
 
 print(json.dumps(out, indent=2))
 btc_str = f"${btc:,.0f}" if btc is not None else "N/A"
