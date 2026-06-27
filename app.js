@@ -440,8 +440,14 @@ function render(d) {
   const arcCX = 90, arcCY = 88;
   const arcCirc = Math.PI * arcR;
   const arcFill = arcCirc * Math.min(sfcEff, 100) / 100;
-  const arcStroke = sfcEff >= 50 ? '#ff4060' : sfcEff >= 25 ? '#f0b429' : '#00ff9d';
-  const arcGlow = sfcEff >= 50 ? 'rgba(255,64,96,0.4)' : sfcEff >= 25 ? 'rgba(240,180,41,0.4)' : 'rgba(0,255,157,0.4)';
+  // Regime-aware arc color (same multiplier as zone)
+  const _ARC_MULT = {CRISIS: 0.6, BEAR: 0.72, BULL: 1.2, SIDEWAYS: 1.0, NORMAL: 1.0, STRESS: 0.8};
+  const _arcMult = _ARC_MULT[String(d.regime).toUpperCase()] || 1.0;
+  const arcStroke = sfcEff >= 50 * _arcMult ? '#ff4060' : sfcEff >= 25 * _arcMult ? '#f0b429' : '#00ff9d';
+  const arcGlow = sfcEff >= 50 * _arcMult ? 'rgba(255,64,96,0.4)' : sfcEff >= 25 * _arcMult ? 'rgba(240,180,41,0.4)' : 'rgba(0,255,157,0.4)';
+  // Regime-aware zone/fill classes
+  function _zoneClass(v) { return v >= 50 * _arcMult ? 'zone-critical' : v >= 25 * _arcMult ? 'zone-elevated' : 'zone-normal'; }
+  function _fillClass(v) { return v >= 50 * _arcMult ? 'pf-red' : v >= 25 * _arcMult ? 'pf-amber' : 'pf-green'; }
 
   const headlines = d.news_headlines || [];
   newsSlideIndex = 0;
@@ -599,11 +605,11 @@ function render(d) {
               <div class="sfc-big-num" style="color:${arcStroke}">${sfcEff.toFixed(1)}<span style="font-size:0.4em;color:var(--text-3);margin-left:2px">%</span></div>
             </div>
             <div class="sfc-desc">Composite Stress Probability</div>
-            <div class="sfc-zone-pill ${sfcZoneClass(sfcEff)}">${d.zone||'NORMAL'} Zone</div>
+            <div class="sfc-zone-pill ${_zoneClass(sfcEff)}">${d.zone||'NORMAL'} Zone</div>
           </div>
 
           <div class="prog-track" style="margin-top:4px">
-            <div class="prog-fill ${sfcFillClass(sfcEff)}" style="width:${Math.min(sfcEff,100)}%"></div>
+            <div class="prog-fill ${_fillClass(sfcEff)}" style="width:${Math.min(sfcEff,100)}%"></div>
           </div>
           <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--text-3);margin-bottom:14px;margin-top:2px">
             <span>SFC Base: ${fmtNum(d.sfc_base,2)}%</span>
