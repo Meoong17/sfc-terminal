@@ -468,7 +468,15 @@ def main() -> None:
     cleaned, ok, warns = cb3.validate(inconsistent)
     print(f"  Valid: {ok}")
     print(f"  Warnings: {warns}")
-    print("  ✓ PASS")
+    # sfc_eff=5.0 < sfc_base - 10 = 5.7 → should trigger consistency warning
+    assert not ok, "Should be invalid when sfc_effective << sfc_base"
+    assert any("sfc_effective" in w for w in warns), (
+        f"Should flag sfc_effective consistency, got: {warns}"
+    )
+    assert cb3._consecutive_failures == 1, (
+        f"Should increment failures, got {cb3._consecutive_failures}"
+    )
+    print("  ✓ PASS (consistency violation detected, failures incremented)")
 
     print("\n" + "=" * 60)
     print("All circuit breaker tests passed!")
