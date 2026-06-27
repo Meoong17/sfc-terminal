@@ -84,7 +84,11 @@ else
     cp paper_trades.json .paper_trades.pullbak 2>/dev/null || true
     cp paper_history.json .paper_history.pullbak 2>/dev/null || true
     log "Syncing with remote..."
-    if git pull --rebase --autostash -X theirs origin main 2>&1; then
+    # Strategy: try rebase first (cleaner history). If conflict, abort and
+    # fall back to merge with -X theirs (prefer remote on conflict).
+    # IMPORTANT: -X theirs is NOT passed to rebase because theirs/ours
+    # semantics are inverted during rebase vs merge, causing confusion.
+    if git pull --rebase --autostash origin main 2>&1; then
         # ⚠ Git pull may override index.html with remote's corrupted version.
         # Re-check and restore from .bak if needed.
         # Note: render() is now in app.js, not index.html — check <!-- b=1 --> marker.

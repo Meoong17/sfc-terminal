@@ -23,13 +23,17 @@ DATA_FILE = SCRIPT_DIR / "data.json"
 TRADES_FILE = SCRIPT_DIR / "paper_trades.json"
 HISTORY_FILE = SCRIPT_DIR / "paper_history.json"  # daily snapshots
 
-# ── Time Slippage Config ──
-# Simulates real-time execution delay by adding random price jitter.
-# TIME_SLIPPAGE_STD = standard deviation of fractional price change between
-# signal and execution (e.g. 0.001 = 0.1% random slippage)
-TIME_SLIPPAGE_STD = 0.001
-# Seed for reproducibility when running in same cycle
-_TIME_SLIPPAGE_RNG = random.Random(42)
+# ── Execution Delay Config ──
+# Simulates real-world delay between signal generation and order execution.
+# During EXECUTION_DELAY_MINUTES, BTC price drifts by a random walk calibrated
+# to typical BTC volatility (~1% hourly = ~0.0167% per minute std).
+# This replaces the old TIME_SLIPPAGE_STD (simple random jitter) with a
+# more realistic delay-based drift model.
+EXECUTION_DELAY_MINUTES = 5       # Simulated delay between signal and execution
+BTC_MINUTE_VOLATILITY = 0.000167  # ~1% hourly / 60 = 0.0167% per minute
+MIN_SLIPPAGE = 0.0001             # Minimum slippage floor (0.01%)
+_MAX_SLIPPAGE = 0.05              # Cap at 5% adverse move
+_SLIPPAGE_RNG = random.Random(42)  # Reproducible seed
 
 # ── Market Impact Model (optional — silent fallback) ──
 _MI_AVAILABLE = False
@@ -96,17 +100,31 @@ class PaperTrader:
         except (TypeError, ValueError): return default
 
     def _get_execution_price(self, signal_price: float) -> float:
-        """Apply time slippage to simulate execution delay.
+        """Simulate execution delay with realistic price drift.
 
-        Returns a slightly different price than the signal price,
-        representing the real-world delay between signal generation
-        and order execution.
+        Instead of simple random jitter, simulates a random walk over
+        EXECUTION_DELAY_MINUTES with BTC's typical per-minute volatility.
+        This produces more realistic slippage: small moves most of the time
+        with occasional larger gaps (fat tails), reflecting actual market
+        behavior during the delay between signal and fill.
+
+        Returns:
+            Execution price after simulated delay.
         """
-        slippage = _TIME_SLIPPAGE_RNG.gauss(0, TIME_SLIPPAGE_STD)
-        # Clamp to [-3*sigma, +3*sigma] to avoid extreme outliers
-        slippage = max(-3 * TIME_SLIPPAGE_STD, min(3 * TIME_SLIPPAGE_STD, slippage))
-        exec_price = signal_price * (1.0 + slippage)
-        return max(exec_price, signal_price * 0.95)  # cap 5% adverse move
+        steps = max(1, int(EXECUTION_DELAY_MINUTES))
+        drift = 0.0
+        for _ in range(steps):
+            drift += _SLIPPAGE_RNG.gauss(0, BTC_MINUTE_VOLATILITY)
+
+        # Clamp to avoid extreme outliers
+        drift = max(-_MAX_SLIPPAGE, min(_MAX_SLIPPAGE, drift))
+
+        # Enforce minimum slippage floor (always show SOME friction)
+        if abs(drift) < MIN_SLIPPAGE:
+            drift = MIN_SLIPPAGE if drift >= 0 else -MIN_SLIPPAGE
+
+        exec_price = signal_price * (1.0 + drift)
+        return round(max(exec_price, signal_price * 0.95), 2)
 
     def evaluate_signal(self, data: dict) -> dict:
         """Evaluate SFC data and return trading decision.

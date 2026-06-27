@@ -31,10 +31,14 @@ SFC_DIR = os.path.dirname(os.path.abspath(__file__))
 STATE_PATH = os.path.join(SFC_DIR, ".calibration_state.json")
 
 # ── Price-Outcome Ground Truth Config ──
-PRICE_DROP_THRESHOLD = -0.02  # 2% drop = "stress was correct" for price-outcome
-PRICE_RISE_THRESHOLD = 0.02   # 2% rise = "calm was correct"
-# Weight assigned to price-outcome calibration (vs model-internal)
-# 1.0 = only price-outcome, 0.0 = only model-internal
+# Adaptive threshold: scales by sqrt of actual time elapsed between snapshots
+# At the base interval (~5 min), threshold = BASE_THRESHOLD_ABS
+# At longer intervals (e.g., 30 min), threshold scales up: BASE_THRESHOLD_ABS * sqrt(Δt / 5min)
+PRICE_BASE_INTERVAL_MINUTES = 5    # Reference interval for threshold scaling
+PRICE_BASE_THRESHOLD_ABS = 0.003   # ±0.3% at base 5-min interval, scales with √(Δt)
+PRICE_MIN_THRESHOLD = 0.002        # Floor: never go below ±0.2% even at very short intervals
+PRICE_MAX_THRESHOLD = 0.05         # Ceiling: never exceed ±5% even at very long intervals
+PRICE_LOOKAHEAD_STEPS = 6          # Look ~30 min ahead (6 snapshots × ~5 min)
 PRICE_OUTCOME_WEIGHT = 0.7
 
 
@@ -167,7 +171,9 @@ def build_calibration_map(
         "total_snapshots": len(snapshots),
         "n_bins": n_bins,
         "price_outcome_weight": PRICE_OUTCOME_WEIGHT,
-        "price_drop_threshold": PRICE_DROP_THRESHOLD,
+        "price_drop_threshold": round(-PRICE_BASE_THRESHOLD_ABS, 4),
+        "price_lookahead_steps": PRICE_LOOKAHEAD_STEPS,
+        "price_base_interval_min": PRICE_BASE_INTERVAL_MINUTES,
         "interpretation": (
             "Well calibrated" if ece < 0.05 else
             "Moderately miscalibrated" if ece < 0.10 else
@@ -180,6 +186,24 @@ def build_calibration_map(
     return state
 
 
+def _adaptive_threshold(delta_minutes: float) -> float:
+    """Compute adaptive price change threshold based on actual time elapsed.
+
+    Scales the base threshold by sqrt(Δt / base_interval), so shorter
+    intervals use a tighter threshold (but never below PRICE_MIN_THRESHOLD)
+    and longer intervals use a proportionally wider threshold.
+
+    Args:
+        delta_minutes: Actual minutes between current and target snapshot.
+
+    Returns:
+        Absolute threshold value (always positive), e.g. 0.003 = ±0.3%.
+    """
+    ratio = delta_minutes / PRICE_BASE_INTERVAL_MINUTES
+    threshold = PRICE_BASE_THRESHOLD_ABS * math.sqrt(ratio)
+    return max(PRICE_MIN_THRESHOLD, min(PRICE_MAX_THRESHOLD, threshold))
+
+
 def _compute_price_outcome(
     snap: Dict,
     snapshots: List[Dict],
@@ -187,33 +211,60 @@ def _compute_price_outcome(
 ) -> Optional[bool]:
     """Determine if stress was correct based on actual BTC price movement.
 
-    Compares current snapshot's BTC price to the next snapshot's BTC price.
+    Uses TWO fixes vs the original flat-±2%-next-snapshot approach:
+
+      Fix 1 — Adaptive threshold: instead of a flat ±2% that never fires
+      on ~5-min intervals, scales the threshold by sqrt(actual time elapsed)
+      so short intervals get proportionally tighter thresholds and longer
+      ones get wider thresholds.
+
+      Fix 2 — Lookahead window: instead of comparing to the immediately next
+      snapshot (~5 min later), looks PRICE_LOOKAHEAD_STEPS (~30 min) ahead
+      so accumulated price movement is large enough to pass even a moderate
+      threshold in typical market conditions.
+
     Returns:
         True  = price dropped significantly — stress was correct
-        False = price rose/flat — stress was wrong
-        None  = no next snapshot available
+        False = price rose significantly — stress was wrong
+        None  = no future snapshot available, or price change was within
+                the adaptive threshold window (too flat to classify)
     """
-    if idx >= len(snapshots) - 1:
-        return None  # no next snapshot to compare
+    target_idx = min(idx + PRICE_LOOKAHEAD_STEPS, len(snapshots) - 1)
+    if target_idx <= idx:
+        return None  # no future snapshot available
 
     curr_price = snap.get("btc", 0)
-    next_price = snapshots[idx + 1].get("btc", 0)
-    if not curr_price or not next_price:
+    target_price = snapshots[target_idx].get("btc", 0)
+    if not curr_price or not target_price:
         return None
 
-    pct_change = (next_price - curr_price) / curr_price
-    sfc = snap.get("sfc_effective") or 0
-    is_stress_model = sfc > 25.0
+    pct_change = (target_price - curr_price) / curr_price
 
-    if pct_change <= PRICE_DROP_THRESHOLD:
-        # Price dropped significantly
-        return True  # stress confirmed
-    elif pct_change >= PRICE_RISE_THRESHOLD:
-        # Price rose significantly
-        return False  # stress was wrong
+    # Compute actual time delta between current and target snapshot
+    delta_minutes = PRICE_BASE_INTERVAL_MINUTES * PRICE_LOOKAHEAD_STEPS  # fallback
+    try:
+        from datetime import datetime
+        curr_ts = snap.get("ts", "")
+        target_ts = snapshots[target_idx].get("ts", "")
+        if curr_ts and target_ts:
+            curr_dt = datetime.fromisoformat(curr_ts.replace("Z", "+00:00"))
+            target_dt = datetime.fromisoformat(target_ts.replace("Z", "+00:00"))
+            delta_minutes = max(
+                PRICE_BASE_INTERVAL_MINUTES,
+                (target_dt - curr_dt).total_seconds() / 60.0,
+            )
+    except (ValueError, TypeError):
+        pass
+
+    # Adaptive threshold
+    threshold = _adaptive_threshold(delta_minutes)
+
+    if pct_change <= -threshold:
+        return True   # price dropped significantly — stress confirmed
+    elif pct_change >= threshold:
+        return False  # price rose significantly — stress was wrong
     else:
-        # Price was flat — neutral (not clearly stress or calm)
-        return None
+        return None   # price change within threshold — too flat to classify
 
 
 def _compute_ece_model_only(curve: List[Dict]) -> float:
@@ -361,10 +412,12 @@ def main() -> None:
         print(f"❌ {state['error']}")
         return
 
-    print(f"\n📊 Calibration Results ({state['total_snapshots']} snapshots)")
+    print(f"📊 Calibration Results ({state['total_snapshots']} snapshots)")
     print(f"   ECE (blended):  {state['ece']} — {state['interpretation']}")
     print(f"   ECE (model-only legacy): {state['ece_model_only']}")
     print(f"   Price-outcome weight: {state.get('price_outcome_weight', 'N/A')}")
+    print(f"   Adaptive threshold: ±{abs(state.get('price_drop_threshold', 0)) * 100:.2f}% @ base 5 min")
+    print(f"   Lookahead: {state.get('price_lookahead_steps', 'N/A')} snapshots (≈{state.get('price_lookahead_steps', 0) * 5} min)")
     print(f"\n   Calibration Curve:")
     print(f"   {'Bin':<12} {'Count':>6} {'Raw':>6} {'Model':>7} {'Price':>7} {'Blend':>7}")
     print(f"   " + "-" * 49)
