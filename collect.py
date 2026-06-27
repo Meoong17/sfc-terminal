@@ -2255,6 +2255,21 @@ try:
             "q10_buying_power": buying_power,
             "q10_market_structure": market_structure,
         })
+    # ── Filter mamba input by DFS regime ──
+    _mamba_dropped = []
+    if DFS_AVAILABLE and _DFS_SELECTOR is not None:
+        try:
+            _dfs_mamba_regime = regime if 'regime' in dir() else 'NORMAL'
+            _mamba_filtered, _mamba_dropped = _DFS_SELECTOR.filter_mamba_input(
+                _dfs_mamba_regime, _mamba_data
+            )
+            if _mamba_dropped:
+                _mamba_data = _mamba_filtered
+                print(f"[DFS] Mamba input filtered for {_dfs_mamba_regime}: "
+                      f"dropped {len(_mamba_dropped)} keys: {', '.join(_mamba_dropped)}", file=sys.stderr)
+        except Exception as _dfs_mamba_e:
+            print(f"[DFS] Mamba filter error: {_dfs_mamba_e}", file=sys.stderr)
+
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     from mamba_encoder import get_mamba_prediction as _mamba_infer
     mamba_result = _mamba_infer(_mamba_data, force=False)

@@ -302,6 +302,93 @@ class DynamicFeatureSelector:
             "groups_detail": summary["groups"],
         }
 
+    def filter_mamba_input(self, regime="NORMAL", data_dict=None):
+        """
+        Filter a Mamba input data dict to only keep keys relevant for the current regime.
+
+        Args:
+            regime: Market regime (BULL, BEAR, SIDEWAYS, CRISIS, NORMAL)
+            data_dict: The _mamba_data dict to filter
+
+        Returns:
+            (filtered_dict, dropped_keys_list)
+        """
+        if data_dict is None:
+            return {}, []
+
+        regime = regime.upper() if regime else "NORMAL"
+        if regime not in self.thresholds:
+            regime = "NORMAL"
+
+        active_groups = set(self.select(regime))
+        active_groups.add("__core__")  # always keep core keys
+
+        filtered = {}
+        dropped = []
+        for key, value in data_dict.items():
+            group = _MAMBA_KEY_MAP.get(key, None)
+
+            if group is None:
+                # Unknown key — keep by default (conservative)
+                filtered[key] = value
+            elif group in active_groups:
+                filtered[key] = value
+            else:
+                dropped.append(key)
+
+        return filtered, dropped
+
+
+# ════════════════════════════════════════════
+# Mamba input key mapping — maps _mamba_data dict keys to DFS feature groups
+# ════════════════════════════════════════════
+
+_MAMBA_KEY_MAP = {
+    # Global Liquidity
+    "m2_yoy": "global_liquidity",
+    "dxy": "global_liquidity",
+    "liq_mod": "global_liquidity",
+    # Derivatives / Market Positioning
+    "pc_oi": "derivatives",
+    "pc_vol": "derivatives",
+    # On-chain
+    "q10_whale_pressure": "onchain",
+    "q10_onchain_value": "onchain",
+    "q10_buying_power": "onchain",
+    "sopr_proxy": "onchain",
+    "sopr_score": "onchain",
+    # Volatility
+    "dvol": "volatility",
+    "rsi_14": "volatility",
+    "cascade_risk": "volatility",
+    "liq_density": "volatility",
+    # Technical
+    "fng": "technical",
+    "fng_cls": "technical",
+    # Macro
+    "regime_prob": "macro",
+    "transition_risk": "macro",
+    # Always-keep keys (core data, no group filter)
+    "btc": "__core__",
+    "btc_24h": "__core__",
+    "btc_mcap": "__core__",
+    "dom": "__core__",
+    "zone": "__core__",
+    "regime": "__core__",
+    "sfc_base": "__core__",
+    "sfc_effective": "__core__",
+    "method_agreement": "__core__",
+    "composite_confidence": "__core__",
+    "m1_klr": "__core__",
+    "m2_logit": "__core__",
+    "m3_bayes": "__core__",
+    "m4_ewc": "__core__",
+    "m5_qreg": "__core__",
+    "m6_regime_score": "__core__",
+    "factors": "__core__",
+    "liq_pressure": "__core__",
+}
+
 
 # ════════════════════════════════════════════
 # Convenience function
