@@ -123,12 +123,6 @@ function fmtNum(n, d2) {
 function sfcColor(v) {
   return v >= 50 ? 'var(--red)' : v >= 25 ? 'var(--amber)' : 'var(--green)';
 }
-function sfcZoneClass(v) {
-  return v >= 50 ? 'zone-critical' : v >= 25 ? 'zone-elevated' : 'zone-normal';
-}
-function sfcFillClass(v) {
-  return v >= 50 ? 'pf-red' : v >= 25 ? 'pf-amber' : 'pf-green';
-}
 function getChgCls(v) {
   return v > 0 ? 'chg-p' : v < 0 ? 'chg-n' : 'chg-z';
 }
