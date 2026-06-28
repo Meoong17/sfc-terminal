@@ -62,10 +62,9 @@ log "Running paper trader..."
 $PYTHON paper_trader.py 2>>sfc-pipeline.log || log "⚠ Paper trader skipped (no data)"
 
 
-# ── Inject fresh data into index.html (instant display before live fetch) + update .bak ──
-$PYTHON inject_data.py data.json index.html 2>>sfc-pipeline.log && \
-  cp index.html index.html.bak && \
-  log "Injected fresh data into index.html + .bak"
+# ── Data ready — no HTML injection needed (page fetches data.json live) ──
+cp index.html index.html.bak 2>/dev/null || true
+log "Data collection complete (index.html unchanged)"
 
 # ── Commit & push ──
 log "Committing..."
