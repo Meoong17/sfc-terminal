@@ -1269,19 +1269,19 @@ body { font-family: 'Inter', 'Space Grotesk', system-ui, sans-serif; }
 .nav-logo { width: 26px; height: 26px; font-size: 9px; }
 
 /* Nav tabs: Linear-style ghost buttons */
-.nav-center { display: flex; align-items: center; gap: 2px; margin: 0 auto; }
-.nav-tab {
+nav .nav-center { display: flex; align-items: center; gap: 2px; margin: 0 auto; }
+nav .nav-tab {
   padding: 6px 14px !important; font-size: 13px !important; font-weight: 500;
   font-family: 'Inter', system-ui, sans-serif;
   color: var(--text-2); background: transparent;
   border: 1px solid transparent; border-radius: 6px;
   cursor: pointer; transition: all 0.15s ease; white-space: nowrap;
 }
-.nav-tab:hover { color: var(--text-1); background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.08); }
-.nav-tab.active { color: #fff; background: rgba(120,100,255,0.1); border-color: rgba(120,100,255,0.25); }
+nav .nav-tab:hover { color: var(--text-1); background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.08); }
+nav .nav-tab.active { color: #fff; background: rgba(120,100,255,0.1); border-color: rgba(120,100,255,0.25); }
 
 /* Cards: subtle translucent */
-.kpi-card, .metric-card, .chart-card, .card {
+.main .kpi-card, .main .metric-card, .main .chart-card, .main .card {
   background: rgba(255,255,255,0.02) !important;
   border: 1px solid rgba(255,255,255,0.06) !important;
   border-radius: 8px !important;
