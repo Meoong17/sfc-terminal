@@ -7,8 +7,14 @@ with open(path, 'rb') as f:
     raw = f.read()
 c = raw.decode('utf-8')
 
-# Skip if already redesigned
-if len(re.findall(r'data-tab="[^"]+"', c)) >= 5:
+# Skip if already redesigned — check INSIDE template only, not injected JSON data
+tpl_start = c.find('const html = `')
+if tpl_start > 0:
+    tpl = c[tpl_start:c.find('`;', tpl_start)]
+    tpl_data_tabs = len(re.findall(r'data-tab="[^"]+"', tpl))
+else:
+    tpl_data_tabs = 0
+if tpl_data_tabs >= 5:
     print('tab: already redesigned, skipping')
     sys.exit(0)
 
