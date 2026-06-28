@@ -1,87 +1,94 @@
-
-data_backup.json
-desktop.ini
-.DS_Store
+# ─── Environment ───
 .env
-env/
-ENV/
-# Environment variables (RAHASIA!)
 .env.*.local
 .env.local
-# IDE
-.idea/
-*.key
-*.log
-# Logs
-# OS
-*.pem
-# Project specific
-__pycache__/
-*.py[cod]
-# Python
-.Python
-# Secrets
-secrets.json
-sfc-terminal
-*.so
-*.swo
-*.swp
-Thumbs.db
-*.tmp
+.env.example
+env/
+ENV/
+
+# ─── Virtual Environments ───
 .venv/
 venv/
-.vscode/
-# Node/Cloudflare worker
+sfc_data_env/
+xai_venv/
+
+# ─── Python cache ───
+__pycache__/
+*.py[cod]
+*.so
+.Python
+
+# ─── Node / JS ───
 node_modules/
-worker/
-wrangler.toml
 package.json
 package-lock.json
-# SFC cache files
-.ath_cache.json
+
+# ─── Cloudflare Worker ───
+.wrangler/
+
+# ─── IDE / OS ───
+.idea/
+.vscode/
+desktop.ini
+.DS_Store
+Thumbs.db
+
+# ─── Temp / Backup ───
+*.bak
+*.tmp
+*.swp
+*.swo
+*.key
+*.pem
+
+# ─── Logs ───
+*.log
+
+# ─── SFC Cache / Auto-generated ───
+.*.json
+!/.env.example
+!/.github/**
+!/worker/**/*.json
+!/package.json
 data_collection.json
+backtest_report.json
+btc_ws.json
+historical_data.json
 ml_ensemble_model.pkl
 ml_ensemble_scaler.pkl
-# Misc
-check_sync.py
-sfc_v2_auto.py
-# Cache / auto-generated
-btc_ws.json
-.liq_cache.json
-.causal_cache.json
-*.bak
-# Hermes internal
-.hermes/
-# Virtual envs
-xai_venv/
-# SFC cache / auto-generated files
-.etf_cache.json
-.fiscal_cache.json
-.daily_market_cache.json
-.onchain_cache.json
-.stablecoin_cache.json
-.micro_cache.json
-.fiscal_cache.json
-.historical_dates.npy
-.historical_features.npy
-.qlstm_cache.json
-.ath_cache.json
+
+# ─── Model weights (too large for git) ───
+models/*.pth
+models/*.pkl
 models/ewma_state.json
-.regime_cache.json
-# New intelligence module cache files
-.global_liquidity_cache.json
-.stablecoin_intel_cache.json
-.mpi_cache.json
-.liq_momentum_cache.json
-.calibration_state.json
-.circuit_breaker_state.json
-.correlation_results.json
-.drift_state.json
-# Temp / helper scripts
-fix_index.py
-# SFC backup / venv / temp
+models/hmm_regime.pkl
+models/xgboost_meta.json
+
+# ─── SFC backups ───
 Backup SFC/
-sfc_data_env/
-historical_data.json
+
+# ─── Nested project ───
+sfc-terminal/
+
+# ─── Public login page ───
 public/
-.wrangler/
+
+# ─── Hermes internal ───
+.hermes/
+
+# ─── Temp scripts (not needed in repo) ───
+check_sync.py
+fix_index.py
+sfc_v2_auto.py
+
+# ─── SFC Data ───
+data.json.bak
+index.html.bak
+
+# ─── Runtime artifacts ───
+paper_trades.json
+paper_history.json
+pinggy.log
+tunnel.log
+tunnel-update.log
+sse_server.log
