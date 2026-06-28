@@ -82,7 +82,7 @@ a_x = find('<!-- XAI -->')
 a_p = find('<!-- PAPER TRADING -->')
 a_mg = find('    <div class="grid-4 mb-16">', a_p)
 a_h = find('<!-- HELP -->')
-sig_end = om.rfind('    </div>\n\n    <!-- Q10 ON-CHAIN', a_sig, a_q10) + len('    </div>')
+sig_end = om.rfind('    </div>\n\n    <!-- Q10 ON-CHAIN', a_sig) + len('    </div>')
 macro_end = om.rfind('    </div>\n    </div>\n\n    <!-- HELP -->') + len('    </div>')
 
 P = [om[0:a_kpi]]

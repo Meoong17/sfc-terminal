@@ -1119,7 +1119,19 @@ body::before {
   .stat-4 { grid-template-columns: repeat(2, 1fr); }
 }
 @media (max-width: 768px) {
-  .nav-center { display: none; }
+  nav.nav { flex-wrap: wrap; gap: 4px; }
+  .nav-center {
+    display: flex;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    width: 100%;
+    padding: 2px 0;
+    gap: 1px;
+    order: 3;
+  }
+  .nav-center::-webkit-scrollbar { display: none; }
+  .nav-tab { white-space: nowrap; padding: 4px 10px; font-size: 10px; }
   .main { padding: 12px; }
   .status-band { padding: 6px 12px; }
   .kpi-row { grid-template-columns: repeat(2, 1fr); }
@@ -1141,6 +1153,14 @@ body::before {
   .kpi-num { font-size: 15px; }
   .kpi-row { gap: 6px; }
   .kpi { padding: 10px; }
+}
+
+/* TAB PANELS */
+.tab-panel { display: none; animation: tabFadeIn 0.25s ease; }
+.tab-panel.active { display: block; }
+@keyframes tabFadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 /* ─── Donation widget ─── */
@@ -1591,11 +1611,23 @@ let activeTab = 'overview';
 
 function switchTab(tab) {
   activeTab = tab;
-  const el = document.getElementById(tab + 'Section');
-  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  document.querySelectorAll('.tab-panel').forEach(p => {
+    p.classList.toggle('active', p.dataset.tab === tab);
+  });
   document.querySelectorAll('.nav-tab').forEach(t => {
     t.classList.toggle('active', t.textContent.trim().toLowerCase() === tab);
   });
+  if (currentData) {
+    setTimeout(function() {
+      if (tab === 'overview' || tab === 'ensemble') {
+        if (typeof buildFactorChart === 'function' && document.getElementById('factorChart')) buildFactorChart(currentData);
+        if (typeof buildMethodChart === 'function' && document.getElementById('methodChart')) buildMethodChart(currentData);
+      }
+      if (tab === 'overview' && chartVisible && typeof updatePriceChart === 'function') {
+        updatePriceChart();
+      }
+    }, 100);
+  }
 }
 
 function restoreScrollPos() {
@@ -1700,9 +1732,10 @@ function render(d) {
     </div>
     <div class="nav-center">
       <div class="nav-tab active" onclick="switchTab('overview')">Overview</div>
-      <div class="nav-tab" onclick="switchTab('ensemble')">Ensemble</div>
       <div class="nav-tab" onclick="switchTab('risk')">Risk</div>
-      <div class="nav-tab" onclick="switchTab('backtest')">Backtest</div>
+      <div class="nav-tab" onclick="switchTab('ensemble')">Ensemble</div>
+      <div class="nav-tab" onclick="switchTab('advanced')">Advanced</div>
+      <div class="nav-tab" onclick="switchTab('trading')">Trading</div>
     </div>
     <div class="nav-right">
       <div class="nav-meta">
@@ -1790,10 +1823,9 @@ function render(d) {
       </div>
     </div>
 
-    <!-- ═══ TAB 1: OVERVIEW ═══ -->
+            <!-- ═══ TAB: OVERVIEW ═══ -->
     <div class="tab-panel active" data-tab="overview">
-
-    <!-- ROW 1: SFC Stress Index + Signal -->
+<!-- ROW 1: SFC Stress Index + Signal -->
     <div class="grid-2 mb-16">
       <!-- SFC STRESS INDEX -->
       <div id="overviewSection" class="card">
@@ -1856,53 +1888,8 @@ function render(d) {
           <canvas id="factorChart" width="400" height="160" style="width:100%;height:auto;max-height:160px;margin-top:10px"></canvas>
         </div>
       </div>
-
-      <!-- ENSEMBLE -->
-      <div id="ensembleSection" class="card">
-        <div class="card-head">
-          <div class="card-title">
-            <div class="card-icon">
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                <rect x="1" y="7" width="2" height="4" rx="0.5" fill="#00d4ff"/>
-                <rect x="5" y="4" width="2" height="7" rx="0.5" fill="#9d7af8"/>
-                <rect x="9" y="1" width="2" height="10" rx="0.5" fill="#00ff9d"/>
-              </svg>
-            </div>
-            6-Method Ensemble
-          </div>
-          <div class="card-badge">Consensus ${(agree*100).toFixed(0)}%</div>
-        </div>
-        <div class="card-body">
-          <canvas id="methodChart" width="400" height="140" style="width:100%;height:auto;max-height:140px;margin-bottom:12px"></canvas>
-
-          <div class="method-grid">
-            ${[
-              ['KLR',   '#00ff9d', fmtNum(d.m1_klr??d.sfc_base*0.9,1)+'%'],
-              ['LOGIT', '#00d4ff', fmtNum(d.m2_logit,1)+'%'],
-              ['BAYES', '#9d7af8', fmtNum(d.m3_bayes,1)+'%'],
-              ['EWC',   '#f0b429', fmtNum(d.m4_ewc,1)+'%'],
-              ['QREG',  '#4a9eff', fmtNum(d.m5_qreg,1)+'%'],
-              ['REGIME','#ff4060', fmtNum(d.m6_regime_score,1)+'%']
-            ].map(([name,color,val]) => `
-              <div class="method-cell">
-                <div class="method-cell-name">${name}</div>
-                <div class="method-cell-val" style="color:${color}">${val}</div>
-              </div>
-            `).join('')}
-          </div>
-
-          <div class="consensus-row">
-            <div class="consensus-ring" style="background:${agree>0.6?'var(--green-dim)':agree>0.3?'var(--amber-dim)':'var(--red-dim)'};border:2px solid ${agreeColor};color:${agreeColor}">${(agree*100).toFixed(0)}%</div>
-            <div class="consensus-info">
-              <div class="consensus-label">Method Consensus — ${agree>0.6?'Strong':agree>0.3?'Moderate':'Low'}</div>
-              <div class="consensus-sub">${d.total_methods_active||28} active methods · ${d.inst_methods_active||12} institutional · ${d.sc_methods_active||0} SC · ${d.macro_methods_active||0} macro</div>
-            </div>
-          </div>
-        </div>
-      </div>
     </div>
-
-    <!-- PRICE CHART -->
+<!-- PRICE CHART -->
     <div class="card span-full mb-16" id="chartCardWrapper">
       <div class="card-head">
         <div class="card-title">
@@ -1923,7 +1910,7 @@ function render(d) {
     </div>
 
     <!-- ROW 2: Momentum, Liquidation, Confidence, Signal -->
-    <div id="riskSection" class="grid-4 mb-16">
+    <div class="grid-4 mb-16">
 
       <!-- MOMENTUM -->
       <div class="card">
@@ -2054,8 +2041,111 @@ function render(d) {
         </div>
       </div>
     </div>
+    </div><!-- /{name} -->
+    <!-- ═══ TAB: RISK ═══ -->
+    <div class="tab-panel" data-tab="risk">
+    <div id="riskSection" class="grid-3 mb-16">
+      <!-- MOMENTUM -->
+      <div class="card">
+        <div class="card-head">
+          <div class="card-title">
+            <div class="card-icon">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                <circle cx="6" cy="6" r="4.5" stroke="#9d7af8" stroke-width="1.2" fill="none"/>
+                <path d="M6 3v3.5" stroke="#9d7af8" stroke-width="1.4" stroke-linecap="round"/>
+                <circle cx="6" cy="8" r="0.8" fill="#9d7af8"/>
+              </svg>
+            </div>
+            Momentum
+          </div>
+        </div>
+        <div class="card-body-sm">
+          <div class="dual-cols">
+            <div class="metric-center">
+              <div class="metric-label">RSI-14M</div>
+              <div class="gauge-wrap">
+                <svg viewBox="0 0 88 88">
+                  <circle cx="44" cy="44" r="38" fill="none" stroke="rgba(255,255,255,0.04)" stroke-width="7"/>
+                  <circle cx="44" cy="44" r="38" fill="none" stroke="${rsiColor}" stroke-width="7"
+                    stroke-dasharray="${rsiCirc}" stroke-dashoffset="${rsiOff}"
+                    stroke-linecap="round" transform="rotate(-90 44 44)"/>
+                </svg>
+                <div class="gauge-center-val" style="color:${rsiColor};font-size:17px">${fmtNum(rsi,1)}</div>
+              </div>
+              <div class="text-xs text-center">${rsi<=30?'Oversold':rsi>=70?'Overbought':'Neutral'}</div>
+            </div>
+            <div class="metric-center">
+              <div class="metric-label">SOPR Proxy</div>
+              <div class="sopr-num" style="color:${(d.sopr_proxy||1)<0.97?'var(--green)':(d.sopr_proxy||1)>1.03?'var(--red)':'var(--amber)'}">${fmtNum(d.sopr_proxy,4)}</div>
+              <div class="text-xs text-center mb-4">${(d.sopr_signal||'—').replace(/_/g,' ')}</div>
+              <div class="prog-track">
+                <div class="prog-fill pf-amber" style="width:${((d.sopr_score||0.5)*100).toFixed(0)}%"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
 
-    <!-- Q10 ON-CHAIN PANEL (ErcinDedeoglu/crypto-market-data) -->
+      <!-- LIQUIDATION -->
+      <div class="card">
+        <div class="card-head">
+          <div class="card-title">
+            <div class="card-icon">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                <path d="M6 1L8 5H11L8.5 7.5L9.5 11L6 9L2.5 11L3.5 7.5L1 5H4L6 1Z" stroke="#ff4060" stroke-width="1.2" stroke-linejoin="round" fill="rgba(255,64,96,0.15)"/>
+              </svg>
+            </div>
+            Liquidation
+          </div>
+        </div>
+        <div class="card-body-sm">
+          <div class="info-row"><span class="info-k">Pressure</span><span class="info-v" style="color:${liqColor}">${liqLabel}</span></div>
+          <div class="info-row"><span class="info-k">Density</span><span class="info-v">${fmtNum((d.liq_density||0)*100,1)}%</span></div>
+          <div class="prog-track"><div class="prog-fill pf-red" style="width:${(d.liq_density||0)*100}%"></div></div>
+          <div class="info-row"><span class="info-k">Cascade Risk</span><span class="info-v" style="color:${(d.cascade_risk||0)>0.5?'var(--red)':(d.cascade_risk||0)>0.25?'var(--amber)':'var(--green)'}">${fmtNum((d.cascade_risk||0)*100,0)}%</span></div>
+          ${d.liq_total_24h ? `
+          <div class="info-row"><span class="info-k">24h Vol (OKX)</span><span class="info-v" style="font-size:11px">$${fmtNum(d.liq_total_24h)}</span></div>
+          <div class="info-row"><span class="info-k" style="font-size:9px">Long / Short</span><span class="info-v" style="font-size:10px"><span style="color:var(--green)">$${(d.liq_long_vol/1e6).toFixed(0)}M</span><span style="color:var(--text-3)"> / </span><span style="color:var(--red)">$${(d.liq_short_vol/1e6).toFixed(0)}M</span></span></div>
+          ` : ''}
+          <div class="info-row"><span class="info-k">P/C OI</span><span class="info-v">${fmtNum(d.pc_oi,2)}</span></div>
+          <div class="info-row"><span class="info-k">P/C Vol</span><span class="info-v">${fmtNum(d.pc_vol,2)}</span></div>
+        </div>
+      </div>
+
+      <!-- CONFIDENCE -->
+      <div class="card">
+        <div class="card-head">
+          <div class="card-title">
+            <div class="card-icon">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                <path d="M2 6L5 9L10 3" stroke="#00ff9d" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </div>
+            Confidence
+          </div>
+        </div>
+        <div class="card-body-sm" style="text-align:center">
+          <div class="gauge-wrap" style="width:80px;height:80px">
+            <svg viewBox="0 0 88 88">
+              <circle cx="44" cy="44" r="38" fill="none" stroke="rgba(255,255,255,0.04)" stroke-width="7"/>
+              <circle cx="44" cy="44" r="38" fill="none" stroke="${confColor}" stroke-width="7"
+                stroke-dasharray="${confCirc}" stroke-dashoffset="${confOff}"
+                stroke-linecap="round" transform="rotate(-90 44 44)"/>
+            </svg>
+            <div class="gauge-center-val" style="font-size:17px;color:${confColor}">${(conf*100).toFixed(0)}%</div>
+          </div>
+          <div class="text-xs mb-8">Execution Confidence</div>
+          ${Object.entries(d.confidence_components||{}).map(([k,v])=>`
+            <div class="info-row"><span class="info-k" style="font-size:9px">${k.replace(/_/g,' ').toUpperCase()}</span><span class="info-v" style="font-size:10px;color:${v>0?'var(--green)':v<0?'var(--red)':'var(--text-2)'}">${v>0?'+':''}${(v*100).toFixed(1)}%</span></div>
+          `).join('')}
+          <div class="prog-track mt-4">
+            <div class="prog-fill pf-cyan" style="width:${(conf*100).toFixed(0)}%"></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+<!-- Q10 ON-CHAIN PANEL (ErcinDedeoglu/crypto-market-data) -->
     <div class="card span-full mb-16" style="display:${d.q10_available?'block':'none'}">
       <div class="card-head">
         <div class="card-title">
@@ -2155,7 +2245,183 @@ function render(d) {
       </div>
     </div>
 
-    <!-- ═══ NEW: LIQUIDITY INTELLIGENCE (GLF + SLI + MPI) ═══ -->
+    
+    </div><!-- /{name} -->
+    <!-- ═══ TAB: ENSEMBLE ═══ -->
+    <div class="tab-panel" data-tab="ensemble">
+      <!-- ENSEMBLE -->
+      <div id="ensembleSection" class="card">
+        <div class="card-head">
+          <div class="card-title">
+            <div class="card-icon">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                <rect x="1" y="7" width="2" height="4" rx="0.5" fill="#00d4ff"/>
+                <rect x="5" y="4" width="2" height="7" rx="0.5" fill="#9d7af8"/>
+                <rect x="9" y="1" width="2" height="10" rx="0.5" fill="#00ff9d"/>
+              </svg>
+            </div>
+            6-Method Ensemble
+          </div>
+          <div class="card-badge">Consensus ${(agree*100).toFixed(0)}%</div>
+        </div>
+        <div class="card-body">
+          <canvas id="methodChart" width="400" height="140" style="width:100%;height:auto;max-height:140px;margin-bottom:12px"></canvas>
+
+          <div class="method-grid">
+            ${[
+              ['KLR',   '#00ff9d', fmtNum(d.m1_klr??d.sfc_base*0.9,1)+'%'],
+              ['LOGIT', '#00d4ff', fmtNum(d.m2_logit,1)+'%'],
+              ['BAYES', '#9d7af8', fmtNum(d.m3_bayes,1)+'%'],
+              ['EWC',   '#f0b429', fmtNum(d.m4_ewc,1)+'%'],
+              ['QREG',  '#4a9eff', fmtNum(d.m5_qreg,1)+'%'],
+              ['REGIME','#ff4060', fmtNum(d.m6_regime_score,1)+'%']
+            ].map(([name,color,val]) => `
+              <div class="method-cell">
+                <div class="method-cell-name">${name}</div>
+                <div class="method-cell-val" style="color:${color}">${val}</div>
+              </div>
+            `).join('')}
+          </div>
+
+          <div class="consensus-row">
+            <div class="consensus-ring" style="background:${agree>0.6?'var(--green-dim)':agree>0.3?'var(--amber-dim)':'var(--red-dim)'};border:2px solid ${agreeColor};color:${agreeColor}">${(agree*100).toFixed(0)}%</div>
+            <div class="consensus-info">
+              <div class="consensus-label">Method Consensus — ${agree>0.6?'Strong':agree>0.3?'Moderate':'Low'}</div>
+              <div class="consensus-sub">${d.total_methods_active||28} active methods · ${d.inst_methods_active||12} institutional · ${d.sc_methods_active||0} SC · ${d.macro_methods_active||0} macro</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div><!-- KELLY + MACRO row -->
+    <div class="card span-full mb-16 card-collapsed" data-lazy>
+      <div class="card-head">
+        <div class="card-title">
+          <div class="card-icon">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <rect x="1" y="1" width="4" height="4" rx="1" stroke="#f0b429" stroke-width="1.2"/>
+              <rect x="7" y="1" width="4" height="4" rx="1" stroke="#4a9eff" stroke-width="1.2"/>
+              <rect x="1" y="7" width="4" height="4" rx="1" stroke="#9d7af8" stroke-width="1.2"/>
+              <rect x="7" y="7" width="4" height="4" rx="1" stroke="#00ff9d" stroke-width="1.2"/>
+            </svg>
+          </div>
+          Kelly Position Sizing
+        </div>
+          <span class="collapse-arrow" onclick="toggleCollapseCard(this)" style="cursor:pointer;font-size:10px;color:var(--text-3);padding:4px 8px;user-select:none">▶</span>
+        <div class="card-badge">Allocation Guide</div>
+      </div>
+      <div class="card-body">
+        <div class="stat-3 mb-12">
+          <div class="stat-box">
+            <div class="stat-label">Signal Confidence</div>
+            <div class="stat-val" style="color:${(d.kelly_p_win||0)>0.6?'var(--green)':'var(--amber)'}">${((d.kelly_p_win||0.5)*100).toFixed(0)}%</div>
+            <div class="stat-note">Bayesian signal trust</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-label">Max Allocation</div>
+            <div class="stat-val" style="color:${(d.kelly_fraction||0)>0.3?'var(--amber)':(d.kelly_fraction||0)>0?'var(--green)':'var(--text-3)'}">${((d.kelly_fraction||0)*100).toFixed(1)}%</div>
+            <div class="stat-note">${(d.kelly_fraction||0)>0?'Optimal Kelly size':'No edge — stay cash'}</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-label">Safe Allocation</div>
+            <div class="stat-val" style="color:var(--green)">${((d.kelly_half||0)*100).toFixed(1)}%</div>
+            <div class="stat-note">½ Kelly — reduced variance</div>
+          </div>
+        </div>
+        <div class="stat-3 mb-12">
+          <div class="info-row"><span class="info-k">Alert Window</span><span class="info-v">~${Math.round(d.alert_window_days||0)}d</span></div>
+          <div class="info-row"><span class="info-k">Timing Precision</span><span class="info-v" style="color:${d.timing_precision==='HIGH'?'var(--green)':'var(--amber)'}">${d.timing_precision||'LOW'}</span></div>
+          <div class="info-row"><span class="info-k">Signal Type</span><span class="info-v" style="color:${d.fng<15||(d.cascade_risk||0)>0.5?'var(--red)':'var(--green)'}">${d.fng<15?(d.fng_cls||'EXTREME FEAR'):(d.cascade_risk||0)>0.5?'CASCADE RISK':'NORMAL'}</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- BACKTEST -->
+    ${d.bt_sharpe != null ? `
+    <div id="backtestSection" class="card span-full mb-16">
+      <div class="card-head">
+        <div class="card-title">
+          <div class="card-icon">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <path d="M1 11L4 7L7 9L11 2" stroke="#00d4ff" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+              <circle cx="4" cy="7" r="1" fill="#00d4ff"/>
+              <circle cx="7" cy="9" r="1" fill="#00d4ff"/>
+            </svg>
+          </div>
+          Walk-Forward Backtest
+        </div>
+        <div class="card-badge">${d.bt_label||'UPPER-BOUND'} · ${d.bt_periods||0} periods</div>
+      </div>
+      <div class="card-body">
+        <div class="stat-4 mb-12">
+          <div class="stat-box">
+            <div class="stat-label">Sharpe Ratio</div>
+            <div class="stat-val" style="color:${(d.bt_sharpe||0)>1.5?'var(--green)':(d.bt_sharpe||0)>0.5?'var(--amber)':'var(--red)'}">${fmtNum(d.bt_sharpe,2)}</div>
+            <div class="stat-note">CI ${fmtNum(d.bt_sharpe_low,2)}–${fmtNum(d.bt_sharpe_high,2)} (95%)</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-label">Win Rate</div>
+            <div class="stat-val" style="color:var(--amber)">${((d.bt_win_rate||0)*100).toFixed(0)}%</div>
+            <div class="stat-note">CI ${((d.bt_win_rate_low||0)*100).toFixed(0)}–${((d.bt_win_rate_high||0)*100).toFixed(0)}%</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-label">Max Drawdown</div>
+            <div class="stat-val" style="color:${(d.bt_max_dd||0)<0.1?'var(--green)':(d.bt_max_dd||0)<0.2?'var(--amber)':'var(--red)'}">${((d.bt_max_dd||0)*100).toFixed(1)}%</div>
+            <div class="stat-note">Peak-to-trough</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-label">Stability</div>
+            <div class="stat-val" style="color:${(d.bt_stability||0)>0.7?'var(--green)':'var(--amber)'}">${((d.bt_stability||0)*100).toFixed(0)}%</div>
+            <div class="stat-note">Signal consistency</div>
+          </div>
+        </div>
+        ${d.bt_calibration_note ? `<div class="calib-note">⚠ ${d.bt_calibration_note}</div>` : ''}
+      </div>
+    </div>` : ''}
+
+    <!-- XAI -->
+    ${d.xai_top_features && d.xai_top_features.length ? `
+    <div class="card span-full mb-16">
+      <div class="card-head">
+        <div class="card-title">
+          <div class="card-icon">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <circle cx="6" cy="3" r="2" stroke="#9d7af8" stroke-width="1.2"/>
+              <circle cx="2" cy="9" r="1.5" stroke="#9d7af8" stroke-width="1.2"/>
+              <circle cx="10" cy="9" r="1.5" stroke="#9d7af8" stroke-width="1.2"/>
+              <path d="M4.5 4.5L3 7.5M7.5 4.5L9 7.5" stroke="rgba(157,122,248,0.5)" stroke-width="1"/>
+            </svg>
+          </div>
+          QLSTM Feature Importance
+        </div>
+        <div class="card-badge">Permutation importance · XAI</div>
+      </div>
+      <div class="card-body">
+        ${d.xai_top_features.map(f => {
+          const barColor = f.direction === 'positive' ? 'var(--red)' : 'var(--green)';
+          const dirIcon  = f.direction === 'positive' ? '↑' : f.direction === 'negative' ? '↓' : '→';
+          return `
+          <div class="xai-bar-row">
+            <div class="xai-name">${f.name}</div>
+            <div class="xai-track">
+              <div class="xai-fill" style="width:${f.importance_pct}%;background:${f.direction==='positive'?'var(--red)':'var(--green)'}"></div>
+            </div>
+            <div class="xai-pct" style="color:${barColor}">${f.importance_pct}%</div>
+            <div class="xai-dir" style="color:${barColor}">${dirIcon}</div>
+          </div>`;
+        }).join('')}
+        <div class="xai-note">
+          QLSTM hybrid SFC: <strong>${d.m32_hybrid_pred!=null?d.m32_hybrid_pred.toFixed(2)+'%':'—'}</strong>
+          &nbsp;·&nbsp; ProAdapt weight: <strong>${d.m32_proadapt_weight!=null?(d.m32_proadapt_weight*100).toFixed(0)+'% QLSTM':'—'}</strong> vs ${d.m32_proadapt_weight!=null?((1-d.m32_proadapt_weight)*100).toFixed(0)+'% GARCH':'—'}.
+          Features with high importance are the dominant risk drivers in the quantum model.
+        </div>
+      </div>
+    </div>` : ''}
+
+    
+    </div><!-- /{name} -->
+    <!-- ═══ TAB: ADVANCED ═══ -->
+    <div class="tab-panel" data-tab="advanced">
+<!-- ═══ NEW: LIQUIDITY INTELLIGENCE (GLF + SLI + MPI) ═══ -->
     <div class="card span-full mb-16 card-collapsed" data-lazy>
       <div class="card-head">
         <div class="card-title">
@@ -2331,132 +2597,93 @@ function render(d) {
       </div>
     </div>
 
-    <!-- KELLY + MACRO row -->
-    <div class="card span-full mb-16 card-collapsed" data-lazy>
-      <div class="card-head">
-        <div class="card-title">
-          <div class="card-icon">
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-              <rect x="1" y="1" width="4" height="4" rx="1" stroke="#f0b429" stroke-width="1.2"/>
-              <rect x="7" y="1" width="4" height="4" rx="1" stroke="#4a9eff" stroke-width="1.2"/>
-              <rect x="1" y="7" width="4" height="4" rx="1" stroke="#9d7af8" stroke-width="1.2"/>
-              <rect x="7" y="7" width="4" height="4" rx="1" stroke="#00ff9d" stroke-width="1.2"/>
-            </svg>
-          </div>
-          Kelly Position Sizing
+        <div class="grid-4 mb-16">
+      <div class="card">
+        <div class="card-head">
+          <div class="card-title">Macro Context</div>
         </div>
-          <span class="collapse-arrow" onclick="toggleCollapseCard(this)" style="cursor:pointer;font-size:10px;color:var(--text-3);padding:4px 8px;user-select:none">▶</span>
-        <div class="card-badge">Allocation Guide</div>
-      </div>
-      <div class="card-body">
-        <div class="stat-3 mb-12">
-          <div class="stat-box">
-            <div class="stat-label">Signal Confidence</div>
-            <div class="stat-val" style="color:${(d.kelly_p_win||0)>0.6?'var(--green)':'var(--amber)'}">${((d.kelly_p_win||0.5)*100).toFixed(0)}%</div>
-            <div class="stat-note">Bayesian signal trust</div>
-          </div>
-          <div class="stat-box">
-            <div class="stat-label">Max Allocation</div>
-            <div class="stat-val" style="color:${(d.kelly_fraction||0)>0.3?'var(--amber)':(d.kelly_fraction||0)>0?'var(--green)':'var(--text-3)'}">${((d.kelly_fraction||0)*100).toFixed(1)}%</div>
-            <div class="stat-note">${(d.kelly_fraction||0)>0?'Optimal Kelly size':'No edge — stay cash'}</div>
-          </div>
-          <div class="stat-box">
-            <div class="stat-label">Safe Allocation</div>
-            <div class="stat-val" style="color:var(--green)">${((d.kelly_half||0)*100).toFixed(1)}%</div>
-            <div class="stat-note">½ Kelly — reduced variance</div>
-          </div>
-        </div>
-        <div class="stat-3 mb-12">
-          <div class="info-row"><span class="info-k">Alert Window</span><span class="info-v">~${Math.round(d.alert_window_days||0)}d</span></div>
-          <div class="info-row"><span class="info-k">Timing Precision</span><span class="info-v" style="color:${d.timing_precision==='HIGH'?'var(--green)':'var(--amber)'}">${d.timing_precision||'LOW'}</span></div>
-          <div class="info-row"><span class="info-k">Signal Type</span><span class="info-v" style="color:${d.fng<15||(d.cascade_risk||0)>0.5?'var(--red)':'var(--green)'}">${d.fng<15?(d.fng_cls||'EXTREME FEAR'):(d.cascade_risk||0)>0.5?'CASCADE RISK':'NORMAL'}</span></div>
+        <div class="card-body-sm">
+          <div class="info-row"><span class="info-k">DXY</span><span class="info-v">${fmtNum(d.dxy,2)}</span></div>
+          <div class="info-row"><span class="info-k">M2 YoY</span><span class="info-v">${fmtNum(d.m2_yoy,2)}%</span></div>
+          <div class="info-row"><span class="info-k">Real Rate</span><span class="info-v">${d.m7_detail?.real_rate!=null?fmtNum(d.m7_detail.real_rate,2)+'%':'—'}</span></div>
+          <div class="info-row"><span class="info-k">Fed Rate</span><span class="info-v">${d.m7_detail?.fed_rate!=null?fmtNum(d.m7_detail.fed_rate,2)+'%':'—'}</span></div>
+          <div class="info-row"><span class="info-k">CPI YoY</span><span class="info-v" style="color:${(d.m7_detail?.cpi_yoy||0)>4?'var(--red)':'var(--text-1)'}">${d.m7_detail?.cpi_yoy!=null?fmtNum(d.m7_detail.cpi_yoy,2)+'%':'—'}</span></div>
+          <div class="info-row"><span class="info-k">Yield Slope</span><span class="info-v">${d.m8_detail?.slope!=null?fmtNum(d.m8_detail.slope,2):'—'}</span></div>
         </div>
       </div>
-    </div>
 
-    <!-- BACKTEST -->
-    ${d.bt_sharpe != null ? `
-    <div id="backtestSection" class="card span-full mb-16">
-      <div class="card-head">
-        <div class="card-title">
-          <div class="card-icon">
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-              <path d="M1 11L4 7L7 9L11 2" stroke="#00d4ff" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-              <circle cx="4" cy="7" r="1" fill="#00d4ff"/>
-              <circle cx="7" cy="9" r="1" fill="#00d4ff"/>
-            </svg>
-          </div>
-          Walk-Forward Backtest
+      <div class="card">
+        <div class="card-head">
+          <div class="card-title">On-Chain</div>
         </div>
-        <div class="card-badge">${d.bt_label||'UPPER-BOUND'} · ${d.bt_periods||0} periods</div>
-      </div>
-      <div class="card-body">
-        <div class="stat-4 mb-12">
-          <div class="stat-box">
-            <div class="stat-label">Sharpe Ratio</div>
-            <div class="stat-val" style="color:${(d.bt_sharpe||0)>1.5?'var(--green)':(d.bt_sharpe||0)>0.5?'var(--amber)':'var(--red)'}">${fmtNum(d.bt_sharpe,2)}</div>
-            <div class="stat-note">CI ${fmtNum(d.bt_sharpe_low,2)}–${fmtNum(d.bt_sharpe_high,2)} (95%)</div>
-          </div>
-          <div class="stat-box">
-            <div class="stat-label">Win Rate</div>
-            <div class="stat-val" style="color:var(--amber)">${((d.bt_win_rate||0)*100).toFixed(0)}%</div>
-            <div class="stat-note">CI ${((d.bt_win_rate_low||0)*100).toFixed(0)}–${((d.bt_win_rate_high||0)*100).toFixed(0)}%</div>
-          </div>
-          <div class="stat-box">
-            <div class="stat-label">Max Drawdown</div>
-            <div class="stat-val" style="color:${(d.bt_max_dd||0)<0.1?'var(--green)':(d.bt_max_dd||0)<0.2?'var(--amber)':'var(--red)'}">${((d.bt_max_dd||0)*100).toFixed(1)}%</div>
-            <div class="stat-note">Peak-to-trough</div>
-          </div>
-          <div class="stat-box">
-            <div class="stat-label">Stability</div>
-            <div class="stat-val" style="color:${(d.bt_stability||0)>0.7?'var(--green)':'var(--amber)'}">${((d.bt_stability||0)*100).toFixed(0)}%</div>
-            <div class="stat-note">Signal consistency</div>
-          </div>
+        <div class="card-body-sm">
+          <div class="info-row"><span class="info-k">GARCH Vol</span><span class="info-v">${d.m10_detail?.garch_vol!=null?fmtNum(d.m10_detail.garch_vol*100,2)+'%':'—'}</span></div>
+          <div class="info-row"><span class="info-k">Persistence</span><span class="info-v">${d.m10_detail?.persistence!=null?fmtNum(d.m10_detail.persistence,3):'—'}</span></div>
+          <div class="info-row"><span class="info-k">VaR 95%</span><span class="info-v" style="color:var(--red)">${d.m11_detail?.var_95!=null?(d.m11_detail.var_95*100).toFixed(2)+'%':'—'}</span></div>
+          <div class="info-row"><span class="info-k">ES 95%</span><span class="info-v" style="color:var(--red)">${d.m11_detail?.es_95!=null?(d.m11_detail.es_95*100).toFixed(2)+'%':'—'}</span></div>
+          <div class="info-row"><span class="info-k">Jump Risk</span><span class="info-v">${d.m12_detail?.jump_risk!=null?(d.m12_detail.jump_risk*100).toFixed(2)+'%':'—'}</span></div>
+          <div class="info-row"><span class="info-k">OBI</span><span class="info-v" style="color:${(d.m20_detail?.obi||0)<-0.3?'var(--red)':(d.m20_detail?.obi||0)>0.3?'var(--green)':'var(--text-1)'}">${d.m20_detail?.obi!=null?fmtNum(d.m20_detail.obi,4):'—'}</span></div>
         </div>
-        ${d.bt_calibration_note ? `<div class="calib-note">⚠ ${d.bt_calibration_note}</div>` : ''}
       </div>
-    </div>` : ''}
 
-    <!-- XAI -->
-    ${d.xai_top_features && d.xai_top_features.length ? `
-    <div class="card span-full mb-16">
-      <div class="card-head">
-        <div class="card-title">
-          <div class="card-icon">
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-              <circle cx="6" cy="3" r="2" stroke="#9d7af8" stroke-width="1.2"/>
-              <circle cx="2" cy="9" r="1.5" stroke="#9d7af8" stroke-width="1.2"/>
-              <circle cx="10" cy="9" r="1.5" stroke="#9d7af8" stroke-width="1.2"/>
-              <path d="M4.5 4.5L3 7.5M7.5 4.5L9 7.5" stroke="rgba(157,122,248,0.5)" stroke-width="1"/>
-            </svg>
-          </div>
-          QLSTM Feature Importance
+      <div class="card">
+        <div class="card-head">
+          <div class="card-title">Behavioral</div>
         </div>
-        <div class="card-badge">Permutation importance · XAI</div>
+        <div class="card-body-sm">
+          <div class="info-row"><span class="info-k">Minsky Stage</span><span class="info-v">${d.m25_detail?.minsky_stage||'—'}</span></div>
+          <div class="info-row"><span class="info-k">Loss Aversion</span><span class="info-v">${d.m26_detail?.loss_aversion!=null?fmtNum(d.m26_detail.loss_aversion,2):'—'}</span></div>
+          <div class="info-row"><span class="info-k">Tail Danger</span><span class="info-v" style="color:${d.m27_detail?.tail_danger==='ELEVATED'?'var(--amber)':d.m27_detail?.tail_danger==='HIGH'?'var(--red)':'var(--text-1)'}">${d.m27_detail?.tail_danger||'—'}</span></div>
+          <div class="info-row"><span class="info-k">Debt/GDP</span><span class="info-v" style="color:${(d.m29_detail?.debt_gdp_ratio||0)>1.2?'var(--red)':'var(--text-1)'}">${d.m29_detail?.debt_gdp_ratio!=null?fmtNum(d.m29_detail.debt_gdp_ratio,3):'—'}</span></div>
+          <div class="info-row"><span class="info-k">Altman-Z</span><span class="info-v" style="color:${(d.m31_detail?.z_score||0)>4?'var(--green)':'var(--amber)'}">${d.m31_detail?.z_score!=null?fmtNum(d.m31_detail.z_score,2):'—'}</span></div>
+          <div class="info-row"><span class="info-k">Reddit</span><span class="info-v">${d.adv_reddit_label||'NEUTRAL'}</span></div>
+        </div>
       </div>
-      <div class="card-body">
-        ${d.xai_top_features.map(f => {
-          const barColor = f.direction === 'positive' ? 'var(--red)' : 'var(--green)';
-          const dirIcon  = f.direction === 'positive' ? '↑' : f.direction === 'negative' ? '↓' : '→';
-          return `
-          <div class="xai-bar-row">
-            <div class="xai-name">${f.name}</div>
-            <div class="xai-track">
-              <div class="xai-fill" style="width:${f.importance_pct}%;background:${f.direction==='positive'?'var(--red)':'var(--green)'}"></div>
+
+      <div class="card">
+        <div class="card-head">
+          <div class="card-title">
+            <div class="card-icon">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                <rect x="1" y="1" width="10" height="10" rx="2" stroke="#9d7af8" stroke-width="1.2" fill="none"/>
+                <path d="M4 6L5.5 7.5L8 4.5" stroke="#00ff9d" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
             </div>
-            <div class="xai-pct" style="color:${barColor}">${f.importance_pct}%</div>
-            <div class="xai-dir" style="color:${barColor}">${dirIcon}</div>
-          </div>`;
-        }).join('')}
-        <div class="xai-note">
-          QLSTM hybrid SFC: <strong>${d.m32_hybrid_pred!=null?d.m32_hybrid_pred.toFixed(2)+'%':'—'}</strong>
-          &nbsp;·&nbsp; ProAdapt weight: <strong>${d.m32_proadapt_weight!=null?(d.m32_proadapt_weight*100).toFixed(0)+'% QLSTM':'—'}</strong> vs ${d.m32_proadapt_weight!=null?((1-d.m32_proadapt_weight)*100).toFixed(0)+'% GARCH':'—'}.
-          Features with high importance are the dominant risk drivers in the quantum model.
+            Advanced ML Signals
+          </div>
+        </div>
+        <div class="card-body-sm">
+          ${d.shock_severity && d.shock_severity !== 'NONE' ? `
+            <div style="margin-bottom:8px">
+              <span class="sec-chip sc-critical">${d.shock_severity} SHOCK</span>
+              ${d.shock_event?`<div class="sec-event-text">${d.shock_event}</div>`:''}
+            </div>
+          ` : ''}
+          <!-- HMM Regime -->
+          <div class="info-row"><span class="info-k">HMM Regime</span><span class="info-v" style="color:${d.hmm_regime==='CRISIS'?'var(--red)':d.hmm_regime==='BEAR'?'var(--amber)':d.hmm_regime==='BULL'?'var(--green)':'var(--text-1)'}">${d.hmm_regime||'—'} ${d.hmm_crisis_prob!=null?'('+fmtNum(d.hmm_crisis_prob*100,0)+'%)':''}</span></div>
+          <!-- XGBoost Meta -->
+          <div class="info-row"><span class="info-k">XGBoost Meta</span><span class="info-v" style="color:${(d.xgb_meta_prediction||0)>25?'var(--red)':(d.xgb_meta_prediction||0)>15?'var(--amber)':'var(--green)'}">${d.xgb_meta_prediction!=null?fmtNum(d.xgb_meta_prediction,1)+'% stress':'—'} ${d.xgb_available?'✓':'✗'}</span></div>
+          <!-- MTF Alignment -->
+          <div class="info-row"><span class="info-k">MTF Alignment</span><span class="info-v" style="color:${(d.mtf_alignment_score||0)>0.3?'var(--green)':(d.mtf_alignment_score||0)<-0.3?'var(--red)':'var(--amber)'}">${d.mtf_available?fmtNum(d.mtf_alignment_score,2):'—'} ${d.mtf_divergence?'⚠ Divergence':''}</span></div>
+          <!-- AFE RSI-14 -->
+          <div class="info-row"><span class="info-k">AFE RSI</span><span class="info-v" style="color:${(d.rsi_14||50)<30?'var(--green)':(d.rsi_14||50)>70?'var(--red)':'var(--text-1)'}">${d.rsi_14!=null?fmtNum(d.rsi_14,1):'&mdash;'}</span></div>
+          <!-- AFE MACD -->
+          <div class="info-row"><span class="info-k">AFE MACD Sig</span><span class="info-v" style="color:${(d.afe_macd_signal||0)<-0.3?'var(--red)':(d.afe_macd_signal||0)>0.3?'var(--green)':'var(--text-1)'}">${d.afe_macd_signal!=null?fmtNum(d.afe_macd_signal,3):'—'} ${d.afe_available?'✓':'✗'}</span></div>
+          <!-- Mamba SSM -->
+          <div class="info-row"><span class="info-k">Mamba SSM</span><span class="info-v" style="color:${(d.m32_mamba||0)>0.3?'var(--red)':(d.m32_mamba||0)>0.2?'var(--amber)':'var(--green)'}">${d.m32_mamba!=null?fmtNum(d.m32_mamba*100,1)+'% stress':'—'}</span></div>
+          <!-- EWMA -->
+          <div class="info-row"><span class="info-k">EWMA Online</span><span class="info-v" style="color:${d.ewma_corrected?'var(--green)':'var(--text-3)'}">${d.ewma_corrected?'✓ Active':'—'}</span></div>
+          <div style="border-top:1px solid var(--border-1);margin:8px 0;padding-top:6px"></div>
+          <div class="info-row"><span class="info-k">Cascade Risk</span><span class="info-v" style="color:${(d.cascade_risk||0)>0.5?'var(--red)':(d.cascade_risk||0)>0.25?'var(--amber)':'var(--green)'}">${fmtNum((d.cascade_risk||0)*100,0)}%</span></div>
+          <div class="info-row"><span class="info-k">Transition Risk</span><span class="info-v" style="color:${(d.transition_risk||0)>0.5?'var(--red)':(d.transition_risk||0)>0.25?'var(--amber)':'var(--green)'}">${fmtNum((d.transition_risk||0)*100,0)}%</span></div>
+          <div class="info-row"><span class="info-k">News Stress</span><span class="info-v" style="color:${(d.news_stress||0)<0?'var(--green)':(d.news_stress||0)>5?'var(--red)':(d.news_stress||0)>1?'var(--amber)':'var(--text-1)'}">${fmtNum(d.news_stress,1)}%</span></div>
+          <div class="info-row"><span class="info-k">Adv Uncertainty</span><span class="info-v">${fmtNum((d.adv_uncertainty||0)*100,1)}%</span></div>
         </div>
       </div>
-    </div>` : ''}
-
-    <!-- PAPER TRADING -->
+    </div><!-- /{name} -->
+    <!-- ═══ TAB: TRADING ═══ -->
+    <div class="tab-panel" data-tab="trading">
+<!-- PAPER TRADING -->
     <div class="card span-full mb-16" id="paperSection">
       <div class="card-head">
         <div class="card-title">
@@ -2544,92 +2771,9 @@ function render(d) {
     </div>
 
     <!-- MACRO ROW -->
-    <div class="grid-4 mb-16">
-      <div class="card">
-        <div class="card-head">
-          <div class="card-title">Macro Context</div>
-        </div>
-        <div class="card-body-sm">
-          <div class="info-row"><span class="info-k">DXY</span><span class="info-v">${fmtNum(d.dxy,2)}</span></div>
-          <div class="info-row"><span class="info-k">M2 YoY</span><span class="info-v">${fmtNum(d.m2_yoy,2)}%</span></div>
-          <div class="info-row"><span class="info-k">Real Rate</span><span class="info-v">${d.m7_detail?.real_rate!=null?fmtNum(d.m7_detail.real_rate,2)+'%':'—'}</span></div>
-          <div class="info-row"><span class="info-k">Fed Rate</span><span class="info-v">${d.m7_detail?.fed_rate!=null?fmtNum(d.m7_detail.fed_rate,2)+'%':'—'}</span></div>
-          <div class="info-row"><span class="info-k">CPI YoY</span><span class="info-v" style="color:${(d.m7_detail?.cpi_yoy||0)>4?'var(--red)':'var(--text-1)'}">${d.m7_detail?.cpi_yoy!=null?fmtNum(d.m7_detail.cpi_yoy,2)+'%':'—'}</span></div>
-          <div class="info-row"><span class="info-k">Yield Slope</span><span class="info-v">${d.m8_detail?.slope!=null?fmtNum(d.m8_detail.slope,2):'—'}</span></div>
-        </div>
-      </div>
 
-      <div class="card">
-        <div class="card-head">
-          <div class="card-title">On-Chain</div>
-        </div>
-        <div class="card-body-sm">
-          <div class="info-row"><span class="info-k">GARCH Vol</span><span class="info-v">${d.m10_detail?.garch_vol!=null?fmtNum(d.m10_detail.garch_vol*100,2)+'%':'—'}</span></div>
-          <div class="info-row"><span class="info-k">Persistence</span><span class="info-v">${d.m10_detail?.persistence!=null?fmtNum(d.m10_detail.persistence,3):'—'}</span></div>
-          <div class="info-row"><span class="info-k">VaR 95%</span><span class="info-v" style="color:var(--red)">${d.m11_detail?.var_95!=null?(d.m11_detail.var_95*100).toFixed(2)+'%':'—'}</span></div>
-          <div class="info-row"><span class="info-k">ES 95%</span><span class="info-v" style="color:var(--red)">${d.m11_detail?.es_95!=null?(d.m11_detail.es_95*100).toFixed(2)+'%':'—'}</span></div>
-          <div class="info-row"><span class="info-k">Jump Risk</span><span class="info-v">${d.m12_detail?.jump_risk!=null?(d.m12_detail.jump_risk*100).toFixed(2)+'%':'—'}</span></div>
-          <div class="info-row"><span class="info-k">OBI</span><span class="info-v" style="color:${(d.m20_detail?.obi||0)<-0.3?'var(--red)':(d.m20_detail?.obi||0)>0.3?'var(--green)':'var(--text-1)'}">${d.m20_detail?.obi!=null?fmtNum(d.m20_detail.obi,4):'—'}</span></div>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="card-head">
-          <div class="card-title">Behavioral</div>
-        </div>
-        <div class="card-body-sm">
-          <div class="info-row"><span class="info-k">Minsky Stage</span><span class="info-v">${d.m25_detail?.minsky_stage||'—'}</span></div>
-          <div class="info-row"><span class="info-k">Loss Aversion</span><span class="info-v">${d.m26_detail?.loss_aversion!=null?fmtNum(d.m26_detail.loss_aversion,2):'—'}</span></div>
-          <div class="info-row"><span class="info-k">Tail Danger</span><span class="info-v" style="color:${d.m27_detail?.tail_danger==='ELEVATED'?'var(--amber)':d.m27_detail?.tail_danger==='HIGH'?'var(--red)':'var(--text-1)'}">${d.m27_detail?.tail_danger||'—'}</span></div>
-          <div class="info-row"><span class="info-k">Debt/GDP</span><span class="info-v" style="color:${(d.m29_detail?.debt_gdp_ratio||0)>1.2?'var(--red)':'var(--text-1)'}">${d.m29_detail?.debt_gdp_ratio!=null?fmtNum(d.m29_detail.debt_gdp_ratio,3):'—'}</span></div>
-          <div class="info-row"><span class="info-k">Altman-Z</span><span class="info-v" style="color:${(d.m31_detail?.z_score||0)>4?'var(--green)':'var(--amber)'}">${d.m31_detail?.z_score!=null?fmtNum(d.m31_detail.z_score,2):'—'}</span></div>
-          <div class="info-row"><span class="info-k">Reddit</span><span class="info-v">${d.adv_reddit_label||'NEUTRAL'}</span></div>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="card-head">
-          <div class="card-title">
-            <div class="card-icon">
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                <rect x="1" y="1" width="10" height="10" rx="2" stroke="#9d7af8" stroke-width="1.2" fill="none"/>
-                <path d="M4 6L5.5 7.5L8 4.5" stroke="#00ff9d" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
-            </div>
-            Advanced ML Signals
-          </div>
-        </div>
-        <div class="card-body-sm">
-          ${d.shock_severity && d.shock_severity !== 'NONE' ? `
-            <div style="margin-bottom:8px">
-              <span class="sec-chip sc-critical">${d.shock_severity} SHOCK</span>
-              ${d.shock_event?`<div class="sec-event-text">${d.shock_event}</div>`:''}
-            </div>
-          ` : ''}
-          <!-- HMM Regime -->
-          <div class="info-row"><span class="info-k">HMM Regime</span><span class="info-v" style="color:${d.hmm_regime==='CRISIS'?'var(--red)':d.hmm_regime==='BEAR'?'var(--amber)':d.hmm_regime==='BULL'?'var(--green)':'var(--text-1)'}">${d.hmm_regime||'—'} ${d.hmm_crisis_prob!=null?'('+fmtNum(d.hmm_crisis_prob*100,0)+'%)':''}</span></div>
-          <!-- XGBoost Meta -->
-          <div class="info-row"><span class="info-k">XGBoost Meta</span><span class="info-v" style="color:${(d.xgb_meta_prediction||0)>25?'var(--red)':(d.xgb_meta_prediction||0)>15?'var(--amber)':'var(--green)'}">${d.xgb_meta_prediction!=null?fmtNum(d.xgb_meta_prediction,1)+'% stress':'—'} ${d.xgb_available?'✓':'✗'}</span></div>
-          <!-- MTF Alignment -->
-          <div class="info-row"><span class="info-k">MTF Alignment</span><span class="info-v" style="color:${(d.mtf_alignment_score||0)>0.3?'var(--green)':(d.mtf_alignment_score||0)<-0.3?'var(--red)':'var(--amber)'}">${d.mtf_available?fmtNum(d.mtf_alignment_score,2):'—'} ${d.mtf_divergence?'⚠ Divergence':''}</span></div>
-          <!-- AFE RSI-14 -->
-          <div class="info-row"><span class="info-k">AFE RSI</span><span class="info-v" style="color:${(d.rsi_14||50)<30?'var(--green)':(d.rsi_14||50)>70?'var(--red)':'var(--text-1)'}">${d.rsi_14!=null?fmtNum(d.rsi_14,1):'&mdash;'}</span></div>
-          <!-- AFE MACD -->
-          <div class="info-row"><span class="info-k">AFE MACD Sig</span><span class="info-v" style="color:${(d.afe_macd_signal||0)<-0.3?'var(--red)':(d.afe_macd_signal||0)>0.3?'var(--green)':'var(--text-1)'}">${d.afe_macd_signal!=null?fmtNum(d.afe_macd_signal,3):'—'} ${d.afe_available?'✓':'✗'}</span></div>
-          <!-- Mamba SSM -->
-          <div class="info-row"><span class="info-k">Mamba SSM</span><span class="info-v" style="color:${(d.m32_mamba||0)>0.3?'var(--red)':(d.m32_mamba||0)>0.2?'var(--amber)':'var(--green)'}">${d.m32_mamba!=null?fmtNum(d.m32_mamba*100,1)+'% stress':'—'}</span></div>
-          <!-- EWMA -->
-          <div class="info-row"><span class="info-k">EWMA Online</span><span class="info-v" style="color:${d.ewma_corrected?'var(--green)':'var(--text-3)'}">${d.ewma_corrected?'✓ Active':'—'}</span></div>
-          <div style="border-top:1px solid var(--border-1);margin:8px 0;padding-top:6px"></div>
-          <div class="info-row"><span class="info-k">Cascade Risk</span><span class="info-v" style="color:${(d.cascade_risk||0)>0.5?'var(--red)':(d.cascade_risk||0)>0.25?'var(--amber)':'var(--green)'}">${fmtNum((d.cascade_risk||0)*100,0)}%</span></div>
-          <div class="info-row"><span class="info-k">Transition Risk</span><span class="info-v" style="color:${(d.transition_risk||0)>0.5?'var(--red)':(d.transition_risk||0)>0.25?'var(--amber)':'var(--green)'}">${fmtNum((d.transition_risk||0)*100,0)}%</span></div>
-          <div class="info-row"><span class="info-k">News Stress</span><span class="info-v" style="color:${(d.news_stress||0)<0?'var(--green)':(d.news_stress||0)>5?'var(--red)':(d.news_stress||0)>1?'var(--amber)':'var(--text-1)'}">${fmtNum(d.news_stress,1)}%</span></div>
-          <div class="info-row"><span class="info-k">Adv Uncertainty</span><span class="info-v">${fmtNum((d.adv_uncertainty||0)*100,1)}%</span></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- HELP -->
+    </div><!-- /{name} -->
+<!-- HELP -->
     <div id="helpPanel" style="display:${helpVisible?'block':'none'}">
       <div class="help-panel">
         <div style="font-size:13px;font-weight:700;margin-bottom:4px">How to Read SFC Terminal</div>
