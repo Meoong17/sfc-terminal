@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# SFC Terminal — Real-time data pipeline
+# SFC Terminal — Real-time data pipeline (repo copy)
+# Cron runs ~/.hermes/scripts/sfc-pipeline.sh — sync both when editing
 set -uo pipefail
 
 log() { echo "[SFC] $(date -u '+%H:%M:%S') $*"; }
@@ -49,40 +50,59 @@ collect_with_retry
 log "Running paper trader..."
 $PYTHON paper_trader.py 2>>sfc-pipeline.log || log "⚠ Paper trader skipped"
 
-# ── Commit & push — pendekatan nuclear reset ──
-# Simpan data files, reset keras ke remote, timpa data files, commit
+# ── Make git ignore index.html ──
+git update-index --skip-worktree index.html 2>/dev/null || true
+
+# ── Restore index.html from authoritative source ──
+log "Restoring index.html from /home/ubuntu/index.html..."
+if [ -f /home/ubuntu/index.html ] && [ "$(wc -c < /home/ubuntu/index.html)" -gt 50000 ]; then
+  cp /home/ubuntu/index.html index.html
+  log "Restored from /home/ubuntu/index.html ($(wc -c < index.html) bytes)"
+elif [ -f index.html.bak ] && [ "$(wc -c < index.html.bak)" -gt 50000 ]; then
+  cp index.html.bak index.html
+  log "Restored from .bak fallback ($(wc -c < index.html) bytes)"
+else
+  log "⚠ No valid restore source found — keeping current index.html"
+fi
+
+log "Injecting data into index.html..."
+$PYTHON inject_data.py data.json index.html 2>>sfc-pipeline.log || \
+  log "⚠ Inject failed (non-fatal)"
+
+# ── Commit & push (data files ONLY) ──
 log "Committing..."
-TMP_DATA=$(mktemp -d)
-cp data.json paper_trades.json paper_history.json "$TMP_DATA/" 2>/dev/null || true
-
-git fetch origin main 2>&1 || { log "❌ Fetch failed"; GIT_RESULT="fetch-failed"; }
-git reset --hard origin/main 2>&1 || { log "❌ Reset failed"; GIT_RESULT="reset-failed"; }
-
-# Restore data files yang baru dikoleksi
-cp "$TMP_DATA/data.json" . 2>/dev/null || true
-cp "$TMP_DATA/paper_trades.json" . 2>/dev/null || true
-cp "$TMP_DATA/paper_history.json" . 2>/dev/null || true
-rm -rf "$TMP_DATA"
-
 git add data.json paper_trades.json paper_history.json
+git add -u 2>/dev/null || true
+git reset HEAD index.html 2>/dev/null || true
 
 if git diff --staged --quiet; then
     log "No changes — skipping push"
     GIT_RESULT="no-change"
 else
     git commit -m "auto: SFC data $(date -u '+%Y-%m-%d %H:%M:%S')"
-    log "Pushing..."
-    if git push origin main 2>&1; then
-        log "✅ Pushed — Pages deploying..."
-        GIT_RESULT="ok"
+    log "Syncing with remote..."
+    if git pull --rebase --autostash -X theirs origin main 2>&1; then
+        log "Pushing..."
+        if git push origin main 2>&1; then
+            log "✅ Pushed — Pages deploying..."
+            GIT_RESULT="ok"
+        else
+            log "❌ Push failed!"
+            GIT_RESULT="push-failed"
+        fi
     else
-        log "❌ Push failed!"
-        GIT_RESULT="push-failed"
+        log "❌ Rebase failed, trying merge strategy..."
+        git rebase --abort 2>/dev/null || true
+        if git pull -X theirs origin main 2>&1 && git push origin main 2>&1; then
+            log "✅ Pushed (merge path) — Pages deploying..."
+            GIT_RESULT="ok"
+        else
+            log "❌ Pull+push both failed!"
+            GIT_RESULT="sync-failed"
+        fi
     fi
 fi
 
-# Restore index.html dari source aman — git reset --hard nimpah file apapun
-cp /home/ubuntu/index.html index.html 2>/dev/null || true
-log "index.html restored from /home/ubuntu/index.html"
+git update-index --skip-worktree index.html 2>/dev/null || true
 
 log "Pipeline done: collect=$COLLECT_RESULT | git=$GIT_RESULT"
