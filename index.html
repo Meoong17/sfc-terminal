@@ -1119,19 +1119,7 @@ body::before {
   .stat-4 { grid-template-columns: repeat(2, 1fr); }
 }
 @media (max-width: 768px) {
-  nav.nav { flex-wrap: wrap; gap: 4px; }
-  .nav-center {
-    display: flex;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-    width: 100%;
-    padding: 2px 0;
-    gap: 1px;
-    order: 3;
-  }
-  .nav-center::-webkit-scrollbar { display: none; }
-  .nav-tab { white-space: nowrap; padding: 4px 10px; font-size: 10px; }
+  .nav-center { display: none; }
   .main { padding: 12px; }
   .status-band { padding: 6px 12px; }
   .kpi-row { grid-template-columns: repeat(2, 1fr); }
@@ -1153,14 +1141,6 @@ body::before {
   .kpi-num { font-size: 15px; }
   .kpi-row { gap: 6px; }
   .kpi { padding: 10px; }
-}
-
-/* TAB PANELS */
-.tab-panel { display: none; animation: tabFadeIn 0.25s ease; }
-.tab-panel.active { display: block; }
-@keyframes tabFadeIn {
-  from { opacity: 0; transform: translateY(6px); }
-  to   { opacity: 1; transform: translateY(0); }
 }
 
 /* ─── Donation widget ─── */
@@ -1258,7 +1238,7 @@ body::before {
 
 <script>
 /* __EMBEDDED_DATA_PLACEHOLDER__ */
-var __EMBEDDED_DATA = {"ts": "2026-06-28T00:08:56.346276+00:00", "btc": 60125.23, "btc_24h": -0.014, "btc_mcap": 1202538699514.241, "fng": 16, "fng_cls": "Extreme Fear", "dom": 58.2, "dvol": 45.16, "sfc_base": 13.84908481646262, "sfc_effective": 16.836107684245654, "news_stress": 5.9, "news_headlines": ["\ud83d\udd34[Rt][CoinTelegrap] Bitcoin faces fresh capitulation risk as 50K BTC moved at a loss", "\ud83d\udd34[Rt][CoinDesk] Why a selloff in gold and silver is dragging bitcoin down", "\ud83d\udd34[Ft][MarketWatch] Older Americans will soon have Medicare access to GLP-1s for weight loss fo", "\ud83d\udd34[Rt][NewsBTC] Top Ethereum MEV Bot JaredfromSubway.eth Drained of Up to $15M in Counter-M", "\ud83d\udd34[Rt][NewsBTC] SecondFi Completes Refund Snapshot for Wallets Impacted by Recent Cardano E", "\ud83d\udd34[Lt][Investing.co] ECB\u2019s Schnabel says inflation risks remain despite easing energy prices", "\ud83d\udd34[Rt][Bitcoin.com] Miners Absorb 18% Hashprice Crash as Bitcoin Difficulty Jumps 7.15%", "\u26aa[Rt][CoinTelegrap] Fidelity rebuts claims Bitcoin becomes less secure after halvings"], "news_sentiment": -0.088, "news_stats": {"total_articles": 34, "sources_hit": 9, "stress_raw": 5.9, "stress_capped": 5.9}, "m2_yoy": 5.58, "liq_mod": 1.1, "liq_total_24h": 515620141.11, "liq_long_vol": 222046592.58, "liq_short_vol": 293573548.53, "zone": "ELEVATED", "floor_buffer": 5393, "floor_total": 54732, "regime": "CRISIS", "regime_prob": 1.0, "transition_risk": 0.5, "dxy": 101.31, "pc_oi": 0.58, "pc_vol": 1.5, "dv_sfc": 0.09, "phi": 1.0, "state": "NORMAL OSCILLATION", "signal": "Standard allocation", "factors": {"Lt": -2.1392251285361, "St": -0.34476589463550633, "Rt": -2.548963821036466, "Ft": 1.51889885003306, "Sc": -0.18116391503877205}, "ath": 126080, "ath_date": "2025-10-06T18:57:42.558Z", "rsi_14": 42.92, "rsi_regime": "NEUTRAL", "sopr_proxy": 0.7707, "sopr_signal": "EXTREME_CAPITULATION", "sopr_score": 0.95, "cascade_risk": 0.172, "liq_density": 0.258, "liq_pressure": "BALANCED", "composite_confidence": 0.399, "confidence_components": {"method_agree": 0.815, "low_stress_boost": 0.0665, "rsi": 0.03, "sopr": -0.05, "dvol": 0.05, "squeeze_penalty": 0.0, "cascade_penalty": -0.0, "fear_penalty": -0.0, "news_penalty": -0.0, "vol_penalty": 0.0, "transition_penalty": 0.0}, "m1_klr": 13.7, "m2_logit": 7.9, "m3_bayes": 8.0, "m4_ewc": 6.7, "m5_qreg": 8.2, "m6_regime_score": 1.0, "method_agreement": 0.815, "m7_fisher": 0.35, "m7_detail": {"real_rate": 0.63, "fed_rate": 3.63, "cpi_yoy": 3.0}, "m8_yield": 0.45, "m8_detail": {"slope": 0.31, "spread": 2.8}, "m9_liquidity": null, "m9_detail": null, "m10_garch": 0.85, "m10_detail": {"garch_vol": 0.1183, "persistence": 0.99}, "m11_var": 0.85, "m11_detail": {"var_95": -0.1759, "es_95": -0.1802}, "m12_jump": 0.15, "m12_detail": {"jump_risk": 0.0, "gap_count": 0}, "m13_funding": null, "m13_detail": null, "m14_skew": 0.1, "m14_detail": {"skew": 0.0, "put_iv": 48.08, "call_iv": 48.08}, "m15_concentration": 0.1, "m15_detail": {"hhi": 0.0054, "top3_share": 0.059}, "m16_regime_ml": 0.45, "m16_detail": {"p_crisis": 0.45, "recent_mean": 0.0212, "recent_std": 0.1427}, "m17_granger": 0.1, "m17_detail": {"corr": -0.287, "lag_corr": 0.062}, "m18_entropy": 0.55, "m18_detail": {"entropy_norm": 0.831, "entropy_raw": 1.912}, "m19_mutual_info": 0.15, "m19_detail": {"mi_norm": 0.097, "mi_raw": 0.107}, "new_methods_active": 12, "new_methods_avg": 0.185, "inst_methods_active": 12, "inst_methods_avg": 0.241, "sc_methods_active": 5, "sc_methods_avg": 0.412, "total_methods_active": 48, "m20_obi": 0.75, "m20_detail": {"obi_change": "SELL_SURGE", "obi_delta": -0.3563, "obi": -0.5877, "obi_norm": 0.2061, "bid_vol": 0.75, "ask_vol": 2.91}, "m21_trade_flow": 0.3, "m21_detail": {"large_sell_notional": 0, "large_buy_notional": 0, "large_ratio": 0, "large_sell_ratio": 0.5, "large_share": 0}, "m22_spread": 0.1, "m22_detail": {"spread_bps": 0.0017, "range_bps": 180.62, "bid": 60125.23, "ask": 60125.24, "mid": 60125.23, "spread_change": "STABLE", "spread_delta": -0.0}, "m23_liquidity": 0.8, "m23_detail": {"slippage_pct": 2.506, "levels_used_buy": 999, "levels_used_sell": 98, "mid_price": 60125.24, "liq_change": "DEEPENING_FAST", "slippage_delta": -2.494}, "m24_cape": 0.1, "m24_detail": {"cape": 0.6576, "current_price": 59950.79, "sma_1y_realized": 91168.41}, "m25_minsky": 0.15, "m25_detail": {"funding_rate": 0, "funding_8h": 4.74e-06, "accel": -0.0, "oi_futures": 1581675000, "minsky_stage": "NORMAL"}, "m26_kahneman": 0.245, "m26_detail": {"loss_aversion": 0.35, "anchoring": 0.15, "fear": 0.2, "realized_price": 64412.54, "ath": 126080.0, "pl_pct": -6.66}, "m27_taleb": 0.502, "m27_detail": {"dvol": 46.53, "skewness": -0.1453, "max_drawdown": 0.2731, "vol_7d_ann": 0.3046, "vol_90d_ann": 0.4653, "term": "3M>1W", "tail_danger": "ELEVATED"}, "m28_summers": 0.2, "m28_detail": {"real_rate": 0.63, "gdp_growth": 2.68, "fed_rate": 3.63, "regime": "NORMAL"}, "m29_debt": 0.85, "m29_detail": {"debt_gdp_ratio": 1.226, "crisis_risk": "HIGH"}, "m30_rajan": 0.15, "m30_detail": {"fsi_score": 0.15, "components": {"credit_growth": 5.58, "asset_vol": 48.08, "yield_curve": 0.31, "hy_spread": 2.8, "top3_concentration": 0.059, "fng": 18}, "stability": "NORMAL"}, "m31_altman": 0.15, "m31_detail": {"z_score": 5.734, "x1_liquidity": 0.0, "x2_network": 4.0, "x3_efficiency": 0.792, "x4_oi_ratio": 0.988, "x5_turnover": 2.662, "zone": "SAFE"}, "m76_supply_growth": null, "m76_detail": {"growth_30d_pct": -2.19, "growth_7d_pct": -0.48, "latest_mcap": 259826886031.0, "mcap_30d_ago": 265641516626.0, "status": "ok"}, "m77_ssr": 0.618, "m77_detail": {"ssr": 4.63, "stablecoin_mcap": 259826886031.0, "btc_mcap": 1202538699514.0, "label": "MODERATE", "status": "ok"}, "m78_exchange_flow": 0.395, "m78_detail": {"netflow": -19728620.96, "netflow_pct_of_reserve": -0.03, "reserve": 62397957485.0, "label": "MILD_OUTFLOW", "status": "ok"}, "m79_velocity": 0.088, "m79_detail": {"velocity": 0.0018, "daily_inflow": 45194381.0, "daily_outflow": 64923002.0, "reserve": 62397957485.0, "label": "DORMANT", "status": "ok"}, "m80_dominance": 0.8, "m80_detail": {"dominance_pct": 12.56, "stablecoin_mcap": 259826886031.0, "total_crypto_mcap": 2067879984562.0, "dom_change_30d": -0.28, "trend": "STABLE", "status": "ok"}, "sli_score": 62.4, "sli_stress": 0.376, "sli_label": "HEALTHY", "sli_available": true, "sli_components": {"dominance": {"score": 0.2, "weight": 0.1, "contribution": -0.03}, "exchange_flow": {"score": 0.605, "weight": 0.15, "contribution": 0.0157}, "growth_divergence": {"score": 0.45, "weight": 0.1, "contribution": -0.005}, "mint_burn": {"score": 0.65, "weight": 0.1, "contribution": 0.015}, "reserve_ratio": {"score": 0.8, "weight": 0.1, "contribution": 0.03}, "ssr": {"score": 0.384, "weight": 0.15, "contribution": -0.0174}, "supply_growth": {"score": 0.842, "weight": 0.2, "contribution": 0.0684}, "velocity": {"score": 0.912, "weight": 0.1, "contribution": 0.0412}}, "sli_usdt_growth": -2.19, "sli_usdc_growth": -3.22, "sli_growth_divergence": 1.03, "micro_change_flags": {"obi": "SELL_SURGE"}, "micro_trend_score": 0.333, "micro_deteriorating": true, "m32_qlstm": 0.1159, "m32_active": true, "m32_adjustment_pp": -0.1019, "m32_garch_residual": -0.5738, "m32_garch_volatility": 2.9027, "m32_hybrid_pred": 11.0162, "m32_proadapt_weight": 0.5, "m32_proadapt_final": 11.0162, "m32_mamba": 0.2431, "m32_mamba_active": true, "m32_mamba_short": 0.2345, "m32_mamba_medium": 0.2549, "m32_mamba_long": 0.2467, "m32_mamba_confidence": 0.5212, "m32_adjustment_pp_mamba": 0.3234, "m33_glo_score": 0.85, "m33_glo_detail": {"fed_yoy": 0.9, "ecb_yoy": -0.68, "jpn_yoy": -9.44, "fed_balance": 6735645.0, "ecb_balance": 6119940.0, "jpn_balance": 6643630.0, "glo_z_score": -2.064, "glo_score": 8.7, "glo_label": "CONTRACTIVE"}, "glf_score": 48.3, "glf_stress": 0.5, "glf_regime": "NEUTRAL", "glf_active_components": 7, "glf_available": true, "glf_component_detail": {"fed": {"z_score": -0.575, "weight": 0.3, "raw": 0.9}, "ecb": {"z_score": -0.669, "weight": 0.15, "raw": -0.68}, "jpn": {"z_score": -2.073, "weight": 0.05, "raw": -9.44}, "m2": {"z_score": -0.105, "weight": 0.15, "raw": 5.58}, "tga": {"z_score": -1.0, "weight": 0.1, "raw": 4.91}, "rrp": {"z_score": 1.5, "weight": 0.1, "raw": 6.4}, "dxy": {"z_score": -0.262, "weight": 0.15, "raw": 101.31}}, "macro_methods_active": 4, "macro_methods_avg": 0.391, "m72_m2_growth": 0.723, "m72_detail": {"m2_yoy_pct": 5.58, "m2_latest": 23052.0, "status": "ok"}, "m73_m2_momentum": 0.05, "m73_detail": {"m2_momentum": -3.7, "m2_growth_3m": 1.88, "m2_growth_12m": 5.58, "label": "CONTRACTING", "status": "ok"}, "m74_fed_balance": 0.4, "m74_detail": {"fed_yoy_pct": 0.9, "fed_balance": 6735645.0, "label": "STABLE", "status": "ok"}, "m75_liquidity_composite": 0.392, "m75_detail": {"composite": 0.392, "regime": "ACCOMMODATIVE", "m72_score": 0.723, "m73_score": 0.05, "m74_score": 0.4, "active_components": "M72=0.72, M73=0.05, M74=0.40", "status": "ok"}, "etf_methods_active": 0, "m81_etf_flow": 0.5, "m81_detail": null, "m82_etf_holdings": 0.5, "m82_detail": null, "fiscal_methods_active": 2, "m83_tga_score": 0.7, "m83_detail": {"tga_latest_b": 918.7, "tga_4w_chg_pct": 4.91, "tga_4w_chg_b": 43.0, "tga_trend": "ACCUMULATING", "status": "ok"}, "m84_rrp_score": 0.12, "m84_detail": {"rrp_latest_b": 6.4, "rrp_4w_chg_b": -0.1, "rrp_level_label": "NEAR_ZERO", "rrp_trend": "STABLE", "status": "ok"}, "m85_fiscal_composite": 0.439, "m85_detail": {"regime": "ACCOMMODATIVE"}, "dxy_btc_corr": null, "dxy_gate_regime": null, "xai_top_features": [{"idx": 2, "name": "M3_Bayes", "importance": 7.3651123046875, "direction": "positive", "corr": 0.4434562601226858, "importance_pct": 53.9}, {"idx": 10, "name": "M11_CVaR", "importance": 2.205150604248047, "direction": "positive", "corr": 0.26780787669289713, "importance_pct": 16.1}, {"idx": 20, "name": "M21_TradeFlow", "importance": 1.9149169921875, "direction": "negative", "corr": -0.5659402124314877, "importance_pct": 14.0}, {"idx": 3, "name": "M4_EWC", "importance": -1.2900581359863281, "direction": "positive", "corr": 0.23015667737717752, "importance_pct": 9.4}, {"idx": 23, "name": "M24_CAPE", "importance": -0.8939933776855469, "direction": "negative", "corr": -0.5148948982456286, "importance_pct": 6.5}], "ml_ensemble_score": 0.216, "ml_ensemble_confidence": 0.8, "ml_ensemble_msg": "WeightedAvg=0.216", "ml_accuracy": 1.0, "ml_total_labeled": 2000, "ml_correct": 2000, "m1_m6_weight_pct": 83.2, "m7_m19_weight_pct": 10.9, "m20_m31_weight_pct": 5.9, "causal_methods_active": 30, "causal_excluded": "m6_regime, m10_garch", "causal_excluded_count": 2, "q10_whale_pressure": 48.8, "q10_onchain_value": 61.6, "q10_buying_power": 40.9, "q10_market_structure": 52.3, "q10_available": true, "q10_details": {"exchange_netflow": {"score": 62.2, "value": -1158.241001, "date": "2026-06-27", "status": "ok"}, "whale_ratio": {"score": 25.8, "value": 0.44480787, "date": "2026-06-26", "status": "ok"}, "exchange_supply_ratio": {"score": 77.0, "value": 0.13390749, "date": "2026-06-26", "status": "ok"}, "funding_rates": {"score": 46.0, "value": 0.007732661666666667, "date": "2026-06-27", "status": "ok"}, "mvrv_ratio": {"score": 99.7, "value": 1.12658757, "date": "2026-06-26", "status": "ok"}, "puell_multiple": {"score": 82.7, "value": 0.7006746901650771, "date": "2026-06-26", "status": "ok"}, "miners_position": {"score": 19.2, "value": 0.2451841427168765, "date": "2026-06-26", "status": "ok"}, "stablecoin_reserve": {"score": 21.9, "value": 62397957484.56023, "date": "2026-06-27", "status": "ok"}, "taker_buy_sell": {"score": 97.3, "value": 1.11698806, "date": "2026-06-27", "status": "ok"}, "exchange_inflow_total": {"score": 2.2, "value": 1786.257919, "date": "2026-06-27", "status": "ok"}, "exchange_outflow_total": {"score": 97.8, "value": 2944.49892, "date": "2026-06-27", "status": "ok"}, "coinbase_premium_gap": {"score": 8.8, "value": -94.74, "date": "2026-06-26", "status": "ok"}, "korea_premium_index": {"score": 14.2, "value": -1.68, "date": "2026-06-26", "status": "ok"}, "miner_netflow_total": {"score": 31.0, "value": 138.85535309, "date": "2026-06-27", "status": "ok"}, "stablecoin_exchange_inflow": {"score": 0, "value": 45194381.17577, "date": "2026-06-27", "status": "ok"}, "stablecoin_exchange_outflow": {"score": 100, "value": 64923002.13414239, "date": "2026-06-27", "status": "ok"}, "stablecoin_exchange_netflow": {"score": 44.9, "value": -19728620.95837239, "date": "2026-06-27", "status": "ok"}, "exchange_stablecoins_ratio": {"score": 32.1, "value": 2.357e-05, "date": "2026-06-26", "status": "ok"}, "open_interest": {"score": 2.2, "value": 20584139516.20325, "date": "2026-06-27", "status": "ok"}, "long_liquidations_usd": {"score": 100, "value": 0, "date": "2026-06-27", "status": "ok"}, "short_liquidations_usd": {"score": 100, "value": 0, "date": "2026-06-27", "status": "ok"}, "fund_flow_ratio": {"score": 31.0, "value": 0.09299248, "date": "2026-06-26", "status": "ok"}, "whale_pressure_score": 48.8, "onchain_value_score": 61.6, "buying_power_score": 40.9, "market_structure_score": 52.3}, "afe_macd_signal": -0.4831, "afe_bb_width": 0.0042, "afe_vwap": 0.1, "afe_obv_norm": 0.0171, "afe_available": true, "xgb_meta_prediction": 20.53, "xgb_meta_confidence": 0.705, "xgb_blend_weight": 0.212, "xgb_available": true, "hmm_regime": "CRISIS", "hmm_crisis_prob": 1.0, "hmm_available": true, "dw_regime": "CRISIS", "dw_z_score": 0.508, "dw_weights": {"Lt": 0.15, "St": 0.1, "Rt": 0.1, "Ft": 0.4, "Sc": 0.25}, "dw_factors": {"Lt": 0.857, "St": 0.557, "Rt": 0.925, "Ft": 0.247, "Sc": 0.53}, "dw_sfc_adjustment": 0.9, "dw_available": true, "mpi_score": 61.0, "mpi_stress": 0.35, "mpi_label": "NEUTRAL", "mpi_available": true, "mpi_components": {"funding_rate": {"score": 0.5, "weight": 0.25, "contribution": 0.0}, "put_call": {"score": 0.3, "weight": 0.2, "contribution": -0.04}, "liquidation": {"score": 0.4, "weight": 0.2, "contribution": -0.02}, "basis": {"score": 0.4, "weight": 0.2, "contribution": -0.02}, "open_interest": {"score": 0.3, "weight": 0.15, "contribution": -0.03}}, "lm_score": 0, "lm_stress_adj": 0.0, "lm_label": "STABLE", "lm_n_points": 2, "lm_available": true, "dfs_regime": "CRISIS", "dfs_n_groups": 6, "dfs_n_features": 46, "dfs_active_groups": ["global_liquidity", "stablecoin", "onchain", "derivatives", "volatility", "macro"], "dfs_group_weights": {"global_liquidity": 0.205, "stablecoin": 0.159, "onchain": 0.091, "derivatives": 0.193, "volatility": 0.216, "macro": 0.136}, "dfs_available": true, "mtf_alignment_score": -1.0, "mtf_divergence": false, "mtf_available": true, "ewma_corrected": true, "ewma_available": true, "adv_regime": "BULL", "adv_crisis_prob": 0.0, "adv_regime_stability": 0.0, "adv_regime_boost": 0, "adv_uncertainty": 0.342, "adv_confidence": "LOW_CONFIDENCE", "adv_trends_recession": 0.82, "adv_trends_crash": 0.82, "adv_reddit_sentiment": 0.0, "adv_reddit_label": "NEUTRAL", "adv_cg_dd_ath": -1.0, "bt_sharpe": 1.91, "bt_sharpe_low": 1.61, "bt_sharpe_high": 2.21, "bt_max_dd": 0.1129, "bt_win_rate": 0.95, "bt_win_rate_low": 0.94, "bt_win_rate_high": 0.959, "bt_return": 0.5, "bt_periods": 2000, "bt_stability": 0.808, "bt_calibration_note": "Limited stress events in training window \u2014 metrics are upper-bound estimates", "bt_label": "ESTIMATED (heuristic formula, not walk-forward validated)", "kelly_p_win": 0.399, "kelly_b_payoff": 2.0, "kelly_fraction": 0.0985, "kelly_half": 0.0493, "kelly_quarter": 0.0246, "kelly_override_reason": null, "signal_type": "CALM", "signal_strength": 0.337, "calibrated_confidence": 0.451, "reliability": "HIGH", "reliability_reason": "Moderate agreement \u2014 healthy signal", "timing_precision": "MEDIUM", "alert_window_days": 25.0, "timeframe": "MONTHLY", "readiness_score": 0.332, "shock_factor": 0.0, "shock_event": null, "shock_severity": "NONE", "sec_events": 2, "q9_available": true, "q9_articles": 0, "m65_cnn_attention": 0.517, "m65_pattern_type": "MODERATE_STRESS - developing pattern", "m65_available": true, "m66_ga_features": null, "m66_ga_count": 0, "m66_available": true, "m67_augmented_shape": null, "m67_available": true, "m68_drl_signal": "HOLD", "m68_available": true, "m69_systemic_risk": 0.5599, "m69_btc_systemic_risk": 1.0, "m69_market_regime": "STRESS", "m69_correlation_breakdown": false, "m69_available": true, "m70_shap_ok": true, "m70_shap_top_1": "M20_OBI", "m70_shap_top_1_pct": 17.2, "m70_shap_top_3": "M20_OBI, M24_CAPE, M9_LiquidityGap", "m71_lime_ok": true, "m71_lime_top_1": "M20_OBI", "m71_lime_top_1_pct": 24.1, "m71_lime_top_3": "M20_OBI, M6_Regime, M1_KLR", "prob_dist_available": true, "predicted_mean": 16.84, "predicted_std": 19.93, "var_95": 0.0, "es_975": 0.0, "ci_90_lower": 0.0, "ci_90_upper": 49.62, "prob_stress": 0.341, "prob_critical": 0.048, "prob_crash_10pct": 0.0152, "prob_calm": 0.4633, "prob_quantiles": {"q_01": -29.51, "q_05": -15.94, "q_10": -8.71, "q_25": 3.41, "q_50": 16.84, "q_75": 30.27, "q_90": 42.38, "q_95": 49.62, "q_99": 63.19}, "prob_sharpe": 1.664, "prob_sortino": 2.496, "prob_uncertainty_breakdown": {"method_disagreement_sigma": 3.0, "confidence_sigma": 9.02, "historical_noise_sigma": 3.0, "regime_multiplier": 2.0, "final_sigma": 19.93}, "dq_available": true, "dq_outliers": [], "dq_imputed": [], "dq_missing": [], "dq_outlier_pct": 0.0, "dq_imputed_pct": 0.0, "dq_active": false, "drift_available": true, "drift_detected": false, "drift_fields": [], "drift_index": 0.0, "drift_consecutive": 0, "drift_stable": false, "cb_available": true, "cb_tripped": false, "cb_failures": 4, "cb_total_failures": 4};
+var __EMBEDDED_DATA = {"ts": "2026-06-28T00:14:52.448085+00:00", "btc": 60112.54, "btc_24h": -0.056, "btc_mcap": 1203465128107.1252, "fng": 17, "fng_cls": "Extreme Fear", "dom": 58.1, "dvol": 45.12, "sfc_base": 13.713035608652092, "sfc_effective": 16.722407450092025, "news_stress": 4.7, "news_headlines": ["\ud83d\udd34[Rt][CoinTelegrap] Bitcoin faces fresh capitulation risk as 50K BTC moved at a loss", "\ud83d\udd34[Ft][MarketWatch] Older Americans will soon have Medicare access to GLP-1s for weight loss fo", "\ud83d\udd34[Rt][NewsBTC] Top Ethereum MEV Bot JaredfromSubway.eth Drained of Up to $15M in Counter-M", "\ud83d\udd34[Rt][NewsBTC] SecondFi Completes Refund Snapshot for Wallets Impacted by Recent Cardano E", "\ud83d\udd34[Lt][Investing.co] ECB\u2019s Schnabel says inflation risks remain despite easing energy prices", "\ud83d\udd34[Rt][Bitcoin.com] Miners Absorb 18% Hashprice Crash as Bitcoin Difficulty Jumps 7.15%", "\u26aa[Rt][CoinTelegrap] Fidelity rebuts claims Bitcoin becomes less secure after halvings", "\u26aa[Rt][CoinTelegrap] Here\u2019s what happened in crypto today"], "news_sentiment": -0.061, "news_stats": {"total_articles": 33, "sources_hit": 8, "stress_raw": 4.65, "stress_capped": 4.7}, "m2_yoy": 5.58, "liq_mod": 1.1, "liq_total_24h": 514725763.81999993, "liq_long_vol": 221152215.29, "liq_short_vol": 293573548.53, "zone": "ELEVATED", "floor_buffer": 5343, "floor_total": 54769, "regime": "CRISIS", "regime_prob": 1.0, "transition_risk": 0.5, "dxy": 101.31, "pc_oi": 0.58, "pc_vol": 1.51, "dv_sfc": 0.089, "phi": 1.0, "state": "NORMAL OSCILLATION", "signal": "Standard allocation", "factors": {"Lt": -2.1399517881903947, "St": -0.3440759616057343, "Rt": -2.546141020007154, "Ft": 1.5190769663200894, "Sc": -0.18116391503877205}, "ath": 126080, "ath_date": "2025-10-06T18:57:42.558Z", "rsi_14": 42.92, "rsi_regime": "NEUTRAL", "sopr_proxy": 0.7706, "sopr_signal": "EXTREME_CAPITULATION", "sopr_score": 0.95, "cascade_risk": 0.173, "liq_density": 0.257, "liq_pressure": "BALANCED", "composite_confidence": 0.399, "confidence_components": {"method_agree": 0.815, "low_stress_boost": 0.0666, "rsi": 0.03, "sopr": -0.05, "dvol": 0.05, "squeeze_penalty": 0.0, "cascade_penalty": -0.0, "fear_penalty": -0.0, "news_penalty": -0.0, "vol_penalty": 0.0, "transition_penalty": 0.0}, "m1_klr": 13.7, "m2_logit": 7.9, "m3_bayes": 8.0, "m4_ewc": 6.7, "m5_qreg": 8.2, "m6_regime_score": 1.0, "method_agreement": 0.815, "m7_fisher": 0.35, "m7_detail": {"real_rate": 0.63, "fed_rate": 3.63, "cpi_yoy": 3.0}, "m8_yield": 0.45, "m8_detail": {"slope": 0.31, "spread": 2.8}, "m9_liquidity": null, "m9_detail": null, "m10_garch": 0.85, "m10_detail": {"garch_vol": 0.1183, "persistence": 0.99}, "m11_var": 0.85, "m11_detail": {"var_95": -0.1759, "es_95": -0.1803}, "m12_jump": 0.15, "m12_detail": {"jump_risk": 0.0, "gap_count": 0}, "m13_funding": null, "m13_detail": null, "m14_skew": 0.1, "m14_detail": {"skew": 0.0, "put_iv": 48.06, "call_iv": 48.06}, "m15_concentration": 0.1, "m15_detail": {"hhi": 0.0054, "top3_share": 0.059}, "m16_regime_ml": 0.45, "m16_detail": {"p_crisis": 0.45, "recent_mean": 0.0212, "recent_std": 0.1427}, "m17_granger": 0.1, "m17_detail": {"corr": -0.287, "lag_corr": 0.062}, "m18_entropy": 0.55, "m18_detail": {"entropy_norm": 0.831, "entropy_raw": 1.912}, "m19_mutual_info": 0.15, "m19_detail": {"mi_norm": 0.097, "mi_raw": 0.107}, "new_methods_active": 12, "new_methods_avg": 0.185, "inst_methods_active": 12, "inst_methods_avg": 0.218, "sc_methods_active": 5, "sc_methods_avg": 0.412, "total_methods_active": 48, "m20_obi": 0.35, "m20_detail": {"obi_change": "BUY_SURGE", "obi_delta": 0.7302, "obi": 0.8727, "obi_norm": 0.9363, "bid_vol": 10.26, "ask_vol": 0.7}, "m21_trade_flow": 0.3, "m21_detail": {"large_sell_notional": 0, "large_buy_notional": 0, "large_ratio": 0, "large_sell_ratio": 0.5, "large_share": 0}, "m22_spread": 0.1, "m22_detail": {"spread_bps": 0.0017, "range_bps": 180.64, "bid": 60121.29, "ask": 60121.3, "mid": 60120.93, "spread_change": "STABLE", "spread_delta": -0.0}, "m23_liquidity": 0.8, "m23_detail": {"slippage_pct": 2.504, "levels_used_buy": 999, "levels_used_sell": 45, "mid_price": 60121.29, "liq_change": "STABLE", "slippage_delta": -0.002}, "m24_cape": 0.1, "m24_detail": {"cape": 0.6576, "current_price": 59950.79, "sma_1y_realized": 91168.41}, "m25_minsky": 0.15, "m25_detail": {"funding_rate": 0, "funding_8h": 4.27e-06, "accel": -0.0, "oi_futures": 1581708560, "minsky_stage": "NORMAL"}, "m26_kahneman": 0.245, "m26_detail": {"loss_aversion": 0.35, "anchoring": 0.15, "fear": 0.2, "realized_price": 64412.54, "ath": 126080.0, "pl_pct": -6.68}, "m27_taleb": 0.502, "m27_detail": {"dvol": 46.51, "skewness": -0.1463, "max_drawdown": 0.2731, "vol_7d_ann": 0.3046, "vol_90d_ann": 0.4651, "term": "3M>1W", "tail_danger": "ELEVATED"}, "m28_summers": 0.2, "m28_detail": {"real_rate": 0.63, "gdp_growth": 2.68, "fed_rate": 3.63, "regime": "NORMAL"}, "m29_debt": 0.85, "m29_detail": {"debt_gdp_ratio": 1.226, "crisis_risk": "HIGH"}, "m30_rajan": 0.15, "m30_detail": {"fsi_score": 0.15, "components": {"credit_growth": 5.58, "asset_vol": 48.06, "yield_curve": 0.31, "hy_spread": 2.8, "top3_concentration": 0.059, "fng": 18}, "stability": "NORMAL"}, "m31_altman": 0.15, "m31_detail": {"z_score": 5.73, "x1_liquidity": 0.0, "x2_network": 4.0, "x3_efficiency": 0.793, "x4_oi_ratio": 0.994, "x5_turnover": 2.644, "zone": "SAFE"}, "m76_supply_growth": null, "m76_detail": {"growth_30d_pct": -2.19, "growth_7d_pct": -0.48, "latest_mcap": 259826886031.0, "mcap_30d_ago": 265641516626.0, "status": "ok"}, "m77_ssr": 0.617, "m77_detail": {"ssr": 4.63, "stablecoin_mcap": 259826886031.0, "btc_mcap": 1203465128107.0, "label": "MODERATE", "status": "ok"}, "m78_exchange_flow": 0.395, "m78_detail": {"netflow": -19728620.96, "netflow_pct_of_reserve": -0.03, "reserve": 62397957485.0, "label": "MILD_OUTFLOW", "status": "ok"}, "m79_velocity": 0.088, "m79_detail": {"velocity": 0.0018, "daily_inflow": 45194381.0, "daily_outflow": 64923002.0, "reserve": 62397957485.0, "label": "DORMANT", "status": "ok"}, "m80_dominance": 0.8, "m80_detail": {"dominance_pct": 12.55, "stablecoin_mcap": 259826886031.0, "total_crypto_mcap": 2070657474273.0, "dom_change_30d": -0.28, "trend": "STABLE", "status": "ok"}, "sli_score": 62.4, "sli_stress": 0.376, "sli_label": "HEALTHY", "sli_available": true, "sli_components": {"dominance": {"score": 0.2, "weight": 0.1, "contribution": -0.03}, "exchange_flow": {"score": 0.605, "weight": 0.15, "contribution": 0.0157}, "growth_divergence": {"score": 0.45, "weight": 0.1, "contribution": -0.005}, "mint_burn": {"score": 0.65, "weight": 0.1, "contribution": 0.015}, "reserve_ratio": {"score": 0.8, "weight": 0.1, "contribution": 0.03}, "ssr": {"score": 0.384, "weight": 0.15, "contribution": -0.0174}, "supply_growth": {"score": 0.842, "weight": 0.2, "contribution": 0.0684}, "velocity": {"score": 0.912, "weight": 0.1, "contribution": 0.0412}}, "sli_usdt_growth": -2.19, "sli_usdc_growth": -3.22, "sli_growth_divergence": 1.03, "micro_change_flags": {}, "micro_trend_score": null, "micro_deteriorating": null, "m32_qlstm": 0.1145, "m32_active": true, "m32_adjustment_pp": -0.1018, "m32_garch_residual": -0.644, "m32_garch_volatility": 2.8519, "m32_hybrid_pred": 10.807, "m32_proadapt_weight": 0.5, "m32_proadapt_final": 10.807, "m32_mamba": 0.2431, "m32_mamba_active": true, "m32_mamba_short": 0.2345, "m32_mamba_medium": 0.2549, "m32_mamba_long": 0.2467, "m32_mamba_confidence": 0.5212, "m32_adjustment_pp_mamba": 0.3276, "m33_glo_score": 0.85, "m33_glo_detail": {"fed_yoy": 0.9, "ecb_yoy": -0.68, "jpn_yoy": -9.44, "fed_balance": 6735645.0, "ecb_balance": 6119940.0, "jpn_balance": 6643630.0, "glo_z_score": -2.064, "glo_score": 8.7, "glo_label": "CONTRACTIVE"}, "glf_score": 48.3, "glf_stress": 0.5, "glf_regime": "NEUTRAL", "glf_active_components": 7, "glf_available": true, "glf_component_detail": {"fed": {"z_score": -0.575, "weight": 0.3, "raw": 0.9}, "ecb": {"z_score": -0.669, "weight": 0.15, "raw": -0.68}, "jpn": {"z_score": -2.073, "weight": 0.05, "raw": -9.44}, "m2": {"z_score": -0.105, "weight": 0.15, "raw": 5.58}, "tga": {"z_score": -1.0, "weight": 0.1, "raw": 4.91}, "rrp": {"z_score": 1.5, "weight": 0.1, "raw": 6.4}, "dxy": {"z_score": -0.262, "weight": 0.15, "raw": 101.31}}, "macro_methods_active": 4, "macro_methods_avg": 0.391, "m72_m2_growth": 0.723, "m72_detail": {"m2_yoy_pct": 5.58, "m2_latest": 23052.0, "status": "ok"}, "m73_m2_momentum": 0.05, "m73_detail": {"m2_momentum": -3.7, "m2_growth_3m": 1.88, "m2_growth_12m": 5.58, "label": "CONTRACTING", "status": "ok"}, "m74_fed_balance": 0.4, "m74_detail": {"fed_yoy_pct": 0.9, "fed_balance": 6735645.0, "label": "STABLE", "status": "ok"}, "m75_liquidity_composite": 0.392, "m75_detail": {"composite": 0.392, "regime": "ACCOMMODATIVE", "m72_score": 0.723, "m73_score": 0.05, "m74_score": 0.4, "active_components": "M72=0.72, M73=0.05, M74=0.40", "status": "ok"}, "etf_methods_active": 0, "m81_etf_flow": 0.5, "m81_detail": null, "m82_etf_holdings": 0.5, "m82_detail": null, "fiscal_methods_active": 2, "m83_tga_score": 0.7, "m83_detail": {"tga_latest_b": 918.7, "tga_4w_chg_pct": 4.91, "tga_4w_chg_b": 43.0, "tga_trend": "ACCUMULATING", "status": "ok"}, "m84_rrp_score": 0.12, "m84_detail": {"rrp_latest_b": 6.4, "rrp_4w_chg_b": -0.1, "rrp_level_label": "NEAR_ZERO", "rrp_trend": "STABLE", "status": "ok"}, "m85_fiscal_composite": 0.439, "m85_detail": {"regime": "ACCOMMODATIVE"}, "dxy_btc_corr": null, "dxy_gate_regime": null, "xai_top_features": [{"idx": 2, "name": "M3_Bayes", "importance": 12.573722839355469, "direction": "positive", "corr": 0.4042746743648771, "importance_pct": 61.2}, {"idx": 10, "name": "M11_CVaR", "importance": 2.596923828125, "direction": "positive", "corr": 0.2825860228075755, "importance_pct": 12.6}, {"idx": 3, "name": "M4_EWC", "importance": 2.4833106994628906, "direction": "negative", "corr": -0.08062447741073851, "importance_pct": 12.1}, {"idx": 20, "name": "M21_TradeFlow", "importance": 1.8914337158203125, "direction": "negative", "corr": -0.5237443320216022, "importance_pct": 9.2}, {"idx": 23, "name": "M24_CAPE", "importance": -1.0065498352050781, "direction": "negative", "corr": -0.5147362596369194, "importance_pct": 4.9}], "ml_ensemble_score": 0.207, "ml_ensemble_confidence": 0.8, "ml_ensemble_msg": "WeightedAvg=0.207", "ml_accuracy": 1.0, "ml_total_labeled": 2000, "ml_correct": 2000, "m1_m6_weight_pct": 83.2, "m7_m19_weight_pct": 10.9, "m20_m31_weight_pct": 5.9, "causal_methods_active": 30, "causal_excluded": "m6_regime, m10_garch", "causal_excluded_count": 2, "q10_whale_pressure": 48.8, "q10_onchain_value": 61.6, "q10_buying_power": 40.9, "q10_market_structure": 52.3, "q10_available": true, "q10_details": {"exchange_netflow": {"score": 62.2, "value": -1158.241001, "date": "2026-06-27", "status": "ok"}, "whale_ratio": {"score": 25.8, "value": 0.44480787, "date": "2026-06-26", "status": "ok"}, "exchange_supply_ratio": {"score": 77.0, "value": 0.13390749, "date": "2026-06-26", "status": "ok"}, "funding_rates": {"score": 46.0, "value": 0.007732661666666667, "date": "2026-06-27", "status": "ok"}, "mvrv_ratio": {"score": 99.7, "value": 1.12658757, "date": "2026-06-26", "status": "ok"}, "puell_multiple": {"score": 82.7, "value": 0.7006746901650771, "date": "2026-06-26", "status": "ok"}, "miners_position": {"score": 19.2, "value": 0.2451841427168765, "date": "2026-06-26", "status": "ok"}, "stablecoin_reserve": {"score": 21.9, "value": 62397957484.56023, "date": "2026-06-27", "status": "ok"}, "taker_buy_sell": {"score": 97.3, "value": 1.11698806, "date": "2026-06-27", "status": "ok"}, "exchange_inflow_total": {"score": 2.2, "value": 1786.257919, "date": "2026-06-27", "status": "ok"}, "exchange_outflow_total": {"score": 97.8, "value": 2944.49892, "date": "2026-06-27", "status": "ok"}, "coinbase_premium_gap": {"score": 8.8, "value": -94.74, "date": "2026-06-26", "status": "ok"}, "korea_premium_index": {"score": 14.2, "value": -1.68, "date": "2026-06-26", "status": "ok"}, "miner_netflow_total": {"score": 31.0, "value": 138.85535309, "date": "2026-06-27", "status": "ok"}, "stablecoin_exchange_inflow": {"score": 0, "value": 45194381.17577, "date": "2026-06-27", "status": "ok"}, "stablecoin_exchange_outflow": {"score": 100, "value": 64923002.13414239, "date": "2026-06-27", "status": "ok"}, "stablecoin_exchange_netflow": {"score": 44.9, "value": -19728620.95837239, "date": "2026-06-27", "status": "ok"}, "exchange_stablecoins_ratio": {"score": 32.1, "value": 2.357e-05, "date": "2026-06-26", "status": "ok"}, "open_interest": {"score": 2.2, "value": 20584139516.20325, "date": "2026-06-27", "status": "ok"}, "long_liquidations_usd": {"score": 100, "value": 0, "date": "2026-06-27", "status": "ok"}, "short_liquidations_usd": {"score": 100, "value": 0, "date": "2026-06-27", "status": "ok"}, "fund_flow_ratio": {"score": 31.0, "value": 0.09299248, "date": "2026-06-26", "status": "ok"}, "whale_pressure_score": 48.8, "onchain_value_score": 61.6, "buying_power_score": 40.9, "market_structure_score": 52.3}, "afe_macd_signal": -0.4831, "afe_bb_width": 0.0042, "afe_vwap": 0.09, "afe_obv_norm": 0.0171, "afe_available": true, "xgb_meta_prediction": 20.53, "xgb_meta_confidence": 0.705, "xgb_blend_weight": 0.212, "xgb_available": true, "hmm_regime": "CRISIS", "hmm_crisis_prob": 1.0, "hmm_available": true, "dw_regime": "CRISIS", "dw_z_score": 0.508, "dw_weights": {"Lt": 0.15, "St": 0.1, "Rt": 0.1, "Ft": 0.4, "Sc": 0.25}, "dw_factors": {"Lt": 0.857, "St": 0.557, "Rt": 0.924, "Ft": 0.247, "Sc": 0.53}, "dw_sfc_adjustment": 0.9, "dw_available": true, "mpi_score": 61.0, "mpi_stress": 0.35, "mpi_label": "NEUTRAL", "mpi_available": true, "mpi_components": {"funding_rate": {"score": 0.5, "weight": 0.25, "contribution": 0.0}, "put_call": {"score": 0.3, "weight": 0.2, "contribution": -0.04}, "liquidation": {"score": 0.4, "weight": 0.2, "contribution": -0.02}, "basis": {"score": 0.4, "weight": 0.2, "contribution": -0.02}, "open_interest": {"score": 0.3, "weight": 0.15, "contribution": -0.03}}, "lm_score": 0, "lm_stress_adj": 0.0, "lm_label": "STABLE", "lm_n_points": 2, "lm_available": true, "dfs_regime": "CRISIS", "dfs_n_groups": 6, "dfs_n_features": 46, "dfs_active_groups": ["global_liquidity", "stablecoin", "onchain", "derivatives", "volatility", "macro"], "dfs_group_weights": {"global_liquidity": 0.205, "stablecoin": 0.159, "onchain": 0.091, "derivatives": 0.193, "volatility": 0.216, "macro": 0.136}, "dfs_available": true, "mtf_alignment_score": -1.0, "mtf_divergence": false, "mtf_available": true, "ewma_corrected": true, "ewma_available": true, "adv_regime": "BULL", "adv_crisis_prob": 0.0, "adv_regime_stability": 0.0, "adv_regime_boost": 0, "adv_uncertainty": 0.414, "adv_confidence": "LOW_CONFIDENCE", "adv_trends_recession": 0.82, "adv_trends_crash": 0.82, "adv_reddit_sentiment": 0.0, "adv_reddit_label": "NEUTRAL", "adv_cg_dd_ath": -1.0, "bt_sharpe": 1.91, "bt_sharpe_low": 1.61, "bt_sharpe_high": 2.21, "bt_max_dd": 0.1128, "bt_win_rate": 0.95, "bt_win_rate_low": 0.94, "bt_win_rate_high": 0.959, "bt_return": 0.5, "bt_periods": 2000, "bt_stability": 0.808, "bt_calibration_note": "Limited stress events in training window \u2014 metrics are upper-bound estimates", "bt_label": "ESTIMATED (heuristic formula, not walk-forward validated)", "kelly_p_win": 0.399, "kelly_b_payoff": 2.0, "kelly_fraction": 0.0985, "kelly_half": 0.0493, "kelly_quarter": 0.0246, "kelly_override_reason": null, "signal_type": "CALM", "signal_strength": 0.334, "calibrated_confidence": 0.451, "reliability": "HIGH", "reliability_reason": "Moderate agreement \u2014 healthy signal", "timing_precision": "MEDIUM", "alert_window_days": 25.0, "timeframe": "MONTHLY", "readiness_score": 0.332, "shock_factor": 0.0, "shock_event": null, "shock_severity": "NONE", "sec_events": 2, "q9_available": true, "q9_articles": 0, "m65_cnn_attention": 0.5292, "m65_pattern_type": "MODERATE_STRESS - developing pattern", "m65_available": true, "m66_ga_features": null, "m66_ga_count": 0, "m66_available": true, "m67_augmented_shape": null, "m67_available": true, "m68_drl_signal": "HOLD", "m68_available": true, "m69_systemic_risk": 0.5599, "m69_btc_systemic_risk": 1.0, "m69_market_regime": "STRESS", "m69_correlation_breakdown": false, "m69_available": true, "m70_shap_ok": true, "m70_shap_top_1": "M23_LiquidityDepth", "m70_shap_top_1_pct": 18.0, "m70_shap_top_3": "M23_LiquidityDepth, M19_MutualInfo, M1_KLR", "m71_lime_ok": true, "m71_lime_top_1": "M20_OBI", "m71_lime_top_1_pct": 24.1, "m71_lime_top_3": "M20_OBI, M6_Regime, M1_KLR", "prob_dist_available": true, "predicted_mean": 16.72, "predicted_std": 19.93, "var_95": 0.0, "es_975": 0.0, "ci_90_lower": 0.0, "ci_90_upper": 49.5, "prob_stress": 0.3389, "prob_critical": 0.0475, "prob_crash_10pct": 0.0149, "prob_calm": 0.4656, "prob_quantiles": {"q_01": -29.63, "q_05": -16.06, "q_10": -8.82, "q_25": 3.29, "q_50": 16.72, "q_75": 30.15, "q_90": 42.27, "q_95": 49.5, "q_99": 63.07}, "prob_sharpe": 1.67, "prob_sortino": 2.505, "prob_uncertainty_breakdown": {"method_disagreement_sigma": 3.0, "confidence_sigma": 9.02, "historical_noise_sigma": 3.0, "regime_multiplier": 2.0, "final_sigma": 19.93}, "dq_available": true, "dq_outliers": [], "dq_imputed": [], "dq_missing": [], "dq_outlier_pct": 0.0, "dq_imputed_pct": 0.0, "dq_active": false, "drift_available": true, "drift_detected": false, "drift_fields": [], "drift_index": 0.0, "drift_consecutive": 0, "drift_stable": false, "cb_available": true, "cb_tripped": false, "cb_failures": 4, "cb_total_failures": 4};
 
 
 
@@ -1611,23 +1591,11 @@ let activeTab = 'overview';
 
 function switchTab(tab) {
   activeTab = tab;
-  document.querySelectorAll('.tab-panel').forEach(p => {
-    p.classList.toggle('active', p.dataset.tab === tab);
-  });
+  const el = document.getElementById(tab + 'Section');
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
   document.querySelectorAll('.nav-tab').forEach(t => {
     t.classList.toggle('active', t.textContent.trim().toLowerCase() === tab);
   });
-  if (currentData) {
-    setTimeout(function() {
-      if (tab === 'overview' || tab === 'ensemble') {
-        if (typeof buildFactorChart === 'function' && document.getElementById('factorChart')) buildFactorChart(currentData);
-        if (typeof buildMethodChart === 'function' && document.getElementById('methodChart')) buildMethodChart(currentData);
-      }
-      if (tab === 'overview' && chartVisible && typeof updatePriceChart === 'function') {
-        updatePriceChart();
-      }
-    }, 100);
-  }
 }
 
 function restoreScrollPos() {
@@ -1732,10 +1700,9 @@ function render(d) {
     </div>
     <div class="nav-center">
       <div class="nav-tab active" onclick="switchTab('overview')">Overview</div>
-      <div class="nav-tab" onclick="switchTab('risk')">Risk</div>
       <div class="nav-tab" onclick="switchTab('ensemble')">Ensemble</div>
-      <div class="nav-tab" onclick="switchTab('advanced')">Advanced</div>
-      <div class="nav-tab" onclick="switchTab('trading')">Trading</div>
+      <div class="nav-tab" onclick="switchTab('risk')">Risk</div>
+      <div class="nav-tab" onclick="switchTab('backtest')">Backtest</div>
     </div>
     <div class="nav-right">
       <div class="nav-meta">
@@ -1823,9 +1790,10 @@ function render(d) {
       </div>
     </div>
 
-            <!-- ═══ TAB: OVERVIEW ═══ -->
+    <!-- ═══ TAB 1: OVERVIEW ═══ -->
     <div class="tab-panel active" data-tab="overview">
-<!-- ROW 1: SFC Stress Index + Signal -->
+
+    <!-- ROW 1: SFC Stress Index + Signal -->
     <div class="grid-2 mb-16">
       <!-- SFC STRESS INDEX -->
       <div id="overviewSection" class="card">
@@ -1888,8 +1856,53 @@ function render(d) {
           <canvas id="factorChart" width="400" height="160" style="width:100%;height:auto;max-height:160px;margin-top:10px"></canvas>
         </div>
       </div>
+
+      <!-- ENSEMBLE -->
+      <div id="ensembleSection" class="card">
+        <div class="card-head">
+          <div class="card-title">
+            <div class="card-icon">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                <rect x="1" y="7" width="2" height="4" rx="0.5" fill="#00d4ff"/>
+                <rect x="5" y="4" width="2" height="7" rx="0.5" fill="#9d7af8"/>
+                <rect x="9" y="1" width="2" height="10" rx="0.5" fill="#00ff9d"/>
+              </svg>
+            </div>
+            6-Method Ensemble
+          </div>
+          <div class="card-badge">Consensus ${(agree*100).toFixed(0)}%</div>
+        </div>
+        <div class="card-body">
+          <canvas id="methodChart" width="400" height="140" style="width:100%;height:auto;max-height:140px;margin-bottom:12px"></canvas>
+
+          <div class="method-grid">
+            ${[
+              ['KLR',   '#00ff9d', fmtNum(d.m1_klr??d.sfc_base*0.9,1)+'%'],
+              ['LOGIT', '#00d4ff', fmtNum(d.m2_logit,1)+'%'],
+              ['BAYES', '#9d7af8', fmtNum(d.m3_bayes,1)+'%'],
+              ['EWC',   '#f0b429', fmtNum(d.m4_ewc,1)+'%'],
+              ['QREG',  '#4a9eff', fmtNum(d.m5_qreg,1)+'%'],
+              ['REGIME','#ff4060', fmtNum(d.m6_regime_score,1)+'%']
+            ].map(([name,color,val]) => `
+              <div class="method-cell">
+                <div class="method-cell-name">${name}</div>
+                <div class="method-cell-val" style="color:${color}">${val}</div>
+              </div>
+            `).join('')}
+          </div>
+
+          <div class="consensus-row">
+            <div class="consensus-ring" style="background:${agree>0.6?'var(--green-dim)':agree>0.3?'var(--amber-dim)':'var(--red-dim)'};border:2px solid ${agreeColor};color:${agreeColor}">${(agree*100).toFixed(0)}%</div>
+            <div class="consensus-info">
+              <div class="consensus-label">Method Consensus — ${agree>0.6?'Strong':agree>0.3?'Moderate':'Low'}</div>
+              <div class="consensus-sub">${d.total_methods_active||28} active methods · ${d.inst_methods_active||12} institutional · ${d.sc_methods_active||0} SC · ${d.macro_methods_active||0} macro</div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
-<!-- PRICE CHART -->
+
+    <!-- PRICE CHART -->
     <div class="card span-full mb-16" id="chartCardWrapper">
       <div class="card-head">
         <div class="card-title">
@@ -1910,7 +1923,7 @@ function render(d) {
     </div>
 
     <!-- ROW 2: Momentum, Liquidation, Confidence, Signal -->
-    <div class="grid-4 mb-16">
+    <div id="riskSection" class="grid-4 mb-16">
 
       <!-- MOMENTUM -->
       <div class="card">
@@ -2011,112 +2024,38 @@ function render(d) {
         </div>
       </div>
 
-
-    </div><!-- /{name} -->
-    <!-- ═══ TAB: RISK ═══ -->
-    <div class="tab-panel" data-tab="risk">
-    <div id="riskSection" class="grid-3 mb-16">
-      <!-- MOMENTUM -->
+      <!-- SIGNAL -->
       <div class="card">
         <div class="card-head">
           <div class="card-title">
             <div class="card-icon">
               <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                <circle cx="6" cy="6" r="4.5" stroke="#9d7af8" stroke-width="1.2" fill="none"/>
-                <path d="M6 3v3.5" stroke="#9d7af8" stroke-width="1.4" stroke-linecap="round"/>
-                <circle cx="6" cy="8" r="0.8" fill="#9d7af8"/>
+                <circle cx="6" cy="10" r="1.5" fill="#f0b429"/>
+                <path d="M3 7.5C3 5.015 4.343 3 6 3s3 2.015 3 4.5" stroke="#f0b429" stroke-width="1.3" stroke-linecap="round" fill="none"/>
+                <path d="M1 5C1 2.239 3.239 0 6 0s5 2.239 5 5" stroke="rgba(240,180,41,0.4)" stroke-width="1.3" stroke-linecap="round" fill="none"/>
               </svg>
             </div>
-            Momentum
-          </div>
-        </div>
-        <div class="card-body-sm">
-          <div class="dual-cols">
-            <div class="metric-center">
-              <div class="metric-label">RSI-14M</div>
-              <div class="gauge-wrap">
-                <svg viewBox="0 0 88 88">
-                  <circle cx="44" cy="44" r="38" fill="none" stroke="rgba(255,255,255,0.04)" stroke-width="7"/>
-                  <circle cx="44" cy="44" r="38" fill="none" stroke="${rsiColor}" stroke-width="7"
-                    stroke-dasharray="${rsiCirc}" stroke-dashoffset="${rsiOff}"
-                    stroke-linecap="round" transform="rotate(-90 44 44)"/>
-                </svg>
-                <div class="gauge-center-val" style="color:${rsiColor};font-size:17px">${fmtNum(rsi,1)}</div>
-              </div>
-              <div class="text-xs text-center">${rsi<=30?'Oversold':rsi>=70?'Overbought':'Neutral'}</div>
-            </div>
-            <div class="metric-center">
-              <div class="metric-label">SOPR Proxy</div>
-              <div class="sopr-num" style="color:${(d.sopr_proxy||1)<0.97?'var(--green)':(d.sopr_proxy||1)>1.03?'var(--red)':'var(--amber)'}">${fmtNum(d.sopr_proxy,4)}</div>
-              <div class="text-xs text-center mb-4">${(d.sopr_signal||'—').replace(/_/g,' ')}</div>
-              <div class="prog-track">
-                <div class="prog-fill pf-amber" style="width:${((d.sopr_score||0.5)*100).toFixed(0)}%"></div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- LIQUIDATION -->
-      <div class="card">
-        <div class="card-head">
-          <div class="card-title">
-            <div class="card-icon">
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                <path d="M6 1L8 5H11L8.5 7.5L9.5 11L6 9L2.5 11L3.5 7.5L1 5H4L6 1Z" stroke="#ff4060" stroke-width="1.2" stroke-linejoin="round" fill="rgba(255,64,96,0.15)"/>
-              </svg>
-            </div>
-            Liquidation
-          </div>
-        </div>
-        <div class="card-body-sm">
-          <div class="info-row"><span class="info-k">Pressure</span><span class="info-v" style="color:${liqColor}">${liqLabel}</span></div>
-          <div class="info-row"><span class="info-k">Density</span><span class="info-v">${fmtNum((d.liq_density||0)*100,1)}%</span></div>
-          <div class="prog-track"><div class="prog-fill pf-red" style="width:${(d.liq_density||0)*100}%"></div></div>
-          <div class="info-row"><span class="info-k">Cascade Risk</span><span class="info-v" style="color:${(d.cascade_risk||0)>0.5?'var(--red)':(d.cascade_risk||0)>0.25?'var(--amber)':'var(--green)'}">${fmtNum((d.cascade_risk||0)*100,0)}%</span></div>
-          ${d.liq_total_24h ? `
-          <div class="info-row"><span class="info-k">24h Vol (OKX)</span><span class="info-v" style="font-size:11px">$${fmtNum(d.liq_total_24h)}</span></div>
-          <div class="info-row"><span class="info-k" style="font-size:9px">Long / Short</span><span class="info-v" style="font-size:10px"><span style="color:var(--green)">$${(d.liq_long_vol/1e6).toFixed(0)}M</span><span style="color:var(--text-3)"> / </span><span style="color:var(--red)">$${(d.liq_short_vol/1e6).toFixed(0)}M</span></span></div>
-          ` : ''}
-          <div class="info-row"><span class="info-k">P/C OI</span><span class="info-v">${fmtNum(d.pc_oi,2)}</span></div>
-          <div class="info-row"><span class="info-k">P/C Vol</span><span class="info-v">${fmtNum(d.pc_vol,2)}</span></div>
-        </div>
-      </div>
-
-      <!-- CONFIDENCE -->
-      <div class="card">
-        <div class="card-head">
-          <div class="card-title">
-            <div class="card-icon">
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                <path d="M2 6L5 9L10 3" stroke="#00ff9d" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
-            </div>
-            Confidence
+            Signal &amp; Action
           </div>
         </div>
         <div class="card-body-sm" style="text-align:center">
-          <div class="gauge-wrap" style="width:80px;height:80px">
-            <svg viewBox="0 0 88 88">
-              <circle cx="44" cy="44" r="38" fill="none" stroke="rgba(255,255,255,0.04)" stroke-width="7"/>
-              <circle cx="44" cy="44" r="38" fill="none" stroke="${confColor}" stroke-width="7"
-                stroke-dasharray="${confCirc}" stroke-dashoffset="${confOff}"
-                stroke-linecap="round" transform="rotate(-90 44 44)"/>
-            </svg>
-            <div class="gauge-center-val" style="font-size:17px;color:${confColor}">${(conf*100).toFixed(0)}%</div>
+          <div style="display:inline-block;margin-bottom:4px">
+            <span class="signal-pill ${sigClass}">${(d.kelly_fraction||0)<=0?'CASH':signal}</span>
           </div>
-          <div class="text-xs mb-8">Execution Confidence</div>
-          ${Object.entries(d.confidence_components||{}).map(([k,v])=>`
-            <div class="info-row"><span class="info-k" style="font-size:9px">${k.replace(/_/g,' ').toUpperCase()}</span><span class="info-v" style="font-size:10px;color:${v>0?'var(--green)':v<0?'var(--red)':'var(--text-2)'}">${v>0?'+':''}${(v*100).toFixed(1)}%</span></div>
-          `).join('')}
-          <div class="prog-track mt-4">
-            <div class="prog-fill pf-cyan" style="width:${(conf*100).toFixed(0)}%"></div>
+          <div style="font-size:10px;color:var(--text-3);margin-bottom:14px;line-height:1.2">${pillReason}</div>
+          <div class="info-row"><span class="info-k">Action</span><span class="info-v" style="color:${(d.kelly_fraction||0)<=0?'var(--red)':sigClass==='sp-buy'?'var(--green)':sigClass==='sp-cash'?'var(--red)':'var(--amber)'}">${(d.kelly_fraction||0)<=0?'⚠ CASH':signal}</span></div>
+          <div class="info-row"><span class="info-k">BTC vs Floor</span><span class="info-v" style="color:${d.btc&&d.floor_total&&d.btc<=d.floor_total*1.05?'var(--green)':'var(--amber)'}">${d.btc&&d.floor_total?((d.btc/d.floor_total-1)*100).toFixed(1)+'% above':'—'}</span></div>
+          <div class="info-row"><span class="info-k">Transition Risk</span><span class="info-v" style="color:${(d.transition_risk||0)>0.5?'var(--red)':(d.transition_risk||0)>0.25?'var(--amber)':'var(--green)'}">${fmtNum((d.transition_risk||0)*100,0)}%</span></div>
+          <div class="info-row"><span class="info-k">Readiness</span><span class="info-v" style="color:${(d.readiness_score||0)>=0.8?'var(--green)':(d.readiness_score||0)>=0.5?'var(--amber)':'var(--text-2)'}">${((d.readiness_score||0)*100).toFixed(0)}%</span></div>
+          <div class="prog-track">
+            <div class="prog-fill ${(d.readiness_score||0)>=0.5?'pf-green':'pf-amber'}" style="width:${((d.readiness_score||0)*100).toFixed(0)}%"></div>
           </div>
+          <div style="font-size:8px;color:var(--text-3);margin-top:6px;line-height:1.5">Floor = Price × (1 − SFC% × 0.6)</div>
         </div>
       </div>
-
     </div>
-<!-- Q10 ON-CHAIN PANEL (ErcinDedeoglu/crypto-market-data) -->
+
+    <!-- Q10 ON-CHAIN PANEL (ErcinDedeoglu/crypto-market-data) -->
     <div class="card span-full mb-16" style="display:${d.q10_available?'block':'none'}">
       <div class="card-head">
         <div class="card-title">
@@ -2216,183 +2155,7 @@ function render(d) {
       </div>
     </div>
 
-    
-    </div><!-- /{name} -->
-    <!-- ═══ TAB: ENSEMBLE ═══ -->
-    <div class="tab-panel" data-tab="ensemble">
-      <!-- ENSEMBLE -->
-      <div id="ensembleSection" class="card">
-        <div class="card-head">
-          <div class="card-title">
-            <div class="card-icon">
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                <rect x="1" y="7" width="2" height="4" rx="0.5" fill="#00d4ff"/>
-                <rect x="5" y="4" width="2" height="7" rx="0.5" fill="#9d7af8"/>
-                <rect x="9" y="1" width="2" height="10" rx="0.5" fill="#00ff9d"/>
-              </svg>
-            </div>
-            6-Method Ensemble
-          </div>
-          <div class="card-badge">Consensus ${(agree*100).toFixed(0)}%</div>
-        </div>
-        <div class="card-body">
-          <canvas id="methodChart" width="400" height="140" style="width:100%;height:auto;max-height:140px;margin-bottom:12px"></canvas>
-
-          <div class="method-grid">
-            ${[
-              ['KLR',   '#00ff9d', fmtNum(d.m1_klr??d.sfc_base*0.9,1)+'%'],
-              ['LOGIT', '#00d4ff', fmtNum(d.m2_logit,1)+'%'],
-              ['BAYES', '#9d7af8', fmtNum(d.m3_bayes,1)+'%'],
-              ['EWC',   '#f0b429', fmtNum(d.m4_ewc,1)+'%'],
-              ['QREG',  '#4a9eff', fmtNum(d.m5_qreg,1)+'%'],
-              ['REGIME','#ff4060', fmtNum(d.m6_regime_score,1)+'%']
-            ].map(([name,color,val]) => `
-              <div class="method-cell">
-                <div class="method-cell-name">${name}</div>
-                <div class="method-cell-val" style="color:${color}">${val}</div>
-              </div>
-            `).join('')}
-          </div>
-
-          <div class="consensus-row">
-            <div class="consensus-ring" style="background:${agree>0.6?'var(--green-dim)':agree>0.3?'var(--amber-dim)':'var(--red-dim)'};border:2px solid ${agreeColor};color:${agreeColor}">${(agree*100).toFixed(0)}%</div>
-            <div class="consensus-info">
-              <div class="consensus-label">Method Consensus — ${agree>0.6?'Strong':agree>0.3?'Moderate':'Low'}</div>
-              <div class="consensus-sub">${d.total_methods_active||28} active methods · ${d.inst_methods_active||12} institutional · ${d.sc_methods_active||0} SC · ${d.macro_methods_active||0} macro</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div><!-- KELLY + MACRO row -->
-    <div class="card span-full mb-16 card-collapsed" data-lazy>
-      <div class="card-head">
-        <div class="card-title">
-          <div class="card-icon">
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-              <rect x="1" y="1" width="4" height="4" rx="1" stroke="#f0b429" stroke-width="1.2"/>
-              <rect x="7" y="1" width="4" height="4" rx="1" stroke="#4a9eff" stroke-width="1.2"/>
-              <rect x="1" y="7" width="4" height="4" rx="1" stroke="#9d7af8" stroke-width="1.2"/>
-              <rect x="7" y="7" width="4" height="4" rx="1" stroke="#00ff9d" stroke-width="1.2"/>
-            </svg>
-          </div>
-          Kelly Position Sizing
-        </div>
-          <span class="collapse-arrow" onclick="toggleCollapseCard(this)" style="cursor:pointer;font-size:10px;color:var(--text-3);padding:4px 8px;user-select:none">▶</span>
-        <div class="card-badge">Allocation Guide</div>
-      </div>
-      <div class="card-body">
-        <div class="stat-3 mb-12">
-          <div class="stat-box">
-            <div class="stat-label">Signal Confidence</div>
-            <div class="stat-val" style="color:${(d.kelly_p_win||0)>0.6?'var(--green)':'var(--amber)'}">${((d.kelly_p_win||0.5)*100).toFixed(0)}%</div>
-            <div class="stat-note">Bayesian signal trust</div>
-          </div>
-          <div class="stat-box">
-            <div class="stat-label">Max Allocation</div>
-            <div class="stat-val" style="color:${(d.kelly_fraction||0)>0.3?'var(--amber)':(d.kelly_fraction||0)>0?'var(--green)':'var(--text-3)'}">${((d.kelly_fraction||0)*100).toFixed(1)}%</div>
-            <div class="stat-note">${(d.kelly_fraction||0)>0?'Optimal Kelly size':'No edge — stay cash'}</div>
-          </div>
-          <div class="stat-box">
-            <div class="stat-label">Safe Allocation</div>
-            <div class="stat-val" style="color:var(--green)">${((d.kelly_half||0)*100).toFixed(1)}%</div>
-            <div class="stat-note">½ Kelly — reduced variance</div>
-          </div>
-        </div>
-        <div class="stat-3 mb-12">
-          <div class="info-row"><span class="info-k">Alert Window</span><span class="info-v">~${Math.round(d.alert_window_days||0)}d</span></div>
-          <div class="info-row"><span class="info-k">Timing Precision</span><span class="info-v" style="color:${d.timing_precision==='HIGH'?'var(--green)':'var(--amber)'}">${d.timing_precision||'LOW'}</span></div>
-          <div class="info-row"><span class="info-k">Signal Type</span><span class="info-v" style="color:${d.fng<15||(d.cascade_risk||0)>0.5?'var(--red)':'var(--green)'}">${d.fng<15?(d.fng_cls||'EXTREME FEAR'):(d.cascade_risk||0)>0.5?'CASCADE RISK':'NORMAL'}</span></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- BACKTEST -->
-    ${d.bt_sharpe != null ? `
-    <div id="backtestSection" class="card span-full mb-16">
-      <div class="card-head">
-        <div class="card-title">
-          <div class="card-icon">
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-              <path d="M1 11L4 7L7 9L11 2" stroke="#00d4ff" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-              <circle cx="4" cy="7" r="1" fill="#00d4ff"/>
-              <circle cx="7" cy="9" r="1" fill="#00d4ff"/>
-            </svg>
-          </div>
-          Walk-Forward Backtest
-        </div>
-        <div class="card-badge">${d.bt_label||'UPPER-BOUND'} · ${d.bt_periods||0} periods</div>
-      </div>
-      <div class="card-body">
-        <div class="stat-4 mb-12">
-          <div class="stat-box">
-            <div class="stat-label">Sharpe Ratio</div>
-            <div class="stat-val" style="color:${(d.bt_sharpe||0)>1.5?'var(--green)':(d.bt_sharpe||0)>0.5?'var(--amber)':'var(--red)'}">${fmtNum(d.bt_sharpe,2)}</div>
-            <div class="stat-note">CI ${fmtNum(d.bt_sharpe_low,2)}–${fmtNum(d.bt_sharpe_high,2)} (95%)</div>
-          </div>
-          <div class="stat-box">
-            <div class="stat-label">Win Rate</div>
-            <div class="stat-val" style="color:var(--amber)">${((d.bt_win_rate||0)*100).toFixed(0)}%</div>
-            <div class="stat-note">CI ${((d.bt_win_rate_low||0)*100).toFixed(0)}–${((d.bt_win_rate_high||0)*100).toFixed(0)}%</div>
-          </div>
-          <div class="stat-box">
-            <div class="stat-label">Max Drawdown</div>
-            <div class="stat-val" style="color:${(d.bt_max_dd||0)<0.1?'var(--green)':(d.bt_max_dd||0)<0.2?'var(--amber)':'var(--red)'}">${((d.bt_max_dd||0)*100).toFixed(1)}%</div>
-            <div class="stat-note">Peak-to-trough</div>
-          </div>
-          <div class="stat-box">
-            <div class="stat-label">Stability</div>
-            <div class="stat-val" style="color:${(d.bt_stability||0)>0.7?'var(--green)':'var(--amber)'}">${((d.bt_stability||0)*100).toFixed(0)}%</div>
-            <div class="stat-note">Signal consistency</div>
-          </div>
-        </div>
-        ${d.bt_calibration_note ? `<div class="calib-note">⚠ ${d.bt_calibration_note}</div>` : ''}
-      </div>
-    </div>` : ''}
-
-    <!-- XAI -->
-    ${d.xai_top_features && d.xai_top_features.length ? `
-    <div class="card span-full mb-16">
-      <div class="card-head">
-        <div class="card-title">
-          <div class="card-icon">
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-              <circle cx="6" cy="3" r="2" stroke="#9d7af8" stroke-width="1.2"/>
-              <circle cx="2" cy="9" r="1.5" stroke="#9d7af8" stroke-width="1.2"/>
-              <circle cx="10" cy="9" r="1.5" stroke="#9d7af8" stroke-width="1.2"/>
-              <path d="M4.5 4.5L3 7.5M7.5 4.5L9 7.5" stroke="rgba(157,122,248,0.5)" stroke-width="1"/>
-            </svg>
-          </div>
-          QLSTM Feature Importance
-        </div>
-        <div class="card-badge">Permutation importance · XAI</div>
-      </div>
-      <div class="card-body">
-        ${d.xai_top_features.map(f => {
-          const barColor = f.direction === 'positive' ? 'var(--red)' : 'var(--green)';
-          const dirIcon  = f.direction === 'positive' ? '↑' : f.direction === 'negative' ? '↓' : '→';
-          return `
-          <div class="xai-bar-row">
-            <div class="xai-name">${f.name}</div>
-            <div class="xai-track">
-              <div class="xai-fill" style="width:${f.importance_pct}%;background:${f.direction==='positive'?'var(--red)':'var(--green)'}"></div>
-            </div>
-            <div class="xai-pct" style="color:${barColor}">${f.importance_pct}%</div>
-            <div class="xai-dir" style="color:${barColor}">${dirIcon}</div>
-          </div>`;
-        }).join('')}
-        <div class="xai-note">
-          QLSTM hybrid SFC: <strong>${d.m32_hybrid_pred!=null?d.m32_hybrid_pred.toFixed(2)+'%':'—'}</strong>
-          &nbsp;·&nbsp; ProAdapt weight: <strong>${d.m32_proadapt_weight!=null?(d.m32_proadapt_weight*100).toFixed(0)+'% QLSTM':'—'}</strong> vs ${d.m32_proadapt_weight!=null?((1-d.m32_proadapt_weight)*100).toFixed(0)+'% GARCH':'—'}.
-          Features with high importance are the dominant risk drivers in the quantum model.
-        </div>
-      </div>
-    </div>` : ''}
-
-    
-    </div><!-- /{name} -->
-    <!-- ═══ TAB: ADVANCED ═══ -->
-    <div class="tab-panel" data-tab="advanced">
-<!-- ═══ NEW: LIQUIDITY INTELLIGENCE (GLF + SLI + MPI) ═══ -->
+    <!-- ═══ NEW: LIQUIDITY INTELLIGENCE (GLF + SLI + MPI) ═══ -->
     <div class="card span-full mb-16 card-collapsed" data-lazy>
       <div class="card-head">
         <div class="card-title">
@@ -2568,93 +2331,132 @@ function render(d) {
       </div>
     </div>
 
-        <div class="grid-4 mb-16">
-      <div class="card">
-        <div class="card-head">
-          <div class="card-title">Macro Context</div>
+    <!-- KELLY + MACRO row -->
+    <div class="card span-full mb-16 card-collapsed" data-lazy>
+      <div class="card-head">
+        <div class="card-title">
+          <div class="card-icon">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <rect x="1" y="1" width="4" height="4" rx="1" stroke="#f0b429" stroke-width="1.2"/>
+              <rect x="7" y="1" width="4" height="4" rx="1" stroke="#4a9eff" stroke-width="1.2"/>
+              <rect x="1" y="7" width="4" height="4" rx="1" stroke="#9d7af8" stroke-width="1.2"/>
+              <rect x="7" y="7" width="4" height="4" rx="1" stroke="#00ff9d" stroke-width="1.2"/>
+            </svg>
+          </div>
+          Kelly Position Sizing
         </div>
-        <div class="card-body-sm">
-          <div class="info-row"><span class="info-k">DXY</span><span class="info-v">${fmtNum(d.dxy,2)}</span></div>
-          <div class="info-row"><span class="info-k">M2 YoY</span><span class="info-v">${fmtNum(d.m2_yoy,2)}%</span></div>
-          <div class="info-row"><span class="info-k">Real Rate</span><span class="info-v">${d.m7_detail?.real_rate!=null?fmtNum(d.m7_detail.real_rate,2)+'%':'—'}</span></div>
-          <div class="info-row"><span class="info-k">Fed Rate</span><span class="info-v">${d.m7_detail?.fed_rate!=null?fmtNum(d.m7_detail.fed_rate,2)+'%':'—'}</span></div>
-          <div class="info-row"><span class="info-k">CPI YoY</span><span class="info-v" style="color:${(d.m7_detail?.cpi_yoy||0)>4?'var(--red)':'var(--text-1)'}">${d.m7_detail?.cpi_yoy!=null?fmtNum(d.m7_detail.cpi_yoy,2)+'%':'—'}</span></div>
-          <div class="info-row"><span class="info-k">Yield Slope</span><span class="info-v">${d.m8_detail?.slope!=null?fmtNum(d.m8_detail.slope,2):'—'}</span></div>
-        </div>
+          <span class="collapse-arrow" onclick="toggleCollapseCard(this)" style="cursor:pointer;font-size:10px;color:var(--text-3);padding:4px 8px;user-select:none">▶</span>
+        <div class="card-badge">Allocation Guide</div>
       </div>
-
-      <div class="card">
-        <div class="card-head">
-          <div class="card-title">On-Chain</div>
-        </div>
-        <div class="card-body-sm">
-          <div class="info-row"><span class="info-k">GARCH Vol</span><span class="info-v">${d.m10_detail?.garch_vol!=null?fmtNum(d.m10_detail.garch_vol*100,2)+'%':'—'}</span></div>
-          <div class="info-row"><span class="info-k">Persistence</span><span class="info-v">${d.m10_detail?.persistence!=null?fmtNum(d.m10_detail.persistence,3):'—'}</span></div>
-          <div class="info-row"><span class="info-k">VaR 95%</span><span class="info-v" style="color:var(--red)">${d.m11_detail?.var_95!=null?(d.m11_detail.var_95*100).toFixed(2)+'%':'—'}</span></div>
-          <div class="info-row"><span class="info-k">ES 95%</span><span class="info-v" style="color:var(--red)">${d.m11_detail?.es_95!=null?(d.m11_detail.es_95*100).toFixed(2)+'%':'—'}</span></div>
-          <div class="info-row"><span class="info-k">Jump Risk</span><span class="info-v">${d.m12_detail?.jump_risk!=null?(d.m12_detail.jump_risk*100).toFixed(2)+'%':'—'}</span></div>
-          <div class="info-row"><span class="info-k">OBI</span><span class="info-v" style="color:${(d.m20_detail?.obi||0)<-0.3?'var(--red)':(d.m20_detail?.obi||0)>0.3?'var(--green)':'var(--text-1)'}">${d.m20_detail?.obi!=null?fmtNum(d.m20_detail.obi,4):'—'}</span></div>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="card-head">
-          <div class="card-title">Behavioral</div>
-        </div>
-        <div class="card-body-sm">
-          <div class="info-row"><span class="info-k">Minsky Stage</span><span class="info-v">${d.m25_detail?.minsky_stage||'—'}</span></div>
-          <div class="info-row"><span class="info-k">Loss Aversion</span><span class="info-v">${d.m26_detail?.loss_aversion!=null?fmtNum(d.m26_detail.loss_aversion,2):'—'}</span></div>
-          <div class="info-row"><span class="info-k">Tail Danger</span><span class="info-v" style="color:${d.m27_detail?.tail_danger==='ELEVATED'?'var(--amber)':d.m27_detail?.tail_danger==='HIGH'?'var(--red)':'var(--text-1)'}">${d.m27_detail?.tail_danger||'—'}</span></div>
-          <div class="info-row"><span class="info-k">Debt/GDP</span><span class="info-v" style="color:${(d.m29_detail?.debt_gdp_ratio||0)>1.2?'var(--red)':'var(--text-1)'}">${d.m29_detail?.debt_gdp_ratio!=null?fmtNum(d.m29_detail.debt_gdp_ratio,3):'—'}</span></div>
-          <div class="info-row"><span class="info-k">Altman-Z</span><span class="info-v" style="color:${(d.m31_detail?.z_score||0)>4?'var(--green)':'var(--amber)'}">${d.m31_detail?.z_score!=null?fmtNum(d.m31_detail.z_score,2):'—'}</span></div>
-          <div class="info-row"><span class="info-k">Reddit</span><span class="info-v">${d.adv_reddit_label||'NEUTRAL'}</span></div>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="card-head">
-          <div class="card-title">
-            <div class="card-icon">
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                <rect x="1" y="1" width="10" height="10" rx="2" stroke="#9d7af8" stroke-width="1.2" fill="none"/>
-                <path d="M4 6L5.5 7.5L8 4.5" stroke="#00ff9d" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
-            </div>
-            Advanced ML Signals
+      <div class="card-body">
+        <div class="stat-3 mb-12">
+          <div class="stat-box">
+            <div class="stat-label">Signal Confidence</div>
+            <div class="stat-val" style="color:${(d.kelly_p_win||0)>0.6?'var(--green)':'var(--amber)'}">${((d.kelly_p_win||0.5)*100).toFixed(0)}%</div>
+            <div class="stat-note">Bayesian signal trust</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-label">Max Allocation</div>
+            <div class="stat-val" style="color:${(d.kelly_fraction||0)>0.3?'var(--amber)':(d.kelly_fraction||0)>0?'var(--green)':'var(--text-3)'}">${((d.kelly_fraction||0)*100).toFixed(1)}%</div>
+            <div class="stat-note">${(d.kelly_fraction||0)>0?'Optimal Kelly size':'No edge — stay cash'}</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-label">Safe Allocation</div>
+            <div class="stat-val" style="color:var(--green)">${((d.kelly_half||0)*100).toFixed(1)}%</div>
+            <div class="stat-note">½ Kelly — reduced variance</div>
           </div>
         </div>
-        <div class="card-body-sm">
-          ${d.shock_severity && d.shock_severity !== 'NONE' ? `
-            <div style="margin-bottom:8px">
-              <span class="sec-chip sc-critical">${d.shock_severity} SHOCK</span>
-              ${d.shock_event?`<div class="sec-event-text">${d.shock_event}</div>`:''}
-            </div>
-          ` : ''}
-          <!-- HMM Regime -->
-          <div class="info-row"><span class="info-k">HMM Regime</span><span class="info-v" style="color:${d.hmm_regime==='CRISIS'?'var(--red)':d.hmm_regime==='BEAR'?'var(--amber)':d.hmm_regime==='BULL'?'var(--green)':'var(--text-1)'}">${d.hmm_regime||'—'} ${d.hmm_crisis_prob!=null?'('+fmtNum(d.hmm_crisis_prob*100,0)+'%)':''}</span></div>
-          <!-- XGBoost Meta -->
-          <div class="info-row"><span class="info-k">XGBoost Meta</span><span class="info-v" style="color:${(d.xgb_meta_prediction||0)>25?'var(--red)':(d.xgb_meta_prediction||0)>15?'var(--amber)':'var(--green)'}">${d.xgb_meta_prediction!=null?fmtNum(d.xgb_meta_prediction,1)+'% stress':'—'} ${d.xgb_available?'✓':'✗'}</span></div>
-          <!-- MTF Alignment -->
-          <div class="info-row"><span class="info-k">MTF Alignment</span><span class="info-v" style="color:${(d.mtf_alignment_score||0)>0.3?'var(--green)':(d.mtf_alignment_score||0)<-0.3?'var(--red)':'var(--amber)'}">${d.mtf_available?fmtNum(d.mtf_alignment_score,2):'—'} ${d.mtf_divergence?'⚠ Divergence':''}</span></div>
-          <!-- AFE RSI-14 -->
-          <div class="info-row"><span class="info-k">AFE RSI</span><span class="info-v" style="color:${(d.rsi_14||50)<30?'var(--green)':(d.rsi_14||50)>70?'var(--red)':'var(--text-1)'}">${d.rsi_14!=null?fmtNum(d.rsi_14,1):'&mdash;'}</span></div>
-          <!-- AFE MACD -->
-          <div class="info-row"><span class="info-k">AFE MACD Sig</span><span class="info-v" style="color:${(d.afe_macd_signal||0)<-0.3?'var(--red)':(d.afe_macd_signal||0)>0.3?'var(--green)':'var(--text-1)'}">${d.afe_macd_signal!=null?fmtNum(d.afe_macd_signal,3):'—'} ${d.afe_available?'✓':'✗'}</span></div>
-          <!-- Mamba SSM -->
-          <div class="info-row"><span class="info-k">Mamba SSM</span><span class="info-v" style="color:${(d.m32_mamba||0)>0.3?'var(--red)':(d.m32_mamba||0)>0.2?'var(--amber)':'var(--green)'}">${d.m32_mamba!=null?fmtNum(d.m32_mamba*100,1)+'% stress':'—'}</span></div>
-          <!-- EWMA -->
-          <div class="info-row"><span class="info-k">EWMA Online</span><span class="info-v" style="color:${d.ewma_corrected?'var(--green)':'var(--text-3)'}">${d.ewma_corrected?'✓ Active':'—'}</span></div>
-          <div style="border-top:1px solid var(--border-1);margin:8px 0;padding-top:6px"></div>
-          <div class="info-row"><span class="info-k">Cascade Risk</span><span class="info-v" style="color:${(d.cascade_risk||0)>0.5?'var(--red)':(d.cascade_risk||0)>0.25?'var(--amber)':'var(--green)'}">${fmtNum((d.cascade_risk||0)*100,0)}%</span></div>
-          <div class="info-row"><span class="info-k">Transition Risk</span><span class="info-v" style="color:${(d.transition_risk||0)>0.5?'var(--red)':(d.transition_risk||0)>0.25?'var(--amber)':'var(--green)'}">${fmtNum((d.transition_risk||0)*100,0)}%</span></div>
-          <div class="info-row"><span class="info-k">News Stress</span><span class="info-v" style="color:${(d.news_stress||0)<0?'var(--green)':(d.news_stress||0)>5?'var(--red)':(d.news_stress||0)>1?'var(--amber)':'var(--text-1)'}">${fmtNum(d.news_stress,1)}%</span></div>
-          <div class="info-row"><span class="info-k">Adv Uncertainty</span><span class="info-v">${fmtNum((d.adv_uncertainty||0)*100,1)}%</span></div>
+        <div class="stat-3 mb-12">
+          <div class="info-row"><span class="info-k">Alert Window</span><span class="info-v">~${Math.round(d.alert_window_days||0)}d</span></div>
+          <div class="info-row"><span class="info-k">Timing Precision</span><span class="info-v" style="color:${d.timing_precision==='HIGH'?'var(--green)':'var(--amber)'}">${d.timing_precision||'LOW'}</span></div>
+          <div class="info-row"><span class="info-k">Signal Type</span><span class="info-v" style="color:${d.fng<15||(d.cascade_risk||0)>0.5?'var(--red)':'var(--green)'}">${d.fng<15?(d.fng_cls||'EXTREME FEAR'):(d.cascade_risk||0)>0.5?'CASCADE RISK':'NORMAL'}</span></div>
         </div>
       </div>
-    </div><!-- /{name} -->
-    <!-- ═══ TAB: TRADING ═══ -->
-    <div class="tab-panel" data-tab="trading">
-<!-- PAPER TRADING -->
+    </div>
+
+    <!-- BACKTEST -->
+    ${d.bt_sharpe != null ? `
+    <div id="backtestSection" class="card span-full mb-16">
+      <div class="card-head">
+        <div class="card-title">
+          <div class="card-icon">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <path d="M1 11L4 7L7 9L11 2" stroke="#00d4ff" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+              <circle cx="4" cy="7" r="1" fill="#00d4ff"/>
+              <circle cx="7" cy="9" r="1" fill="#00d4ff"/>
+            </svg>
+          </div>
+          Walk-Forward Backtest
+        </div>
+        <div class="card-badge">${d.bt_label||'UPPER-BOUND'} · ${d.bt_periods||0} periods</div>
+      </div>
+      <div class="card-body">
+        <div class="stat-4 mb-12">
+          <div class="stat-box">
+            <div class="stat-label">Sharpe Ratio</div>
+            <div class="stat-val" style="color:${(d.bt_sharpe||0)>1.5?'var(--green)':(d.bt_sharpe||0)>0.5?'var(--amber)':'var(--red)'}">${fmtNum(d.bt_sharpe,2)}</div>
+            <div class="stat-note">CI ${fmtNum(d.bt_sharpe_low,2)}–${fmtNum(d.bt_sharpe_high,2)} (95%)</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-label">Win Rate</div>
+            <div class="stat-val" style="color:var(--amber)">${((d.bt_win_rate||0)*100).toFixed(0)}%</div>
+            <div class="stat-note">CI ${((d.bt_win_rate_low||0)*100).toFixed(0)}–${((d.bt_win_rate_high||0)*100).toFixed(0)}%</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-label">Max Drawdown</div>
+            <div class="stat-val" style="color:${(d.bt_max_dd||0)<0.1?'var(--green)':(d.bt_max_dd||0)<0.2?'var(--amber)':'var(--red)'}">${((d.bt_max_dd||0)*100).toFixed(1)}%</div>
+            <div class="stat-note">Peak-to-trough</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-label">Stability</div>
+            <div class="stat-val" style="color:${(d.bt_stability||0)>0.7?'var(--green)':'var(--amber)'}">${((d.bt_stability||0)*100).toFixed(0)}%</div>
+            <div class="stat-note">Signal consistency</div>
+          </div>
+        </div>
+        ${d.bt_calibration_note ? `<div class="calib-note">⚠ ${d.bt_calibration_note}</div>` : ''}
+      </div>
+    </div>` : ''}
+
+    <!-- XAI -->
+    ${d.xai_top_features && d.xai_top_features.length ? `
+    <div class="card span-full mb-16">
+      <div class="card-head">
+        <div class="card-title">
+          <div class="card-icon">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <circle cx="6" cy="3" r="2" stroke="#9d7af8" stroke-width="1.2"/>
+              <circle cx="2" cy="9" r="1.5" stroke="#9d7af8" stroke-width="1.2"/>
+              <circle cx="10" cy="9" r="1.5" stroke="#9d7af8" stroke-width="1.2"/>
+              <path d="M4.5 4.5L3 7.5M7.5 4.5L9 7.5" stroke="rgba(157,122,248,0.5)" stroke-width="1"/>
+            </svg>
+          </div>
+          QLSTM Feature Importance
+        </div>
+        <div class="card-badge">Permutation importance · XAI</div>
+      </div>
+      <div class="card-body">
+        ${d.xai_top_features.map(f => {
+          const barColor = f.direction === 'positive' ? 'var(--red)' : 'var(--green)';
+          const dirIcon  = f.direction === 'positive' ? '↑' : f.direction === 'negative' ? '↓' : '→';
+          return `
+          <div class="xai-bar-row">
+            <div class="xai-name">${f.name}</div>
+            <div class="xai-track">
+              <div class="xai-fill" style="width:${f.importance_pct}%;background:${f.direction==='positive'?'var(--red)':'var(--green)'}"></div>
+            </div>
+            <div class="xai-pct" style="color:${barColor}">${f.importance_pct}%</div>
+            <div class="xai-dir" style="color:${barColor}">${dirIcon}</div>
+          </div>`;
+        }).join('')}
+        <div class="xai-note">
+          QLSTM hybrid SFC: <strong>${d.m32_hybrid_pred!=null?d.m32_hybrid_pred.toFixed(2)+'%':'—'}</strong>
+          &nbsp;·&nbsp; ProAdapt weight: <strong>${d.m32_proadapt_weight!=null?(d.m32_proadapt_weight*100).toFixed(0)+'% QLSTM':'—'}</strong> vs ${d.m32_proadapt_weight!=null?((1-d.m32_proadapt_weight)*100).toFixed(0)+'% GARCH':'—'}.
+          Features with high importance are the dominant risk drivers in the quantum model.
+        </div>
+      </div>
+    </div>` : ''}
+
+    <!-- PAPER TRADING -->
     <div class="card span-full mb-16" id="paperSection">
       <div class="card-head">
         <div class="card-title">
@@ -2742,9 +2544,92 @@ function render(d) {
     </div>
 
     <!-- MACRO ROW -->
+    <div class="grid-4 mb-16">
+      <div class="card">
+        <div class="card-head">
+          <div class="card-title">Macro Context</div>
+        </div>
+        <div class="card-body-sm">
+          <div class="info-row"><span class="info-k">DXY</span><span class="info-v">${fmtNum(d.dxy,2)}</span></div>
+          <div class="info-row"><span class="info-k">M2 YoY</span><span class="info-v">${fmtNum(d.m2_yoy,2)}%</span></div>
+          <div class="info-row"><span class="info-k">Real Rate</span><span class="info-v">${d.m7_detail?.real_rate!=null?fmtNum(d.m7_detail.real_rate,2)+'%':'—'}</span></div>
+          <div class="info-row"><span class="info-k">Fed Rate</span><span class="info-v">${d.m7_detail?.fed_rate!=null?fmtNum(d.m7_detail.fed_rate,2)+'%':'—'}</span></div>
+          <div class="info-row"><span class="info-k">CPI YoY</span><span class="info-v" style="color:${(d.m7_detail?.cpi_yoy||0)>4?'var(--red)':'var(--text-1)'}">${d.m7_detail?.cpi_yoy!=null?fmtNum(d.m7_detail.cpi_yoy,2)+'%':'—'}</span></div>
+          <div class="info-row"><span class="info-k">Yield Slope</span><span class="info-v">${d.m8_detail?.slope!=null?fmtNum(d.m8_detail.slope,2):'—'}</span></div>
+        </div>
+      </div>
 
-    </div><!-- /{name} -->
-<!-- HELP -->
+      <div class="card">
+        <div class="card-head">
+          <div class="card-title">On-Chain</div>
+        </div>
+        <div class="card-body-sm">
+          <div class="info-row"><span class="info-k">GARCH Vol</span><span class="info-v">${d.m10_detail?.garch_vol!=null?fmtNum(d.m10_detail.garch_vol*100,2)+'%':'—'}</span></div>
+          <div class="info-row"><span class="info-k">Persistence</span><span class="info-v">${d.m10_detail?.persistence!=null?fmtNum(d.m10_detail.persistence,3):'—'}</span></div>
+          <div class="info-row"><span class="info-k">VaR 95%</span><span class="info-v" style="color:var(--red)">${d.m11_detail?.var_95!=null?(d.m11_detail.var_95*100).toFixed(2)+'%':'—'}</span></div>
+          <div class="info-row"><span class="info-k">ES 95%</span><span class="info-v" style="color:var(--red)">${d.m11_detail?.es_95!=null?(d.m11_detail.es_95*100).toFixed(2)+'%':'—'}</span></div>
+          <div class="info-row"><span class="info-k">Jump Risk</span><span class="info-v">${d.m12_detail?.jump_risk!=null?(d.m12_detail.jump_risk*100).toFixed(2)+'%':'—'}</span></div>
+          <div class="info-row"><span class="info-k">OBI</span><span class="info-v" style="color:${(d.m20_detail?.obi||0)<-0.3?'var(--red)':(d.m20_detail?.obi||0)>0.3?'var(--green)':'var(--text-1)'}">${d.m20_detail?.obi!=null?fmtNum(d.m20_detail.obi,4):'—'}</span></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div class="card-title">Behavioral</div>
+        </div>
+        <div class="card-body-sm">
+          <div class="info-row"><span class="info-k">Minsky Stage</span><span class="info-v">${d.m25_detail?.minsky_stage||'—'}</span></div>
+          <div class="info-row"><span class="info-k">Loss Aversion</span><span class="info-v">${d.m26_detail?.loss_aversion!=null?fmtNum(d.m26_detail.loss_aversion,2):'—'}</span></div>
+          <div class="info-row"><span class="info-k">Tail Danger</span><span class="info-v" style="color:${d.m27_detail?.tail_danger==='ELEVATED'?'var(--amber)':d.m27_detail?.tail_danger==='HIGH'?'var(--red)':'var(--text-1)'}">${d.m27_detail?.tail_danger||'—'}</span></div>
+          <div class="info-row"><span class="info-k">Debt/GDP</span><span class="info-v" style="color:${(d.m29_detail?.debt_gdp_ratio||0)>1.2?'var(--red)':'var(--text-1)'}">${d.m29_detail?.debt_gdp_ratio!=null?fmtNum(d.m29_detail.debt_gdp_ratio,3):'—'}</span></div>
+          <div class="info-row"><span class="info-k">Altman-Z</span><span class="info-v" style="color:${(d.m31_detail?.z_score||0)>4?'var(--green)':'var(--amber)'}">${d.m31_detail?.z_score!=null?fmtNum(d.m31_detail.z_score,2):'—'}</span></div>
+          <div class="info-row"><span class="info-k">Reddit</span><span class="info-v">${d.adv_reddit_label||'NEUTRAL'}</span></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div class="card-title">
+            <div class="card-icon">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                <rect x="1" y="1" width="10" height="10" rx="2" stroke="#9d7af8" stroke-width="1.2" fill="none"/>
+                <path d="M4 6L5.5 7.5L8 4.5" stroke="#00ff9d" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </div>
+            Advanced ML Signals
+          </div>
+        </div>
+        <div class="card-body-sm">
+          ${d.shock_severity && d.shock_severity !== 'NONE' ? `
+            <div style="margin-bottom:8px">
+              <span class="sec-chip sc-critical">${d.shock_severity} SHOCK</span>
+              ${d.shock_event?`<div class="sec-event-text">${d.shock_event}</div>`:''}
+            </div>
+          ` : ''}
+          <!-- HMM Regime -->
+          <div class="info-row"><span class="info-k">HMM Regime</span><span class="info-v" style="color:${d.hmm_regime==='CRISIS'?'var(--red)':d.hmm_regime==='BEAR'?'var(--amber)':d.hmm_regime==='BULL'?'var(--green)':'var(--text-1)'}">${d.hmm_regime||'—'} ${d.hmm_crisis_prob!=null?'('+fmtNum(d.hmm_crisis_prob*100,0)+'%)':''}</span></div>
+          <!-- XGBoost Meta -->
+          <div class="info-row"><span class="info-k">XGBoost Meta</span><span class="info-v" style="color:${(d.xgb_meta_prediction||0)>25?'var(--red)':(d.xgb_meta_prediction||0)>15?'var(--amber)':'var(--green)'}">${d.xgb_meta_prediction!=null?fmtNum(d.xgb_meta_prediction,1)+'% stress':'—'} ${d.xgb_available?'✓':'✗'}</span></div>
+          <!-- MTF Alignment -->
+          <div class="info-row"><span class="info-k">MTF Alignment</span><span class="info-v" style="color:${(d.mtf_alignment_score||0)>0.3?'var(--green)':(d.mtf_alignment_score||0)<-0.3?'var(--red)':'var(--amber)'}">${d.mtf_available?fmtNum(d.mtf_alignment_score,2):'—'} ${d.mtf_divergence?'⚠ Divergence':''}</span></div>
+          <!-- AFE RSI-14 -->
+          <div class="info-row"><span class="info-k">AFE RSI</span><span class="info-v" style="color:${(d.rsi_14||50)<30?'var(--green)':(d.rsi_14||50)>70?'var(--red)':'var(--text-1)'}">${d.rsi_14!=null?fmtNum(d.rsi_14,1):'&mdash;'}</span></div>
+          <!-- AFE MACD -->
+          <div class="info-row"><span class="info-k">AFE MACD Sig</span><span class="info-v" style="color:${(d.afe_macd_signal||0)<-0.3?'var(--red)':(d.afe_macd_signal||0)>0.3?'var(--green)':'var(--text-1)'}">${d.afe_macd_signal!=null?fmtNum(d.afe_macd_signal,3):'—'} ${d.afe_available?'✓':'✗'}</span></div>
+          <!-- Mamba SSM -->
+          <div class="info-row"><span class="info-k">Mamba SSM</span><span class="info-v" style="color:${(d.m32_mamba||0)>0.3?'var(--red)':(d.m32_mamba||0)>0.2?'var(--amber)':'var(--green)'}">${d.m32_mamba!=null?fmtNum(d.m32_mamba*100,1)+'% stress':'—'}</span></div>
+          <!-- EWMA -->
+          <div class="info-row"><span class="info-k">EWMA Online</span><span class="info-v" style="color:${d.ewma_corrected?'var(--green)':'var(--text-3)'}">${d.ewma_corrected?'✓ Active':'—'}</span></div>
+          <div style="border-top:1px solid var(--border-1);margin:8px 0;padding-top:6px"></div>
+          <div class="info-row"><span class="info-k">Cascade Risk</span><span class="info-v" style="color:${(d.cascade_risk||0)>0.5?'var(--red)':(d.cascade_risk||0)>0.25?'var(--amber)':'var(--green)'}">${fmtNum((d.cascade_risk||0)*100,0)}%</span></div>
+          <div class="info-row"><span class="info-k">Transition Risk</span><span class="info-v" style="color:${(d.transition_risk||0)>0.5?'var(--red)':(d.transition_risk||0)>0.25?'var(--amber)':'var(--green)'}">${fmtNum((d.transition_risk||0)*100,0)}%</span></div>
+          <div class="info-row"><span class="info-k">News Stress</span><span class="info-v" style="color:${(d.news_stress||0)<0?'var(--green)':(d.news_stress||0)>5?'var(--red)':(d.news_stress||0)>1?'var(--amber)':'var(--text-1)'}">${fmtNum(d.news_stress,1)}%</span></div>
+          <div class="info-row"><span class="info-k">Adv Uncertainty</span><span class="info-v">${fmtNum((d.adv_uncertainty||0)*100,1)}%</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- HELP -->
     <div id="helpPanel" style="display:${helpVisible?'block':'none'}">
       <div class="help-panel">
         <div style="font-size:13px;font-weight:700;margin-bottom:4px">How to Read SFC Terminal</div>
