@@ -24,6 +24,9 @@ cd "$REPO_DIR" || { log "FATAL: Cannot cd to $REPO_DIR"; exit 1; }
 COLLECT_RESULT="skipped"
 GIT_RESULT="skipped"
 
+# ── Make index.html + app.js invisible to git — never committed by pipeline ──
+git update-index --skip-worktree index.html app.js 2>/dev/null || true
+
 # ── Collect data with timeout & retry ──
 PYTHON="/usr/bin/python3"
 # Add sfc2 venv path so numpy loads before collect.py line 9
@@ -63,7 +66,6 @@ $PYTHON paper_trader.py 2>>sfc-pipeline.log || log "⚠ Paper trader skipped (no
 
 
 # ── Data ready — no HTML injection needed (page fetches data.json live) ──
-cp index.html index.html.bak 2>/dev/null || true
 log "Data collection complete (index.html unchanged)"
 
 # ── Commit & push ──
@@ -72,8 +74,6 @@ log "Committing..."
 # Only commit data files that change every pipeline run.
 git add data.json paper_trades.json paper_history.json
 git add -u 2>/dev/null || true  # add any tracked file changes
-# Force reset static files ke HEAD — jangan sampai ikut ter-commit
-git checkout HEAD -- index.html app.js 2>/dev/null || true
 if git diff --staged --quiet; then
     log "No changes — skipping push"
     GIT_RESULT="no-change"
@@ -85,19 +85,7 @@ else
     cp paper_trades.json .paper_trades.pullbak 2>/dev/null || true
     cp paper_history.json .paper_history.pullbak 2>/dev/null || true
     log "Syncing with remote..."
-    # Strategy: try rebase first (cleaner history). If conflict, abort and
-    # fall back to merge with -X theirs (prefer remote on conflict).
-    # IMPORTANT: -X theirs is NOT passed to rebase because theirs/ours
-    # semantics are inverted during rebase vs merge, causing confusion.
     if git pull --rebase origin main 2>&1; then
-        # ⚠ Git pull may override index.html with remote's corrupted version.
-        # Re-check and restore from .bak if needed.
-        # Note: render() is now in app.js, not index.html — check <!-- b=1 --> marker.
-        if [ -f "index.html.bak" ] && ( [ "$(wc -c < index.html)" -lt 5000 ] || grep -q 'loginForm' index.html 2>/dev/null || ! grep -q '<!-- b=1 -->' index.html 2>/dev/null ); then
-          log "⚠ index.html was corrupted during pull — restoring from .bak"
-          cp index.html.bak index.html
-          log "Restored ($(wc -c < index.html) bytes)"
-        fi
         # Restore trade history if git pull overwrote it with stale remote version
         if [ -f ".paper_trades.pullbak" ] && [ "$(wc -l < paper_trades.json 2>/dev/null || echo 0)" -lt "$(wc -l < .paper_trades.pullbak 2>/dev/null || echo 0)" ]; then
           log "⚠ paper_trades.json was replaced with smaller remote version — restoring local"
@@ -126,12 +114,11 @@ else
             GIT_RESULT="sync-failed"
         fi
     fi
-
-    # Final guard — ensure index.html is the real dashboard even after failed/pushed git ops
-    if [ -f "index.html.bak" ] && ( [ "$(wc -c < index.html)" -lt 5000 ] || grep -q 'loginForm' index.html 2>/dev/null || ! grep -q '<!-- b=1 -->' index.html 2>/dev/null ); then
-      log "⚠ Final guard: index.html corrupted — restoring from .bak"
-      cp index.html.bak index.html
-    fi
 fi
+
+# ── Restore index.html from known-good version after all git ops ──
+cp /home/ubuntu/index.html index.html 2>/dev/null || true
+cp /home/ubuntu/sfc/trouble/index.html index.html 2>/dev/null || true
+log "index.html restored (post-pipeline cleanup)"
 
 log "Pipeline done: collect=$COLLECT_RESULT | git=$GIT_RESULT"
