@@ -82,6 +82,93 @@ if tpl_start > 0:
 else:
     tpl_data_tabs = 0
 
+# 4b. Premium CSS override (run every time, idempotent via marker check)
+PREMIUM_MARKER = '/* PREMIUM OVERRIDES'
+if PREMIUM_MARKER not in c:
+    premium_css = '''\n/* ══════════════════════════════════════════
+   PREMIUM OVERRIDES — Linear-inspired
+══════════════════════════════════════════ */
+
+/* Font: use Inter for nav + UI, keep Space Grotesk for data */
+body { font-family: 'Inter', 'Space Grotesk', system-ui, sans-serif; }
+
+/* Nav: cleaner, premium */
+.nav { padding: 0 20px; height: 52px; background: rgba(7,8,13,0.92); border-bottom: 1px solid rgba(255,255,255,0.05); }
+.nav-brand { gap: 8px; }
+.nav-logo { width: 26px; height: 26px; font-size: 9px; }
+
+/* Nav tabs: Linear-style ghost buttons */
+.nav-center { display: flex; align-items: center; gap: 2px; margin: 0 auto; }
+.nav-tab {
+  padding: 6px 14px; font-size: 13px; font-weight: 500;
+  font-family: 'Inter', system-ui, sans-serif;
+  color: var(--text-2); background: transparent;
+  border: 1px solid transparent; border-radius: 6px;
+  cursor: pointer; transition: all 0.15s ease; white-space: nowrap;
+}
+.nav-tab:hover { color: var(--text-1); background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.08); }
+.nav-tab.active { color: #fff; background: rgba(120,100,255,0.1); border-color: rgba(120,100,255,0.25); }
+
+/* Cards: subtle translucent */
+.kpi-card, .metric-card, .chart-card, .card {
+  background: rgba(255,255,255,0.02) !important;
+  border: 1px solid rgba(255,255,255,0.06) !important;
+  border-radius: 8px !important;
+  transition: border-color 0.15s ease;
+}
+.kpi-card:hover, .metric-card:hover, .chart-card:hover { border-color: rgba(255,255,255,0.12) !important; }
+
+/* KPI row: cleaner spacing */
+.kpi-row { gap: 8px; }
+.kpi-card { padding: 12px 16px !important; }
+.kpi-num { font-family: 'JetBrains Mono', monospace; font-weight: 600; }
+.kpi-label { font-weight: 400; color: var(--text-2); }
+
+/* Status band: clean */
+.status-band { background: rgba(255,255,255,0.02); border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 12px; padding: 6px 20px; letter-spacing: 0.01em; }
+
+/* Tab panels: smooth transitions */
+.tab-panel { animation: tabFadeIn 0.2s ease; }
+
+/* Nav right: compact */
+.nav-meta { gap: 12px; }
+.nav-meta-item { gap: 4px; }
+.nav-meta-label { font-size: 10px; color: var(--text-3); }
+.nav-meta-val { font-size: 12px; font-weight: 500; }
+
+/* Scrollbar: subtle dark */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+
+/* Mobile: keep tabs scrollable */
+@media (max-width: 768px) {
+  .nav { padding: 0 12px; height: 48px; }
+  .nav-center { gap: 1px; padding: 2px 0; }
+  .nav-tab { padding: 6px 10px; font-size: 11px; flex: 0 0 auto; }
+  .nav-right { display: none; }
+  .kpi-card { padding: 8px 10px !important; }
+  .status-band { padding: 4px 12px; font-size: 10px; }
+}
+@media (max-width: 480px) {
+  .nav-tab { padding: 5px 8px; font-size: 10px; }
+  .nav-brand .nav-logo { display: none; }
+  .kpi-row { grid-template-columns: repeat(2, 1fr); gap: 4px; }
+}
+
+/* ══════════════════════════════════════════
+   END PREMIUM OVERRIDES
+══════════════════════════════════════════ */\n\n'''
+    # Insert before INTER Font link or at end of head
+    head_close = c.find('</head>')
+    if head_close > 0:
+        c = c[:head_close] + premium_css + c[head_close:]
+        print('tab: Premium CSS injected')
+    else:
+        print('tab: Premium CSS skip (no </head>)')
+else:
+    print('tab: Premium CSS skip (already applied)')
+
 if tpl_data_tabs >= 5:
     print('tab: .main already redesigned, skipping rewrite')
 else:
