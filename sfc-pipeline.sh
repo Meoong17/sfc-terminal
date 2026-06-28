@@ -24,7 +24,7 @@ cd "$REPO_DIR" || { log "FATAL: Cannot cd to $REPO_DIR"; exit 1; }
 COLLECT_RESULT="skipped"
 GIT_RESULT="skipped"
 
-# ── Make index.html + app.js invisible to git — never committed by pipeline ──
+# ── Make index.html + app.js invisible to git — never committed/updated by pipeline ──
 git update-index --skip-worktree index.html app.js 2>/dev/null || true
 
 # ── Collect data with timeout & retry ──
@@ -65,36 +65,39 @@ log "Running paper trader..."
 $PYTHON paper_trader.py 2>>sfc-pipeline.log || log "⚠ Paper trader skipped (no data)"
 
 
-# ── Data ready — no HTML injection needed (page fetches data.json live) ──
+# ── Data ready — page fetches data.json live ──
 log "Data collection complete (index.html unchanged)"
 
-# ── Commit & push ──
+# ── Commit & push (skip-worktree melindungi index.html & app.js) ──
 log "Committing..."
-# IMPORTANT: Do NOT add index.html or app.js — they're static now.
-# Only commit data files that change every pipeline run.
 git add data.json paper_trades.json paper_history.json
-git add -u 2>/dev/null || true  # add any tracked file changes
+git add -u 2>/dev/null || true
+
 if git diff --staged --quiet; then
     log "No changes — skipping push"
     GIT_RESULT="no-change"
 else
-    git commit -m "auto: SFC data $(date -u '+%Y-%m-%d %H:%M:%S')"
+    # Strategy: fetch remote, soft-reset ke remote HEAD, lalu commit di atasnya
+    # Soft reset tdk sentuh working tree — aman untuk skip-worktree files
+    log "Fetching latest remote..."
+    git fetch origin main 2>&1 || {
+        log "❌ Fetch failed — trying direct push"
+        git push origin main 2>&1 && GIT_RESULT="ok" || GIT_RESULT="push-failed"
+        # Final restore
+        cp /home/ubuntu/index.html index.html 2>/dev/null || true
+        log "Pipeline done: collect=$COLLECT_RESULT | git=$GIT_RESULT"
+        exit 0
+    }
 
-    # Pull remote changes before pushing (handles GH Actions concurrent pushes)
-    log "Backing up trade history before git pull..."
-    cp paper_trades.json .paper_trades.pullbak 2>/dev/null || true
-    cp paper_history.json .paper_history.pullbak 2>/dev/null || true
-    log "Syncing with remote..."
-    if git pull --rebase origin main 2>&1; then
-        # Restore trade history if git pull overwrote it with stale remote version
-        if [ -f ".paper_trades.pullbak" ] && [ "$(wc -l < paper_trades.json 2>/dev/null || echo 0)" -lt "$(wc -l < .paper_trades.pullbak 2>/dev/null || echo 0)" ]; then
-          log "⚠ paper_trades.json was replaced with smaller remote version — restoring local"
-          cp .paper_trades.pullbak paper_trades.json
-        fi
-        if [ -f ".paper_history.pullbak" ] && [ "$(wc -l < paper_history.json 2>/dev/null || echo 0)" -lt "$(wc -l < .paper_history.pullbak 2>/dev/null || echo 0)" ]; then
-          cp .paper_history.pullbak paper_history.json
-        fi
-        rm -f .paper_trades.pullbak .paper_history.pullbak
+    # Soft reset ke remote — pindahin branch pointer tanpa sentuh file
+    git reset --soft origin/main 2>/dev/null || true
+
+    # Commit di atas remote HEAD
+    if git diff --staged --quiet; then
+        log "No new changes after sync — skipping push"
+        GIT_RESULT="no-change"
+    else
+        git commit -m "auto: SFC data $(date -u '+%Y-%m-%d %H:%M:%S')"
         log "Pushing..."
         if git push origin main 2>&1; then
             log "✅ Pushed — Pages deploying..."
@@ -103,20 +106,11 @@ else
             log "❌ Push failed!"
             GIT_RESULT="push-failed"
         fi
-    else
-        log "❌ Rebase failed, trying merge strategy..."
-        git rebase --abort 2>/dev/null || true
-        if git pull -X theirs origin main 2>&1 && git push origin main 2>&1; then
-            log "✅ Pushed (merge path) — Pages deploying..."
-            GIT_RESULT="ok"
-        else
-            log "❌ Pull+push both failed!"
-            GIT_RESULT="sync-failed"
-        fi
     fi
 fi
 
-# ── Restore index.html from known-good version after all git ops ──
+# ── Remove skip-worktree + restore index.html yg bener ──
+git update-index --no-skip-worktree index.html app.js 2>/dev/null || true
 cp /home/ubuntu/index.html index.html 2>/dev/null || true
 log "index.html restored (post-pipeline cleanup)"
 
