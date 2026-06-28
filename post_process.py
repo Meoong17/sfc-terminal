@@ -82,13 +82,21 @@ if tpl_start > 0:
 else:
     tpl_data_tabs = 0
 
-# 4b. Premium CSS override (run every time, idempotent via marker check)
+# 4b. Inter font link (always run, independent of premium CSS)
+if 'family=Inter' not in c:
+    font_link = '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">\n'
+    old_link = '<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk'
+    if old_link in c:
+        c = c.replace(old_link, font_link, 1)
+        print('tab: Inter font link added')
+    else:
+        print('tab: Inter font link skip (anchor not found)')
+else:
+    print('tab: Inter font link skip (already present)')
+
+# 4c. Premium CSS override (run every time, idempotent via marker check)
 PREMIUM_MARKER = '/* PREMIUM OVERRIDES'
 if PREMIUM_MARKER not in c:
-    # Ensure Inter font link exists
-    if 'family=Inter' not in c:
-        font_link = '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">\n'
-        c = c.replace('<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk', font_link, 1)
     premium_css = '''\n/* ══════════════════════════════════════════
    PREMIUM OVERRIDES — Linear-inspired
 ══════════════════════════════════════════ */
