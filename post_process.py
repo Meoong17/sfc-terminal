@@ -95,7 +95,7 @@ else:
     print('tab: Inter font link skip (already present)')
 
 # 4c. Premium CSS override (run every time, idempotent via marker check)
-PREMIUM_MARKER = '/* PREMIUM OVERRIDES'
+PREMIUM_MARKER = 'PREMIUM OVERRIDES'
 if PREMIUM_MARKER not in c:
     premium_css = '''\n/* ══════════════════════════════════════════
    PREMIUM OVERRIDES — Linear-inspired
