@@ -72,7 +72,8 @@ log "Committing..."
 # Only commit data files that change every pipeline run.
 git add data.json paper_trades.json paper_history.json
 git add -u 2>/dev/null || true  # add any tracked file changes
-git reset HEAD index.html app.js 2>/dev/null || true  # don't commit static files
+# Force reset static files ke HEAD — jangan sampai ikut ter-commit
+git checkout HEAD -- index.html app.js 2>/dev/null || true
 if git diff --staged --quiet; then
     log "No changes — skipping push"
     GIT_RESULT="no-change"
@@ -88,7 +89,7 @@ else
     # fall back to merge with -X theirs (prefer remote on conflict).
     # IMPORTANT: -X theirs is NOT passed to rebase because theirs/ours
     # semantics are inverted during rebase vs merge, causing confusion.
-    if git pull --rebase --autostash origin main 2>&1; then
+    if git pull --rebase origin main 2>&1; then
         # ⚠ Git pull may override index.html with remote's corrupted version.
         # Re-check and restore from .bak if needed.
         # Note: render() is now in app.js, not index.html — check <!-- b=1 --> marker.
