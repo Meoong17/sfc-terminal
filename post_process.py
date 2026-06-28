@@ -117,7 +117,7 @@ if missing:
 
 # 5. Mobile nav fix: show scrollable tabs instead of hide
 old_mob = '@media (max-width: 768px) {\n  .nav-center { display: none; }'
-new_mob = '@media (max-width: 768px) {\n  nav.nav { flex-wrap: wrap; gap: 4px; }\n  .nav-center {\n    display: flex;\n    overflow-x: auto;\n    -webkit-overflow-scrolling: touch;\n    scrollbar-width: none;\n    width: 100%;\n    padding: 2px 0;\n    gap: 1px;\n    order: 3;\n  }\n  .nav-center::-webkit-scrollbar { display: none; }\n  .nav-tab { white-space: nowrap; padding: 4px 10px; font-size: 10px; }'
+new_mob = '@media (max-width: 768px) {\n  nav.nav { flex-wrap: wrap; gap: 4px; padding: 4px 8px; }\n  .nav-center {\n    display: flex;\n    overflow-x: auto;\n    -webkit-overflow-scrolling: touch;\n    scrollbar-width: none;\n    width: 100%;\n    padding: 4px 0;\n    gap: 6px;\n    order: 3;\n    justify-content: flex-start;\n  }\n  .nav-center::-webkit-scrollbar { display: none; }\n  .nav-tab {\n    white-space: nowrap;\n    padding: 8px 16px !important;\n    font-size: 13px !important;\n    flex: 0 0 auto;\n    border-radius: 8px;\n    border: 1px solid rgba(255,255,255,0.08);\n  }\n  .nav-tab.active { border-color: var(--purple-dim); }\n  .tab-panel { padding: 8px 0; }'
 if old_mob in c:
     c = c.replace(old_mob, new_mob, 1)
     print('tab: Mobile nav OK')
