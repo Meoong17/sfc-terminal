@@ -73,6 +73,7 @@ log "Committing..."
 # Only commit data files that change every pipeline run.
 git add data.json paper_trades.json paper_history.json
 git add -u 2>/dev/null || true  # add any tracked file changes
+git reset HEAD index.html app.js 2>/dev/null || true  # don't commit static files
 if git diff --staged --quiet; then
     log "No changes — skipping push"
     GIT_RESULT="no-change"
