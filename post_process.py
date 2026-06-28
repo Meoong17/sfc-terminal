@@ -34,19 +34,19 @@ c = raw.decode('utf-8')
 old = "onclick=\"switchTab('overview')\">Overview</div>\n      <div class=\"nav-tab\" onclick=\"switchTab('ensemble')\">Ensemble</div>\n      <div class=\"nav-tab\" onclick=\"switchTab('risk')\">Risk</div>\n      <div class=\"nav-tab\" onclick=\"switchTab('backtest')\">Backtest</div>"
 new = "onclick=\"switchTab('overview')\">Overview</div>\n      <div class=\"nav-tab\" onclick=\"switchTab('risk')\">Risk</div>\n      <div class=\"nav-tab\" onclick=\"switchTab('ensemble')\">Ensemble</div>\n      <div class=\"nav-tab\" onclick=\"switchTab('advanced')\">Advanced</div>\n      <div class=\"nav-tab\" onclick=\"switchTab('trading')\">Trading</div>"
 if old not in c:
-    print('tab: nav anchor not found')
-    sys.exit(1)
-c = c.replace(old, new, 1)
-print('tab: Nav OK')
+    print('tab: nav skip (already 5 tabs)')
+else:
+    c = c.replace(old, new, 1)
+    print('tab: Nav OK')
 
 # 3. switchTab
 old = "function switchTab(tab) {\n  activeTab = tab;\n  const el = document.getElementById(tab + 'Section');\n  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });\n  document.querySelectorAll('.nav-tab').forEach(t => {\n    t.classList.toggle('active', t.textContent.trim().toLowerCase() === tab);\n  });\n}"
 new = "function switchTab(tab) {\n  activeTab = tab;\n  document.querySelectorAll('.tab-panel').forEach(p => {\n    p.classList.toggle('active', p.dataset.tab === tab);\n  });\n  document.querySelectorAll('.nav-tab').forEach(t => {\n    t.classList.toggle('active', t.textContent.trim().toLowerCase() === tab);\n  });\n  if (currentData) {\n    setTimeout(function() {\n      if (tab === 'overview' || tab === 'ensemble') {\n        if (typeof buildFactorChart === 'function' && document.getElementById('factorChart')) buildFactorChart(currentData);\n        if (typeof buildMethodChart === 'function' && document.getElementById('methodChart')) buildMethodChart(currentData);\n      }\n      if (tab === 'overview' && chartVisible && typeof updatePriceChart === 'function') {\n        updatePriceChart();\n      }\n    }, 100);\n  }\n}"
 if old not in c:
-    print('tab: switchTab anchor not found')
-    sys.exit(1)
-c = c.replace(old, new, 1)
-print('tab: switchTab OK')
+    print('tab: switchTab skip (already updated)')
+else:
+    c = c.replace(old, new, 1)
+    print('tab: switchTab OK')
 
 # 4. Rewrite .main into 5 tab panels
 im = c.find('\n  <!-- MAIN -->\n  <div class="main">')
@@ -118,8 +118,7 @@ if old_mob in c:
     c = c.replace(old_mob, new_mob, 1)
     print('tab: Mobile nav OK')
 else:
-    print('tab: Mobile nav anchor not found')
-    sys.exit(1)
+    print('tab: Mobile nav skip (already scrollable)')
 
 with open(path, 'w') as f:
     f.write(c)
