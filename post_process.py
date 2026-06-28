@@ -112,7 +112,7 @@ body { font-family: 'Inter', 'Space Grotesk', system-ui, sans-serif; }
 /* Nav tabs: Linear-style ghost buttons */
 .nav-center { display: flex; align-items: center; gap: 2px; margin: 0 auto; }
 .nav-tab {
-  padding: 6px 14px; font-size: 13px; font-weight: 500;
+  padding: 6px 14px !important; font-size: 13px !important; font-weight: 500;
   font-family: 'Inter', system-ui, sans-serif;
   color: var(--text-2); background: transparent;
   border: 1px solid transparent; border-radius: 6px;
