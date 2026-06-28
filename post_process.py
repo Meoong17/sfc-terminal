@@ -10,7 +10,11 @@ c = raw.decode('utf-8')
 # Skip if already redesigned — check INSIDE template only, not injected JSON data
 tpl_start = c.find('const html = `')
 if tpl_start > 0:
-    tpl = c[tpl_start:c.find('`;', tpl_start)]
+    tpl_end = c.find('`;\n\n  document', tpl_start)
+    if tpl_end > 0:
+        tpl = c[tpl_start:tpl_end]
+    else:
+        tpl = c[tpl_start:tpl_start+500]
     tpl_data_tabs = len(re.findall(r'data-tab="[^"]+"', tpl))
 else:
     tpl_data_tabs = 0
