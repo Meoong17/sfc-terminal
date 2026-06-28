@@ -174,7 +174,7 @@ nav .nav-tab.active { color: #fff; background: rgba(120,100,255,0.1); border-col
     # Insert before INTER Font link or at end of head
     head_close = c.find('</head>')
     if head_close > 0:
-        c = c[:head_close] + premium_css + c[head_close:]
+        c = c[:head_close] + '<style>\n' + premium_css + '\n</style>\n' + c[head_close:]
         print('tab: Premium CSS injected')
     else:
         print('tab: Premium CSS skip (no </head>)')
