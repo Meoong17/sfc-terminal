@@ -118,7 +118,6 @@ fi
 
 # ── Restore index.html from known-good version after all git ops ──
 cp /home/ubuntu/index.html index.html 2>/dev/null || true
-cp /home/ubuntu/sfc/trouble/index.html index.html 2>/dev/null || true
 log "index.html restored (post-pipeline cleanup)"
 
 log "Pipeline done: collect=$COLLECT_RESULT | git=$GIT_RESULT"
