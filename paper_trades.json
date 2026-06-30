@@ -1,19 +1,7 @@
 {
-  "capital": 48723.77,
+  "capital": 49909.7,
   "peak_capital": 50117.92,
-  "positions": [
-    {
-      "type": "LONG",
-      "entry_price": 60451.13,
-      "size": 1208.77,
-      "entry_date": "2026-06-29T12:06:13.176288+00:00",
-      "reason": "SFC 19% \u00b7 Conf 36%",
-      "sfc_at_entry": 18.6,
-      "confidence_at_entry": 36.0,
-      "slippage_entry": 0.0,
-      "time_slippage_pct": 0.01
-    }
-  ],
+  "positions": [],
   "trades": [
     {
       "id": 1,
@@ -459,16 +447,21 @@
       "slippage": 0.0,
       "time_slippage_pct": 0.01,
       "reason": "SFC 19% \u00b7 Conf 36%"
+    },
+    {
+      "id": 50,
+      "type": "CLOSE",
+      "direction": "LONG",
+      "date": "2026-06-30T09:02:01.863183+00:00",
+      "price": 59308.71,
+      "size": 1208.77,
+      "pnl": -22.84,
+      "pnl_pct": -1.89,
+      "slippage_exit": 0.0,
+      "reason": "No edge"
     }
   ],
   "equity_history": [
-    {
-      "ts": "2026-06-18T07:44:02.979482+00:00",
-      "btc": 64447.99,
-      "equity": 49901.66,
-      "capital": 49901.66,
-      "unrealized": 0
-    },
     {
       "ts": "2026-06-18T07:50:01.910993+00:00",
       "btc": 64478.0,
@@ -14461,6 +14454,13 @@
       "equity": 49909.27,
       "capital": 48723.77,
       "unrealized": -23.27
+    },
+    {
+      "ts": "2026-06-30T09:02:01.863194+00:00",
+      "btc": 59308.71,
+      "equity": 49909.7,
+      "capital": 49909.7,
+      "unrealized": 0
     }
   ],
   "daily_snapshots": {
@@ -14631,15 +14631,15 @@
     },
     "2026-06-30": {
       "date": "2026-06-30",
-      "equity": 49909.27,
+      "equity": 49909.7,
       "return_pct": -0.18,
       "sharpe": 0.06,
-      "win_rate": 0.5417,
+      "win_rate": 0.52,
       "max_dd_pct": 0.2,
-      "total_trades": 49,
-      "open_positions": 1,
-      "status": "IN_MARKET"
+      "total_trades": 50,
+      "open_positions": 0,
+      "status": "CASH"
     }
   },
-  "updated_at": "2026-06-30T08:56:04.413288+00:00"
+  "updated_at": "2026-06-30T09:02:01.868805+00:00"
 }
