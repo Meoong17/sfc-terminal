@@ -1,19 +1,7 @@
 {
-  "capital": 49253.49,
+  "capital": 49900.83,
   "peak_capital": 50117.92,
-  "positions": [
-    {
-      "type": "LONG",
-      "entry_price": 59345.75,
-      "size": 656.21,
-      "entry_date": "2026-06-30T09:26:02.458702+00:00",
-      "reason": "SFC 20% \u00b7 Conf 35%",
-      "sfc_at_entry": 20.3,
-      "confidence_at_entry": 35.0,
-      "slippage_entry": 0.0,
-      "time_slippage_pct": 0.01
-    }
-  ],
+  "positions": [],
   "trades": [
     {
       "id": 1,
@@ -482,16 +470,21 @@
       "slippage": 0.0,
       "time_slippage_pct": 0.01,
       "reason": "SFC 20% \u00b7 Conf 35%"
+    },
+    {
+      "id": 52,
+      "type": "CLOSE",
+      "direction": "LONG",
+      "date": "2026-06-30T12:57:06.527236+00:00",
+      "price": 58543.85,
+      "size": 656.21,
+      "pnl": -8.87,
+      "pnl_pct": -1.35,
+      "slippage_exit": 0.0,
+      "reason": "Cascade Risk 52%"
     }
   ],
   "equity_history": [
-    {
-      "ts": "2026-06-18T11:39:04.285268+00:00",
-      "btc": 63959.5,
-      "equity": 49901.66,
-      "capital": 49901.66,
-      "unrealized": 0
-    },
     {
       "ts": "2026-06-18T11:45:04.791266+00:00",
       "btc": 63932.0,
@@ -14484,6 +14477,13 @@
       "equity": 49901.88,
       "capital": 49253.49,
       "unrealized": -7.82
+    },
+    {
+      "ts": "2026-06-30T12:57:06.527248+00:00",
+      "btc": 58543.85,
+      "equity": 49900.83,
+      "capital": 49900.83,
+      "unrealized": 0
     }
   ],
   "daily_snapshots": {
@@ -14654,15 +14654,15 @@
     },
     "2026-06-30": {
       "date": "2026-06-30",
-      "equity": 49901.88,
+      "equity": 49900.83,
       "return_pct": -0.2,
-      "sharpe": 0.0,
-      "win_rate": 0.52,
+      "sharpe": -0.01,
+      "win_rate": 0.5,
       "max_dd_pct": 0.2,
-      "total_trades": 51,
-      "open_positions": 1,
-      "status": "IN_MARKET"
+      "total_trades": 52,
+      "open_positions": 0,
+      "status": "CASH"
     }
   },
-  "updated_at": "2026-06-30T12:51:06.185353+00:00"
+  "updated_at": "2026-06-30T12:57:06.532980+00:00"
 }
