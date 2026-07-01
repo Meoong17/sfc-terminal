@@ -72,15 +72,11 @@ async function gzip(data) {
   return out;
 }
 
-// Cookie helpers
+// Cookie helpers (moved inside fetch() for access to env.AUTH_SECRET)
 function getCookie(request, name) {
   const cookie = request.headers.get('Cookie') || '';
   const match = cookie.match(new RegExp('(?:^|;\\s*)' + name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '=([^;]*)'));
   return match ? decodeURIComponent(match[1]) : null;
-}
-
-function setCookie(name, value, maxAgeDays = 30) {
-  return `${name}=${encodeURIComponent(value)}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${maxAgeDays * 86400}`;
 }
 
 function clearCookie(name) {
@@ -89,6 +85,39 @@ function clearCookie(name) {
 
 export default {
   async fetch(request, env, ctx) {
+    const AUTH_SECRET = env.AUTH_SECRET || '';
+
+    // HMAC sign with AUTH_SECRET (SHA-256). Returns value.signature
+    async function signCookie(value) {
+      if (!AUTH_SECRET) return value;
+      const enc = new TextEncoder();
+      const key = await crypto.subtle.importKey('raw', enc.encode(AUTH_SECRET),
+        { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+      const sig = await crypto.subtle.sign('HMAC', key, enc.encode(value));
+      const sigB64 = btoa(String.fromCharCode(...new Uint8Array(sig)));
+      return value + '.' + sigB64;
+    }
+
+    // Verify HMAC signature. Returns original value or null if invalid.
+    async function verifyCookie(signed) {
+      if (!AUTH_SECRET || !signed) return signed || null;
+      const idx = signed.lastIndexOf('.');
+      if (idx === -1) return null;
+      const expected = await signCookie(signed.substring(0, idx));
+      return expected === signed ? signed.substring(0, idx) : null;
+    }
+
+    async function makeSessionCookie(value, maxAgeDays = 30) {
+      const signed = await signCookie(value);
+      return `sfc_session=${encodeURIComponent(signed)}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${maxAgeDays * 86400}`;
+    }
+
+    // Session check helper — returns normalized username or null
+    async function getSessionUser(request) {
+      const raw = getCookie(request, 'sfc_session');
+      if (!raw) return null;
+      return await verifyCookie(raw);
+    }
     const url = new URL(request.url);
     const path = url.pathname;
     const method = request.method;
@@ -116,11 +145,6 @@ export default {
       }
       // Same-origin requests don't need CORS
       return {};
-    }
-
-    // Session check helper — returns normalized username or null
-    function getSessionUser(request) {
-      return getCookie(request, 'sfc_session');
     }
 
     // Security headers for HTML pages (clickjacking, MIME sniffing, HSTS, referrer)
@@ -157,7 +181,7 @@ export default {
       const username = decodeURIComponent(userStateMatch[1]);
       const normalized = username.toLowerCase();
       // Session guard: only the logged-in user can read their own state
-      const sessionUser = getSessionUser(request);
+      const sessionUser = await getSessionUser(request);
       if (!sessionUser || sessionUser.toLowerCase() !== normalized) {
         return new Response('Forbidden', { status: 403, headers: getCorsHeaders(request) });
       }
@@ -179,7 +203,7 @@ export default {
       const username = decodeURIComponent(userStateMatch[1]);
       const normalized = username.toLowerCase();
       // Session guard: only the logged-in user can write their own state
-      const sessionUser = getSessionUser(request);
+      const sessionUser = await getSessionUser(request);
       if (!sessionUser || sessionUser.toLowerCase() !== normalized) {
         return new Response('Forbidden', { status: 403, headers: getCorsHeaders(request) });
       }
@@ -211,7 +235,7 @@ export default {
       const username = decodeURIComponent(userConfigMatch[1]);
       const normalized = username.toLowerCase();
       // Session guard
-      const sessionUser = getSessionUser(request);
+      const sessionUser = await getSessionUser(request);
       if (!sessionUser || sessionUser.toLowerCase() !== normalized) {
         return new Response('Forbidden', { status: 403, headers: getCorsHeaders(request) });
       }
@@ -236,7 +260,7 @@ export default {
       const username = decodeURIComponent(userStatusMatch[1]);
       const normalized = username.toLowerCase();
       // Session guard
-      const sessionUser = getSessionUser(request);
+      const sessionUser = await getSessionUser(request);
       if (!sessionUser || sessionUser.toLowerCase() !== normalized) {
         return new Response('Forbidden', { status: 403, headers: getCorsHeaders(request) });
       }
@@ -298,7 +322,7 @@ export default {
             status: 200,
             headers: {
               'Content-Type': 'text/html; charset=utf-8',
-              'Set-Cookie': setCookie('sfc_session', username),
+              'Set-Cookie': await makeSessionCookie(username),
               'Cache-Control': 'no-cache, no-store, must-revalidate',
               ...securityHeaders,
               ...getCorsHeaders(request),
@@ -310,7 +334,7 @@ export default {
         status: 200,
         headers: {
           'Content-Type': 'application/json',
-          'Set-Cookie': setCookie('sfc_session', username),
+          'Set-Cookie': await makeSessionCookie(username),
           ...getCorsHeaders(request),
         },
       });
@@ -561,7 +585,7 @@ document.getElementById('loginForm').addEventListener('submit', function(e) {
       
       // Auto-login: if ?user= is present, set cookie
       if (queryUser) {
-        const setCookieHeader = setCookie('sfc_session', queryUser);
+        const setCookieHeader = await makeSessionCookie(queryUser);
         const resp = await fetchAny(urls, '/', 'text/html');
         if (!resp) return new Response('Backend unreachable', { status: 502 });
         const html = await resp.text();
