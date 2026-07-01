@@ -179,12 +179,16 @@ except ImportError as e:
 # ── NEW: Dynamic Feature Weighting (regime-adaptive weights) ──
 try:
     from dynamic_feature_weighting import (
-        get_sfc_effective_with_dynamic_weights,
+        get_regime_weights, apply_dynamic_weights,
+        get_feature_group_weights, get_sfc_effective_with_dynamic_weights,
     )
     DYNAMIC_WEIGHTING_AVAILABLE = True
 except ImportError as e:
     DYNAMIC_WEIGHTING_AVAILABLE = False
     print(f"[SFC] Dynamic Feature Weighting unavailable: {e}", file=sys.stderr)
+    def get_regime_weights(*a, **k): return {"Lt":0.25,"St":0.20,"Rt":0.20,"Ft":0.20,"Sc":0.15}
+    def apply_dynamic_weights(*a, **k): return {}, 0.5, {}
+    def get_feature_group_weights(*a, **k): return {}
     def get_sfc_effective_with_dynamic_weights(*a, **k): return None, 0.0
 
 # ── NEW: Market Positioning Index (MPI) ──
@@ -2667,6 +2671,7 @@ if DYNAMIC_WEIGHTING_AVAILABLE:
     try:
         # Get regime name from HMM or fallback to detect_regime result
         _dw_regime = _hmm_result.get('regime', regime) if _hmm_result else regime
+        _dw_norm_factors, _dw_z_score, _dw_weights = apply_dynamic_weights(factors, _dw_regime)
         # Apply dynamic SFC adjustment based on regime
         _dw_adjusted_sfc, _dw_sfc_adjustment = get_sfc_effective_with_dynamic_weights(
             factors, effective_sfc, _dw_regime
@@ -3076,9 +3081,47 @@ else:
 
 # ── Q5 Advanced Methods: M65-M69 ──
 # M65: CNN+Attention pattern recognition
+#
+# Previously called with np.array([[0.5]*41]) — a constant array, not
+# derived from any market data. This meant m65_cnn_attention always ran
+# CNN inference on the same fixed input regardless of actual conditions,
+# making the displayed "pattern_type" result meaningless (identical
+# structural input every cycle, differing only by whatever randomness
+# exists inside the model's own initialization/dropout).
+#
+# Fixed to use a real window of historical method-score observations from
+# data_collection.json (the same file ml_ensemble.py's add_observation()
+# writes to), giving the CNN an actual temporal sequence of past method
+# scores to find patterns in — consistent with its intended design
+# (seq_len=60 window). Falls back to the single current-cycle vector
+# (still real data, just no history yet) if data_collection.json doesn't
+# have enough observations, and only falls back to the constant array if
+# no real data is available at all (e.g. very first run).
+def _build_m65_input_window():
+    try:
+        coll_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data_collection.json")
+        with open(coll_path) as f:
+            coll = json.load(f)
+        hist_features = coll.get("features", [])
+        if len(hist_features) >= 5:
+            # Use the last 60 observations (or fewer — calculate_cnn_attention_stress
+            # pads automatically if shorter than seq_len).
+            window = hist_features[-60:]
+            return np.array(window, dtype=np.float32)
+    except (FileNotFoundError, json.JSONDecodeError, OSError):
+        pass
+    # Fallback: current cycle's real method scores (still real data, just
+    # a single timestep rather than a full window).
+    if all_method_scores:
+        return np.array([all_method_scores], dtype=np.float32)
+    # Last resort — no real data available at all (e.g. first ever run
+    # before all_method_scores exists in scope, or completely empty history).
+    return np.array([[0.5] * 41], dtype=np.float32)
+
 if _get_cnn_attention():
     try:
-        _m65_result = calculate_cnn_attention_stress(np.array([[0.5]*41]))
+        _m65_input = _build_m65_input_window()
+        _m65_result = calculate_cnn_attention_stress(_m65_input)
     except Exception as _m65_e:
         _m65_result = {"m65_cnn_attention": 0.5, "attention_focus": [], "pattern_type": f"FALLBACK — {_m65_e}"}
 else:
@@ -3127,7 +3170,52 @@ _drl_market_state = {
 _m68_signal = get_trading_signal(_drl_market_state)
 
 # M69: GNN Systemic Risk
-_m69_result = calculate_systemic_risk()
+#
+# Previously called calculate_systemic_risk() with no arguments, which
+# fell back to _default_simulated_data() inside gnn_module.py — five
+# hardcoded constant values, not live market data. Now wired to real
+# ETH (Binance), Gold (GoldAPI.io), SPX (Twelve Data / Alpha Vantage
+# fallback), DXY (rolling series from this pipeline's own dxy variable),
+# and BTC (derived from this cycle's chg/dvol/rsi, consistent with how
+# the rest of this file already characterizes BTC's state).
+#
+# Any asset whose live fetch fails (network issue, missing API key, rate
+# limit) is passed as None — calculate_systemic_risk() falls back to that
+# ONE asset's simulated default individually rather than failing the
+# whole calculation, so partial real data still improves on the
+# all-simulated baseline rather than requiring all five to succeed.
+_m69_is_simulated = False
+try:
+    from market_data_fetcher import fetch_all_cross_asset_data
+    _m69_btc_return = (chg or 0) / 100.0
+    _m69_btc_vol = (dvol or 45.0) / 100.0
+    _m69_btc_momentum = ((rsi_14m or 50) - 50) / 100.0  # RSI deviation from neutral as momentum proxy
+    _m69_cross_asset = fetch_all_cross_asset_data(
+        btc_return=_m69_btc_return,
+        btc_volatility=_m69_btc_vol,
+        btc_momentum=_m69_btc_momentum,
+        dxy_price=dxy,
+    )
+    _m69_result = calculate_systemic_risk(
+        btc_data=_m69_cross_asset["btc_data"],
+        eth_data=_m69_cross_asset["eth_data"],
+        spx_data=_m69_cross_asset["spx_data"],
+        gold_data=_m69_cross_asset["gold_data"],
+        dxy_data=_m69_cross_asset["dxy_data"],
+    )
+    # Only genuinely "not simulated" if at least one non-BTC asset came
+    # back with real data — if everything except BTC failed, this is
+    # functionally still the old simulated behavior and should say so.
+    _m69_real_count = sum(
+        1 for k in ("eth_data", "spx_data", "gold_data", "dxy_data")
+        if _m69_cross_asset.get(k) is not None
+    )
+    _m69_is_simulated = _m69_real_count == 0
+except Exception as _m69_fetch_e:
+    print(f"[M69] Cross-asset fetch failed, using simulated fallback: {_m69_fetch_e}", file=sys.stderr)
+    _m69_result = calculate_systemic_risk()
+    _m69_is_simulated = True
+
 _m69_overall = _m69_result.get("overall_systemic_risk", 0.5)
 _m69_btc = _m69_result.get("btc_systemic_risk", 0.5)
 _m69_regime = _m69_result.get("market_regime", "NORMAL")
@@ -3571,18 +3659,23 @@ out = {
     "m65_cnn_attention": round(_m65_stress, 4),
     "m65_pattern_type": _m65_pattern,
     "m65_available": CNN_ATTENTION_AVAILABLE,
+    "m65_affects_sfc_score": False,  # display-only — pattern info, not blended into sfc_pct/effective_sfc
     "m66_ga_features": _m66_features,
     "m66_ga_count": len(_m66_features) if _m66_features else 0,
     "m66_available": GA_AVAILABLE,
+    "m66_affects_sfc_score": False,  # display-only — selected features not fed back into any active weighting
     "m67_augmented_shape": str(_m67_augmented) if _m67_augmented else None,
     "m67_available": TIMEGAN_AVAILABLE,
+    "m67_affects_sfc_score": False,  # display-only — augmented data not used for retraining in this pipeline
     "m68_drl_signal": _m68_signal,
     "m68_available": DRL_AVAILABLE,
+    "m68_affects_sfc_score": False,  # display-only — uses real market state as input, but signal isn't blended into sfc_pct
     "m69_systemic_risk": round(_m69_overall, 4),
     "m69_btc_systemic_risk": round(_m69_btc, 4),
     "m69_market_regime": _m69_regime,
     "m69_correlation_breakdown": _m69_breakdown,
     "m69_available": GNN_AVAILABLE,
+    "m69_is_simulated": _m69_is_simulated,  # True: no real ETH/SPX/Gold data source, uses fixed simulated inputs
     # ── XAI Explainability: M70-M71 ──
     "m70_shap_ok": _xai_result.get("m70_shap_ok", False),
     "m70_shap_top_1": _m70_shap_features[0]["name"] if len(_m70_shap_features) > 0 else None,
