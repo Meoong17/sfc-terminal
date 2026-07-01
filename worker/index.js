@@ -6,12 +6,13 @@
 // 1. Cloudflare Tunnel (set via env TUNNEL_URL or hardcoded below)
 // 2. Direct VPS IP (blocked by some Tencent Cloud security groups)
 
-const TUNNEL = 'https://coat-pays-injuries-irrigation.trycloudflare.com';
-const BACKUP = 'http://43.134.89.23:8765';
+// Fallback URLs (overridden by env.TUNNEL_URL / env.BACKUP_URL secrets)
+const TUNNEL_FALLBACK = 'https://coat-pays-injuries-irrigation.trycloudflare.com';
+const BACKUP_FALLBACK = 'http://43.134.89.23:8765';
 
 async function fetchAny(urls, path, accept) {
   // Try tunnel first, then VPS direct IP
-  const ordered = [TUNNEL, BACKUP];
+  const ordered = urls || [TUNNEL_FALLBACK, BACKUP_FALLBACK];
   for (const base of ordered) {
     try {
       const resp = await fetch(base + path, {
@@ -91,7 +92,10 @@ export default {
     const url = new URL(request.url);
     const path = url.pathname;
     const method = request.method;
-    const urls = [TUNNEL, BACKUP];
+    const urls = [
+      env.TUNNEL_URL || TUNNEL_FALLBACK,
+      env.BACKUP_URL || BACKUP_FALLBACK,
+    ];
 
     // Allowed origins for CORS (GitHub Pages frontend that calls worker API)
     const ALLOWED_ORIGINS = [
