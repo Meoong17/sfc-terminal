@@ -2758,25 +2758,28 @@ function render(d) {
         <div class="card-badge">${d.bt_label||'UPPER-BOUND'} · ${d.bt_periods||0} periods</div>
       </div>
       <div class="card-body">
+        <div style="background:rgba(240,180,41,0.08);border:1px solid rgba(240,180,41,0.25);border-radius:6px;padding:6px 10px;margin-bottom:10px;font-size:9px;color:var(--amber);line-height:1.5">
+          ⚠ These are <strong>heuristic estimates</strong> derived from current signal quality — not walk-forward validated trade simulation. Values prefixed with ~ should be treated as directional reference only.
+        </div>
         <div class="stat-4 mb-12">
           <div class="stat-box">
             <div class="stat-label">Sharpe Ratio</div>
-            <div class="stat-val" style="color:${(d.bt_sharpe||0)>1.5?'var(--green)':(d.bt_sharpe||0)>0.5?'var(--amber)':'var(--red)'}">${fmtNum(d.bt_sharpe,2)}</div>
+            <div class="stat-val" style="color:var(--amber)">~${fmtNum(d.bt_sharpe,2)}</div>
             <div class="stat-note">CI ${fmtNum(d.bt_sharpe_low,2)}–${fmtNum(d.bt_sharpe_high,2)} (95%)</div>
           </div>
           <div class="stat-box">
             <div class="stat-label">Win Rate</div>
-            <div class="stat-val" style="color:var(--amber)">${((d.bt_win_rate||0)*100).toFixed(0)}%</div>
+            <div class="stat-val" style="color:var(--amber)">~${((d.bt_win_rate||0)*100).toFixed(0)}%</div>
             <div class="stat-note">CI ${((d.bt_win_rate_low||0)*100).toFixed(0)}–${((d.bt_win_rate_high||0)*100).toFixed(0)}%</div>
           </div>
           <div class="stat-box">
             <div class="stat-label">Max Drawdown</div>
-            <div class="stat-val" style="color:${(d.bt_max_dd||0)<0.1?'var(--green)':(d.bt_max_dd||0)<0.2?'var(--amber)':'var(--red)'}">${((d.bt_max_dd||0)*100).toFixed(1)}%</div>
+            <div class="stat-val" style="color:${(d.bt_max_dd||0)<0.1?'var(--green)':(d.bt_max_dd||0)<0.2?'var(--amber)':'var(--red)'}">~${((d.bt_max_dd||0)*100).toFixed(1)}%</div>
             <div class="stat-note">Peak-to-trough</div>
           </div>
           <div class="stat-box">
             <div class="stat-label">Stability</div>
-            <div class="stat-val" style="color:${(d.bt_stability||0)>0.7?'var(--green)':'var(--amber)'}">${((d.bt_stability||0)*100).toFixed(0)}%</div>
+            <div class="stat-val" style="color:${(d.bt_stability||0)>0.7?'var(--green)':'var(--amber)'}">~${((d.bt_stability||0)*100).toFixed(0)}%</div>
             <div class="stat-note">Signal consistency</div>
           </div>
         </div>
