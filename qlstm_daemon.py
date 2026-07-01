@@ -30,10 +30,10 @@ def run_inference():
     """Run one QLSTM+Hybrid inference cycle via subprocess."""
     code = '''
 import sys, os, json, time
-sfc2_dir = os.path.join("{sfc_dir}", "..", "sfc2")
-venv_path = os.path.join(sfc2_dir, "venv", "lib", "python3.12", "site-packages")
+sfc_dir = os.path.dirname(os.path.abspath(__file__))  # actually cwd is SFC_DIR
+venv_path = os.path.join(sfc_dir, ".venv", "lib", "python3.12", "site-packages")
 if os.path.isdir(venv_path): sys.path.insert(0, venv_path)
-sys.path.insert(0, sfc2_dir)
+sys.path.insert(0, sfc_dir)
 from qlstm_enhanced import run_enhanced_inference
 result = run_enhanced_inference(force=True)
 out = {{
@@ -49,7 +49,7 @@ out = {{
     "qlstm_error": result.get("error"),
 }}
 print(json.dumps(out))
-'''.format(sfc_dir=SFC_DIR)
+'''
     
     try:
         proc = subprocess.run(

@@ -395,10 +395,11 @@ def _run_qlstm_inference():
     
     # Fallback: run direct inference (slow, loads torch)
     try:
-        sfc2_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "sfc2")
-        sys.path.insert(0, sfc2_dir)
+        sfc_dir = os.path.dirname(os.path.abspath(__file__))
+        if sfc_dir not in sys.path:
+            sys.path.insert(0, sfc_dir)
         # Ensure venv deps (torch, pennylane) are available
-        venv_path = os.path.join(sfc2_dir, "venv", "lib", "python3.12", "site-packages")
+        venv_path = os.path.join(sfc_dir, ".venv", "lib", "python3.12", "site-packages")
         if os.path.isdir(venv_path) and venv_path not in sys.path:
             sys.path.insert(0, venv_path)
         from qlstm_enhanced import run_enhanced_inference
