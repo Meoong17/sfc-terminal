@@ -289,14 +289,6 @@ def calculate_cnn_attention_stress(*a, **k):
     return {"m65_cnn_attention": 0.5, "attention_focus": [], "pattern_type": "FALLBACK"}
 
 try:
-    from optimization.genetic_algorithm import weekly_feature_optimization
-    GA_AVAILABLE = True
-except ImportError:
-    GA_AVAILABLE = False
-    print("[SFC] Genetic Algorithm (M66) not available", file=sys.stderr)
-    def weekly_feature_optimization(*a, **k): return []
-
-try:
     from data_augmentation.timegan_module import monthly_data_augmentation
     TIMEGAN_AVAILABLE = True
 except ImportError:
@@ -3129,26 +3121,10 @@ else:
 _m65_stress = _m65_result.get("m65_cnn_attention", 0.5)
 _m65_pattern = _m65_result.get("pattern_type", "FALLBACK")
 
-# M66: Genetic Algorithm feature selection (runs weekly, not every cycle)
-# Only check if optimization is due
-_m66_last_opt = getattr(sys.modules.get('collect.py'), '_m66_last_opt', 0)
-_m66_now = time.time()
-_m66_due = (_m66_now - _m66_last_opt > 604800)  # 7 days
-_m66_features = None
-if _m66_due and GA_AVAILABLE:
-    try:
-        _m66_result = weekly_feature_optimization()
-        if _m66_result and len(_m66_result) > 0:
-            _m66_features = _m66_result
-            # Cache timestamp — store on module
-            import collect as _collect_mod
-            _collect_mod._m66_last_opt = _m66_now
-    except Exception:
-        pass
-
 # M67: TimeGAN crisis data augmentation (runs monthly)
 _m67_last_aug = getattr(sys.modules.get('collect.py'), '_m67_last_aug', 0)
-_m67_due = (_m66_now - _m67_last_aug > 2592000)  # 30 days
+_m67_now = time.time()
+_m67_due = (_m67_now - _m67_last_aug > 2592000)  # 30 days
 _m67_augmented = None
 if _m67_due and TIMEGAN_AVAILABLE:
     try:
@@ -3156,7 +3132,7 @@ if _m67_due and TIMEGAN_AVAILABLE:
         if _m67_result is not None:
             _m67_augmented = _m67_result.shape
             import collect as _collect_mod
-            _collect_mod._m67_last_aug = _m66_now
+            _collect_mod._m67_last_aug = _m67_now
     except Exception:
         pass
 
@@ -3660,10 +3636,6 @@ out = {
     "m65_pattern_type": _m65_pattern,
     "m65_available": CNN_ATTENTION_AVAILABLE,
     "m65_affects_sfc_score": False,  # display-only — pattern info, not blended into sfc_pct/effective_sfc
-    "m66_ga_features": _m66_features,
-    "m66_ga_count": len(_m66_features) if _m66_features else 0,
-    "m66_available": GA_AVAILABLE,
-    "m66_affects_sfc_score": False,  # display-only — selected features not fed back into any active weighting
     "m67_augmented_shape": str(_m67_augmented) if _m67_augmented else None,
     "m67_available": TIMEGAN_AVAILABLE,
     "m67_affects_sfc_score": False,  # display-only — augmented data not used for retraining in this pipeline
