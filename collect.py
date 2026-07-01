@@ -165,6 +165,9 @@ except ImportError as e:
     print(f"[SFC] Repo market stress module unavailable: {e}", file=sys.stderr)
     def compute_repo_stress(*a, **k): return 0.5, {"status": "unavailable"}
 
+# Early init: M86 score starts at neutral (updated later by execution block if available)
+_m86_score = 0.5
+
 # ── NEW: Global Liquidity Engine (GLF — consolidated liquidity factor) ──
 try:
     from global_liquidity_engine import compute_global_liquidity_factor, get_glf_for_factors, get_glf_weight_by_regime
