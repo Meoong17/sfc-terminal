@@ -289,14 +289,6 @@ def calculate_cnn_attention_stress(*a, **k):
     return {"m65_cnn_attention": 0.5, "attention_focus": [], "pattern_type": "FALLBACK"}
 
 try:
-    from data_augmentation.timegan_module import monthly_data_augmentation
-    TIMEGAN_AVAILABLE = True
-except ImportError:
-    TIMEGAN_AVAILABLE = False
-    print("[SFC] TimeGAN (M67) not available", file=sys.stderr)
-    def monthly_data_augmentation(*a, **k): return None
-
-try:
     from trading.drl_agent import get_trading_signal, train_drl_agent
     DRL_AVAILABLE = True
 except ImportError:
@@ -3121,21 +3113,6 @@ else:
 _m65_stress = _m65_result.get("m65_cnn_attention", 0.5)
 _m65_pattern = _m65_result.get("pattern_type", "FALLBACK")
 
-# M67: TimeGAN crisis data augmentation (runs monthly)
-_m67_last_aug = getattr(sys.modules.get('collect.py'), '_m67_last_aug', 0)
-_m67_now = time.time()
-_m67_due = (_m67_now - _m67_last_aug > 2592000)  # 30 days
-_m67_augmented = None
-if _m67_due and TIMEGAN_AVAILABLE:
-    try:
-        _m67_result = monthly_data_augmentation()
-        if _m67_result is not None:
-            _m67_augmented = _m67_result.shape
-            import collect as _collect_mod
-            _collect_mod._m67_last_aug = _m67_now
-    except Exception:
-        pass
-
 # M68: DRL Trading Signal
 _drl_market_state = {
     "stress": effective_sfc / 100.0 if effective_sfc else 0.5,
@@ -3636,9 +3613,6 @@ out = {
     "m65_pattern_type": _m65_pattern,
     "m65_available": CNN_ATTENTION_AVAILABLE,
     "m65_affects_sfc_score": False,  # display-only — pattern info, not blended into sfc_pct/effective_sfc
-    "m67_augmented_shape": str(_m67_augmented) if _m67_augmented else None,
-    "m67_available": TIMEGAN_AVAILABLE,
-    "m67_affects_sfc_score": False,  # display-only — augmented data not used for retraining in this pipeline
     "m68_drl_signal": _m68_signal,
     "m68_available": DRL_AVAILABLE,
     "m68_affects_sfc_score": False,  # display-only — uses real market state as input, but signal isn't blended into sfc_pct
