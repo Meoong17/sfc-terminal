@@ -100,6 +100,9 @@ def _fetch_all_parallel():
         ("WTREGEN", 8),      # TGA balance
         ("RRPONTSYD", 8),    # RRP facility
         ("M2SL", 13),        # M2 money supply
+        ("MYAGM2CNM189N", 13),  # China M2 (Broad Money, OECD via FRED) — see
+                                 # note in _compute_china_component() below;
+                                 # UNVERIFIED series ID, confirm on FRED before relying on this.
     ]
 
     def _fetch_one(series, limit):
@@ -143,11 +146,14 @@ def compute_global_liquidity_factor(force_refresh=False):
     Components and weights (based on market impact):
         Fed Balance Sheet YoY:      30%  (largest CB, directly drives risk assets)
         ECB Balance Sheet YoY:      15%
-        BOJ/PBOC Balance Sheet YoY:  5%
+        BOJ Balance Sheet YoY:       3%  (reduced from 5% — China split out below)
+        China M2 YoY:                4%  (NEW — was previously mislabeled as
+                                           part of "BOJ/PBOC", never actually
+                                           fetched; see _compute china_z note)
         US M2 YoY:                  15%
         TGA Composite:              10%  (fiscal liquidity drain)
         RRP Composite:              10%  (money market liquidity)
-        DXY (inverted):             15%  (USD strength = liquidity tightening)
+        DXY (inverted):             13%  (reduced from 15%; USD strength = liquidity tightening)
 
     Returns:
         (glf_score_0_100, sfc_stress_0_1, details_dict)
@@ -181,6 +187,33 @@ def compute_global_liquidity_factor(force_refresh=False):
     jpn = _FRED_CACHE.get("JPNASSETS:13")
     jpn_yoy = _yoy_chg(jpn) if jpn else None
     jpn_z = _z_score(jpn_yoy, 3.0, 6.0) if jpn_yoy is not None else 0
+
+    # ── 3b. China M2 YoY ──
+    # NOTE ON SERIES ID: MYAGM2CNM189N (China Broad Money, OECD via FRED)
+    # was NOT verified against a live FRED query when this was written —
+    # network access was unavailable in the environment this was built in.
+    # Confirm the series resolves at
+    # https://fred.stlouisfed.org/series/MYAGM2CNM189N before relying on
+    # this component; if it 404s or returns no data, china_yoy will
+    # correctly come back None and this component contributes 0 to GLF
+    # (fails safe, doesn't silently corrupt the score) — but you should
+    # still find the correct series ID and update it here, since a
+    # permanently-zero component just wastes its weight allocation.
+    #
+    # This was added because the previous "BOJ/PBOC Balance Sheet" label
+    # was misleading: the code only ever fetched JPNASSETS (Bank of Japan)
+    # — no PBOC/China-specific data was ever fetched despite the comment
+    # implying otherwise. China is a genuinely separate liquidity engine
+    # from Japan; conflating them under one series was inaccurate for a
+    # liquidity-focused model.
+    china = _FRED_CACHE.get("MYAGM2CNM189N:13")
+    china_yoy = _yoy_chg(china) if china else None
+    # Mean/std here are a rough starting estimate (China M2 growth has
+    # historically run higher than US/EU, often 8-12%/yr) — NOT yet
+    # verified against real FRED history the way liquidity_zscore_calibration.py
+    # does for the other four components. Run that script against this
+    # series once the ID is confirmed working.
+    china_z = _z_score(china_yoy, 9.0, 3.5) if china_yoy is not None else 0
 
     # ── 4. US M2 YoY ──
     m2 = _FRED_CACHE.get("M2SL:13")
@@ -277,7 +310,9 @@ def compute_global_liquidity_factor(force_refresh=False):
     if ecb_yoy is not None:
         components["ecb"] = (ecb_z, 0.15)
     if jpn_yoy is not None:
-        components["jpn"] = (jpn_z, 0.05)
+        components["jpn"] = (jpn_z, 0.03)  # reduced from 0.05 to make room for china (separate component below)
+    if china_yoy is not None:
+        components["china"] = (china_z, 0.04)  # NEW — see note above on unverified series ID
     if m2_yoy is not None:
         components["m2"] = (m2_z, 0.15)
     if isinstance(tga_detail, dict):
@@ -285,7 +320,7 @@ def compute_global_liquidity_factor(force_refresh=False):
     if isinstance(rrp_detail, dict):
         components["rrp"] = (rrp_score, 0.10)
     if dxy is not None:
-        components["dxy"] = (dxy_z, 0.15)
+        components["dxy"] = (dxy_z, 0.13)  # reduced from 0.15 to make room for china component
 
     if not components:
         # Fallback: neutral
@@ -335,6 +370,8 @@ def compute_global_liquidity_factor(force_refresh=False):
             raw_val = round(ecb_yoy, 2) if ecb_yoy is not None else None
         elif name == "jpn":
             raw_val = round(jpn_yoy, 2) if jpn_yoy is not None else None
+        elif name == "china":
+            raw_val = round(china_yoy, 2) if china_yoy is not None else None
         elif name == "m2":
             raw_val = round(m2_yoy, 2) if m2_yoy is not None else None
         elif name == "tga" and isinstance(tga_detail, dict):

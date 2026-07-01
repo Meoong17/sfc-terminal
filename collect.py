@@ -156,6 +156,15 @@ except ImportError as e:
     print(f"[SFC] Fiscal liquidity module unavailable: {e}", file=sys.stderr)
     def compute_fiscal_liquidity_metrics(*a, **k): return 0.5, 0.5, 0.5, {"status": "unavailable"}
 
+# Import repo market stress module (M86 — SOFR-EFFR spread)
+try:
+    from repo_market_stress import compute_repo_stress
+    REPO_STRESS_AVAILABLE = True
+except ImportError as e:
+    REPO_STRESS_AVAILABLE = False
+    print(f"[SFC] Repo market stress module unavailable: {e}", file=sys.stderr)
+    def compute_repo_stress(*a, **k): return 0.5, {"status": "unavailable"}
+
 # ── NEW: Global Liquidity Engine (GLF — consolidated liquidity factor) ──
 try:
     from global_liquidity_engine import compute_global_liquidity_factor, get_glf_for_factors, get_glf_weight_by_regime
@@ -898,7 +907,19 @@ def score_factors_from_market(btc, btc_24h, dom, dvol, fng, pc_oi, m2_yoy, dxy, 
         ms_adj = (onchain_market_structure - 50) / 50 * 1.5  # scale -1.5 to +1.5
         factors["St"] += ms_adj
         print(f"[OnChain] Market structure={onchain_market_structure:.1f} → St adj={ms_adj:+.3f}", file=sys.stderr)
-    
+
+    # ── REPO MARKET STRESS FACTOR ADJUSTMENT ──
+    # Applied to Ft (Systemic/Funding), not Lt — repo stress measures whether
+    # funding markets are transmitting liquidity smoothly RIGHT NOW, a
+    # different dimension from Lt's central-bank-balance-sheet liquidity
+    # LEVEL. See repo_market_stress.py module docstring for the full
+    # rationale (Sept 2019 repo crisis as the reference case: ample Fed
+    # liquidity coexisting with a funding-market seizure).
+    if _m86_score != 0.5:
+        repo_adj = (_m86_score - 0.5) * 1.5  # higher stress score -> positive Ft adjustment (more systemic risk)
+        factors["Ft"] += max(-1.5, min(1.5, repo_adj))
+        print(f"[REPO] Factor adj: Ft={repo_adj:+.3f}", file=sys.stderr)
+
     # Clamp all factors to [-3, 3]
     for k in factors:
         factors[k] = max(-3.0, min(3.0, factors[k]))
@@ -3174,6 +3195,17 @@ _m69_btc = _m69_result.get("btc_systemic_risk", 0.5)
 _m69_regime = _m69_result.get("market_regime", "NORMAL")
 _m69_breakdown = _m69_result.get("correlation_breakdown", False)
 
+# M86: Repo Market Stress (SOFR-EFFR spread)
+_m86_score = 0.5
+_m86_details = {"status": "unavailable"}
+if REPO_STRESS_AVAILABLE:
+    try:
+        _m86_score, _m86_details = compute_repo_stress()
+        print(f"[REPO] M86(SOFR-EFFR)={_m86_score:.3f} | spread={_m86_details.get('spread_bps')}bp "
+              f"label={_m86_details.get('label','?')}", file=sys.stderr)
+    except Exception as e:
+        print(f"[REPO] Error: {e}", file=sys.stderr)
+
 # M70-M71: XAI Explainability (SHAP + LIME) — runs every cycle, cached by function
 _xai_result = run_all_xai() if XAI_AVAILABLE else {"m70_shap_ok": False, "m71_lime_ok": False, "m70_shap_features": [], "m71_lime_features": []}
 _m70_shap_features = _xai_result.get("m70_shap_features", [])
@@ -3622,6 +3654,10 @@ out = {
     "m69_correlation_breakdown": _m69_breakdown,
     "m69_available": GNN_AVAILABLE,
     "m69_is_simulated": _m69_is_simulated,  # True: no real ETH/SPX/Gold data source, uses fixed simulated inputs
+    # Repo market stress (M86 — SOFR-EFFR spread)
+    "m86_repo_stress_score": round(_m86_score, 3),
+    "m86_detail": _m86_details if _m86_details.get("status") == "ok" else None,
+    "m86_available": REPO_STRESS_AVAILABLE,
     # ── XAI Explainability: M70-M71 ──
     "m70_shap_ok": _xai_result.get("m70_shap_ok", False),
     "m70_shap_top_1": _m70_shap_features[0]["name"] if len(_m70_shap_features) > 0 else None,
