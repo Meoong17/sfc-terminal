@@ -179,16 +179,12 @@ except ImportError as e:
 # ── NEW: Dynamic Feature Weighting (regime-adaptive weights) ──
 try:
     from dynamic_feature_weighting import (
-        get_regime_weights, apply_dynamic_weights,
-        get_feature_group_weights, get_sfc_effective_with_dynamic_weights,
+        get_sfc_effective_with_dynamic_weights,
     )
     DYNAMIC_WEIGHTING_AVAILABLE = True
 except ImportError as e:
     DYNAMIC_WEIGHTING_AVAILABLE = False
     print(f"[SFC] Dynamic Feature Weighting unavailable: {e}", file=sys.stderr)
-    def get_regime_weights(*a, **k): return {"Lt":0.25,"St":0.20,"Rt":0.20,"Ft":0.20,"Sc":0.15}
-    def apply_dynamic_weights(*a, **k): return {}, 0.5, {}
-    def get_feature_group_weights(*a, **k): return {}
     def get_sfc_effective_with_dynamic_weights(*a, **k): return None, 0.0
 
 # ── NEW: Market Positioning Index (MPI) ──
@@ -2671,7 +2667,6 @@ if DYNAMIC_WEIGHTING_AVAILABLE:
     try:
         # Get regime name from HMM or fallback to detect_regime result
         _dw_regime = _hmm_result.get('regime', regime) if _hmm_result else regime
-        _dw_norm_factors, _dw_z_score, _dw_weights = apply_dynamic_weights(factors, _dw_regime)
         # Apply dynamic SFC adjustment based on regime
         _dw_adjusted_sfc, _dw_sfc_adjustment = get_sfc_effective_with_dynamic_weights(
             factors, effective_sfc, _dw_regime
