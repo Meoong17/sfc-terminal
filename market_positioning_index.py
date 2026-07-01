@@ -157,18 +157,27 @@ def compute_market_positioning_index(
     comps = {}
 
     # 1. Funding Rate: high positive = crowded long = bearish (overheated)
+    # Thresholds calibrated against Deribit's actual interest_8h scale
+    # (hard-capped at +/-0.005 per their published funding formula — see
+    # the matching note in collect.py's calculate_m13_funding(), which had
+    # the same scale mismatch). The previous thresholds here (0.15 down to
+    # -0.05) were likewise 10-30x larger than interest_8h's physical range,
+    # so this component — weighted 0.25, the single largest weight in MPI
+    # — always landed on the "neutral" (0.40) tier regardless of actual
+    # leverage conditions.
+    FR_CAP = 0.005
     if fr_now is not None:
-        if fr_now > 0.15:
+        if fr_now > FR_CAP * 0.70:
             fr_score = 0.80  # extremely crowded long
-        elif fr_now > 0.08:
+        elif fr_now > FR_CAP * 0.45:
             fr_score = 0.65
-        elif fr_now > 0.03:
+        elif fr_now > FR_CAP * 0.20:
             fr_score = 0.55
-        elif fr_now > 0.01:
+        elif fr_now > FR_CAP * 0.05:
             fr_score = 0.45  # normal
-        elif fr_now > -0.01:
+        elif fr_now > -FR_CAP * 0.05:
             fr_score = 0.40  # neutral
-        elif fr_now > -0.05:
+        elif fr_now > -FR_CAP * 0.45:
             fr_score = 0.60  # mild bearish funding = bearish sentiment
         else:
             fr_score = 0.75  # extreme negative funding = panic

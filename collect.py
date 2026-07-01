@@ -342,7 +342,10 @@ except ImportError as e:
     INSTITUTIONAL_AVAILABLE = False
 
 try:
-    from ml_ensemble import predict_with_ml, add_observation, evaluate_accuracy, retrain_on_errors, compute_actual_stress
+    from ml_ensemble import (
+        predict_with_ml, add_observation, evaluate_accuracy, retrain_on_errors,
+        record_price_snapshot, resolve_pending_labels,
+    )
     ML_AVAILABLE = True
 except ImportError as e:
     print(f"[SFC] ML ensemble not available: {e}", file=sys.stderr)
@@ -350,6 +353,8 @@ except ImportError as e:
     def add_observation(*a, **k): return None
     def evaluate_accuracy(): return {"accuracy": None}
     def retrain_on_errors(): return None
+    def record_price_snapshot(*a, **k): return None
+    def resolve_pending_labels(*a, **k): return 0
     ML_AVAILABLE = False
 
 # ── QLSTM INFERENCE (M32 — Hybrid Quantum LSTM + GARCH + ProAdapt) ──
@@ -502,17 +507,50 @@ def get_cmc_dominance():
 def get_btc():
     """BTC price — try Binance WebSocket first, then CMC, fallback CoinGecko"""
     # Fast local read from Binance WebSocket daemon (no API call)
+    # Staleness threshold: if the daemon wrote this file more than
+    # MAX_WS_AGE_SECONDS ago, the daemon has probably stopped updating
+    # (crashed, network issue, or ws-watchdog hasn't restarted it yet).
+    # In that case, fall through to the REST API fallbacks rather than
+    # silently using a stale price for potentially many consecutive cycles
+    # — which would affect paper trading execution prices and stress
+    # score inputs without any visible indication in the dashboard.
+    MAX_WS_AGE_SECONDS = 300  # 5 min — two full pipeline cycles
     ws_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "btc_ws.json")
     if os.path.exists(ws_path):
         try:
             with open(ws_path) as f:
                 ws_data = json.load(f)
             if ws_data.get("btc") is not None:
-                btc_ws = ws_data["btc"]
-                chg_ws = ws_data.get("btc_24h", 0)
-                _, _, mcap = get_cmc_price()
-                print(f"[SFC] BTC from Binance WS: ${btc_ws:,.0f} ({chg_ws:+.2f}%)", file=sys.stderr)
-                return btc_ws, chg_ws, mcap
+                # Check how old the data actually is from the ts field,
+                # not just whether the file exists (the file persists
+                # indefinitely after the daemon dies).
+                ts_str = ws_data.get("ts")
+                ws_age_seconds = None
+                if ts_str:
+                    try:
+                        from datetime import datetime, timezone
+                        ws_ts = datetime.fromisoformat(ts_str)
+                        if ws_ts.tzinfo is None:
+                            ws_ts = ws_ts.replace(tzinfo=timezone.utc)
+                        ws_age_seconds = (datetime.now(timezone.utc) - ws_ts).total_seconds()
+                    except (ValueError, TypeError):
+                        ws_age_seconds = None
+
+                if ws_age_seconds is not None and ws_age_seconds > MAX_WS_AGE_SECONDS:
+                    print(
+                        f"[SFC] BTC WS data is {ws_age_seconds:.0f}s old "
+                        f"(>{MAX_WS_AGE_SECONDS}s threshold) — daemon may be down, "
+                        f"falling back to REST API",
+                        file=sys.stderr,
+                    )
+                else:
+                    btc_ws = ws_data["btc"]
+                    chg_ws = ws_data.get("btc_24h", 0)
+                    _, _, mcap = get_cmc_price()
+                    age_str = f", age {ws_age_seconds:.0f}s" if ws_age_seconds is not None else ""
+                    print(f"[SFC] BTC from Binance WS: ${btc_ws:,.0f} ({chg_ws:+.2f}%{age_str})",
+                          file=sys.stderr)
+                    return btc_ws, chg_ws, mcap
         except (json.JSONDecodeError, OSError, KeyError):
             pass
 
@@ -1243,9 +1281,20 @@ def calculate_m13_funding():
         fr_1 = rates[1]
         fr_2 = rates[2]
         accel = (fr_now - fr_1) - (fr_1 - fr_2)
-        if accel > 0.01: score = 0.75
-        elif fr_now > 0.15: score = 0.65
-        elif fr_now > 0.05: score = 0.35
+        # Thresholds calibrated against Deribit's actual interest_8h scale.
+        # interest_8h is a small decimal (e.g. -0.00009...), hard-capped by
+        # Deribit at +/-0.005 (0.5% per 8h) per their published funding
+        # formula (base component 0.025% = 0.00025). The previous
+        # thresholds here (0.15, 0.05, accel 0.01) were 20-30x larger than
+        # the maximum value this field can ever physically take, so this
+        # scoring branch always fell through to the lowest tier regardless
+        # of real leverage conditions — confirmed by testing the most
+        # extreme historically plausible funding rate (0.003) against the
+        # old thresholds and finding it still scored as "neutral".
+        FR_CAP = 0.005
+        if accel > FR_CAP * 0.40: score = 0.75
+        elif fr_now > FR_CAP * 0.70: score = 0.65
+        elif fr_now > FR_CAP * 0.30: score = 0.35
         else: score = 0.15
         return score, {"funding_rate": round(fr_now,6), "accel": round(accel,6)}
     except: return None, None
@@ -1965,6 +2014,76 @@ if _m83_score != 0.5 or _m84_score != 0.5:
 for k in factors:
     factors[k] = max(-3.0, min(3.0, factors[k]))
 
+# ── FACTOR-LEVEL OUTLIER GUARD ──────────────────────────────────
+# Runs right before calculate_sfc_ensemble() uses `factors` to produce
+# sfc_pct (the headline stress score). This closes a gap found during
+# audit: DataQualityPipeline (data_quality.py) already does proper
+# outlier detection + Kalman imputation on the 31 method scores, but it
+# only runs much later in this script (after sfc_pct is already final),
+# so its cleaned output was never actually used to protect the score
+# users see — it only fed monitoring fields (dq_outliers etc). Rather
+# than relocate that whole pipeline (which depends on ~31 method-score
+# locals not all available this early), this is a lighter, targeted
+# check on the 5 factors directly feeding the ensemble: it flags (and
+# damps, not discards) any factor that has moved implausibly far from
+# its own recent history, since a single corrupted API value showing up
+# as e.g. Lt=2.9 instead of Lt=-0.3 would otherwise pass straight through
+# the re-clamp above (which only bounds to [-3,3], not "is this plausible
+# given recent history").
+def _apply_factor_outlier_guard(factors_dict):
+    history_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".factor_history.json")
+    try:
+        with open(history_path, "r") as f:
+            hist = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        hist = {k: [] for k in factors_dict}
+
+    flagged = []
+    # Minimum std floor: each factor's plausible range is roughly [-3, 3]
+    # (see the re-clamp above), so a swing under ~0.5 is well within normal
+    # day-to-day movement regardless of how flat the recent history
+    # happens to be. Without this floor, a few cycles of coincidentally
+    # stable readings would make the z-score test oversensitive to entirely
+    # ordinary moves — confirmed during testing: a calm period with
+    # std≈0.03 flagged an ordinary 0.2-unit move as a "z=5.66 outlier".
+    MIN_STD_FLOOR = 0.5
+    for k, v in factors_dict.items():
+        past = hist.get(k, [])
+        if len(past) >= 5:
+            mean = sum(past) / len(past)
+            var = sum((x - mean) ** 2 for x in past) / len(past)
+            std = max(var ** 0.5, MIN_STD_FLOOR)
+            z = abs(v - mean) / std
+            if z > 4.0:
+                # Implausible jump vs this factor's own recent history.
+                # Damp toward the historical mean rather than discard
+                # outright — a genuine regime break should still move
+                # the score, just not by the full magnitude of what
+                # may be a bad API read.
+                damped = mean + (v - mean) * 0.3
+                flagged.append((k, round(v, 3), round(damped, 3), round(z, 2)))
+                factors_dict[k] = damped
+
+        hist.setdefault(k, []).append(v)
+        hist[k] = hist[k][-10:]
+
+    try:
+        with open(history_path, "w") as f:
+            json.dump(hist, f)
+    except OSError:
+        pass
+
+    if flagged:
+        for k, orig, damped, z in flagged:
+            print(f"[DQ-GUARD] {k}: {orig} -> {damped} (z={z}, dampened toward recent history)",
+                  file=sys.stderr)
+
+    return factors_dict, flagged
+
+
+factors, _factor_outlier_flags = _apply_factor_outlier_guard(factors)
+
+
 # Calculate SFC ensemble
 sfc_pct, zone, factors_raw, norm_factors, m1_klr, m2_logit, m3_bayes, m4_ewc, m5_qreg, m6_regime, method_agreement = calculate_sfc_ensemble(factors)
 
@@ -2449,11 +2568,25 @@ for name in sorted(inst_results.keys()):
 total_methods = len(all_method_scores)
 ml_score, ml_confidence, ml_msg = predict_with_ml(all_method_scores, total_methods)
 
-# Label: compute actual stress for today
-actual_stress = compute_actual_stress(dvol, sfc_pct, news_stress, chg)
+# Record this cycle's BTC price so resolve_pending_labels() can later
+# determine what actually happened, independent of sfc_pct/dvol/news_stress
+# (the old compute_actual_stress() derived its label from sfc_pct, which is
+# itself built from the same M1-M6 scores being fed into this feature
+# vector — the model was learning to reproduce its own formula rather than
+# predict real outcomes. See ml_ensemble.py for the full explanation).
+record_price_snapshot(btc)
 
-# Store observation for online learning
-add_observation(all_method_scores, prediction=ml_score, actual_label=actual_stress)
+# Store this cycle's feature vector with a PENDING label (None). The label
+# is filled in later, once price_log has enough history past
+# LABEL_LOOKAHEAD_MINUTES, by resolve_pending_labels() below — never at
+# observation time.
+add_observation(all_method_scores, prediction=ml_score)
+
+# Try to resolve any observations that are now old enough to have a known
+# real-world outcome.
+_n_resolved = resolve_pending_labels()
+if _n_resolved:
+    print(f"[SFC] ML: resolved {_n_resolved} pending label(s) from BTC price outcome", file=sys.stderr)
 
 # Accuracy tracking
 ml_metrics = evaluate_accuracy()
@@ -2492,11 +2625,18 @@ _hmm_module = _get_adv_hmm()
 _hmm_available = False
 if _hmm_module:
     try:
-        # Build feature vector: [daily_return, dvol/100, sfc_effective/100, rsi_14/100, fng/100]
+        # Build feature vector: [daily_return, dvol/100, m2_yoy/15, rsi_14/100, fng/100]
+        # m2_yoy (global M2 growth, independent of M1-M31 ensemble output)
+        # replaces the previous sfc_effective/100 feature — see hmm_regime.py
+        # FEATURE_COLS comment for why: sfc_effective is itself partly
+        # determined by the same composite scores this regime detector's
+        # CRISIS/BEAR override (below) feeds back into, so using it as an
+        # input reduced the value of HMM regime detection as a check that's
+        # actually independent of the ensemble's own current reading.
         _hmm_feat = np.array([[
             (chg or 0) / 100.0,
             (dvol or 50) / 100.0,
-            (effective_sfc or 20) / 100.0,
+            (m2_yoy if m2_yoy is not None else 5.0) / 15.0,
             (rsi_14m or 50) / 100.0,
             (fng or 50) / 100.0,
         ]], dtype=np.float32)

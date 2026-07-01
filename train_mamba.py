@@ -12,6 +12,7 @@ Usage:
 """
 
 import json, os, sys, time, subprocess, math
+from datetime import datetime, timedelta
 import numpy as np
 from pathlib import Path
 
@@ -192,40 +193,113 @@ def merge_datasets(git_features, git_targets, hist_features, hist_targets):
 def build_dataset(snapshots):
     """
     Build feature array and target array from snapshots.
-    
+
     Returns:
         features: (n, n_features) numpy array
-        targets: (n,) numpy array — sfc_effective / 100 (0-1)
+        targets: (n,) numpy array — realized future BTC price-outcome
+            proxy (0-1), NOT sfc_effective. See note below for why.
+
+    WHY THIS CHANGED FROM "target = sfc_effective / 100":
+    sfc_effective is itself one of the 39 features in build_feature_vector()
+    (see mamba_encoder.py), and is highly autocorrelated at the snapshot
+    intervals this pipeline runs at (every few minutes) — empirically, a
+    naive "predict(t+1) = value(t)" persistence baseline reaches R²≈0.94 at
+    horizon=1 on simulated data with this kind of autocorrelation, which is
+    higher than what most genuine forecasting models achieve. Training
+    Mamba to predict sfc_effective(t+h) when sfc_effective(t) is already in
+    its own input sequence rewards the model for learning to copy a recent
+    input value forward, not for learning genuine macro-liquidity dynamics.
+
+    The realized BTC price target below is independent of every feature in
+    build_feature_vector() (model scores, sfc_effective/sfc_base are all
+    excluded from determining this), so the model can no longer get credit
+    just for reproducing something already visible in its own input window.
+
+    Each snapshot's target is the price-outcome PRICE_LOOKAHEAD_MINUTES
+    ahead of it (own price_outcome window, NOT the create_sequences()
+    multi-step horizon below — these compose: create_sequences() then
+    additionally looks further ahead in snapshot-index space for its
+    [1,3,6]-step horizons, so the effective lookahead for horizon h
+    becomes PRICE_LOOKAHEAD_MINUTES + h*avg_snapshot_interval).
     """
+    PRICE_LOOKAHEAD_MINUTES = 360
+    PRICE_LOOKAHEAD_TOLERANCE_MINUTES = 60
+    PRICE_STRESS_DROP_PCT = -3.0
+    PRICE_CALM_FLOOR_PCT = 1.0
+
+    def _parse_ts(snap):
+        ts_str = snap.get('ts')
+        if not ts_str:
+            return None
+        try:
+            return datetime.fromisoformat(ts_str)
+        except (ValueError, TypeError):
+            return None
+
+    parsed_times = [_parse_ts(s) for s in snapshots]
+    btc_prices = [s.get('btc') for s in snapshots]
+
     features = []
     targets = []
-    skipped = 0
-    
+    skipped_no_future = 0
+    skipped_no_price = 0
+
     for i, snap in enumerate(snapshots):
-        # Build feature vector
+        obs_time = parsed_times[i]
+        obs_price = btc_prices[i]
+        if obs_time is None or obs_price is None:
+            skipped_no_price += 1
+            continue
+
+        target_time = obs_time + timedelta(minutes=PRICE_LOOKAHEAD_MINUTES)
+        best_diff = None
+        future_price = None
+        for j in range(i + 1, len(snapshots)):
+            t_j = parsed_times[j]
+            if t_j is None:
+                continue
+            diff_minutes = abs((t_j - target_time).total_seconds()) / 60.0
+            if diff_minutes <= PRICE_LOOKAHEAD_TOLERANCE_MINUTES:
+                if best_diff is None or diff_minutes < best_diff:
+                    best_diff = diff_minutes
+                    future_price = btc_prices[j]
+            if (t_j - target_time).total_seconds() / 60.0 > PRICE_LOOKAHEAD_TOLERANCE_MINUTES:
+                break
+
+        if future_price is None:
+            skipped_no_future += 1
+            continue
+
+        pct_change = (future_price - obs_price) / obs_price * 100.0
+        if pct_change <= PRICE_STRESS_DROP_PCT:
+            target_01 = 1.0
+        elif pct_change >= -PRICE_CALM_FLOOR_PCT:
+            target_01 = 0.0
+        else:
+            span = PRICE_STRESS_DROP_PCT - (-PRICE_CALM_FLOOR_PCT)
+            target_01 = (pct_change - (-PRICE_CALM_FLOOR_PCT)) / span
+            target_01 = max(0.0, min(1.0, target_01))
+
         vec = build_feature_vector(snap)
-        
-        # Target: sfc_effective / 100 (normalized 0-1)
-        target_val = snap.get('sfc_effective')
-        if target_val is None:
-            # Fallback: use sfc_base or ensemble
-            target_val = snap.get('sfc_base', 50.0)
-        
-        target_01 = float(target_val) / 100.0
-        target_01 = max(0.0, min(1.0, target_01))  # Clamp
-        
         features.append(vec)
         targets.append(target_01)
-        
+
         if (i + 1) % 500 == 0:
             print(f"[Train]  Processed {i+1}/{len(snapshots)} snapshots...")
-    
+
+    print(f"[Train] Skipped {skipped_no_price} snapshot(s) missing ts/btc, "
+          f"{skipped_no_future} with no future reference point in range")
+
     features = np.array(features, dtype=np.float32)
     targets = np.array(targets, dtype=np.float32)
-    
+
     print(f"[Train] Feature array: {features.shape}")
-    print(f"[Train] Target range: [{targets.min():.4f}, {targets.max():.4f}], mean={targets.mean():.4f}")
-    
+    if len(targets) > 0:
+        print(f"[Train] Target range: [{targets.min():.4f}, {targets.max():.4f}], mean={targets.mean():.4f}")
+    else:
+        print("[Train] WARNING: no usable (feature, target) pairs were built — "
+              "check that snapshots have parseable 'ts' and numeric 'btc' fields.")
+
     return features, targets
 
 

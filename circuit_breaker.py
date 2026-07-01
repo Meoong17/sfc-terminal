@@ -167,7 +167,22 @@ class CircuitBreaker:
             warnings.append(f"NAN/INF detected and replaced: {', '.join(nan_keys[:10])}")
 
         # ── 2. Range validation ──
-        range_violations = []
+        # Two categories of range problems:
+        #
+        # (a) CLAMPED: value was out of range but corrected by clamping.
+        #     Output is still usable — counting this as a "failure" toward
+        #     MAX_CONSECUTIVE_FAILURES would trip the breaker on systematic
+        #     rounding drift (e.g. sfc_effective=100.5 every cycle) even
+        #     when every output field is perfectly valid after clamping.
+        #     Confirmed by test: trivial 0.5pp overshoot recurring 5x
+        #     tripped the breaker and purged ALL output including valid
+        #     fields. → all_ok stays True; warning still emitted.
+        #
+        # (b) INVALID: value cannot be recovered (wrong type, NaN, Inf).
+        #     → all_ok = False → counts toward failure / circuit trip.
+        range_clamped = []
+        range_invalid = []
+
         for key, (lo, hi) in FIELD_RULES.items():
             if key not in cleaned:
                 continue
@@ -175,18 +190,45 @@ class CircuitBreaker:
             if val is None:
                 continue
             if not isinstance(val, (int, float)):
+                range_invalid.append(f"{key}={val!r} (not numeric)")
+                all_ok = False
+                continue
+            if val != val or val in (float('inf'), float('-inf')):
+                range_invalid.append(f"{key}={val} (NaN/Inf)")
+                all_ok = False
                 continue
             if lo is not None and val < lo:
-                range_violations.append(f"{key}={val:.2f} < {lo}")
                 cleaned[key] = lo
-                all_ok = False
+                range_clamped.append(f"{key}={val:.3f}→{lo}")
             elif hi is not None and val > hi:
-                range_violations.append(f"{key}={val:.2f} > {hi}")
                 cleaned[key] = hi
-                all_ok = False
+                range_clamped.append(f"{key}={val:.3f}→{hi}")
 
-        if range_violations:
-            warnings.append(f"Range violations clamped: {'; '.join(range_violations[:10])}")
+        # ── 2b. Validate prob_quantiles nested dict ──
+        # Previously absent from FIELD_RULES entirely — q_01=-27.42 was
+        # confirmed in production data as a nonsensical negative percentile
+        # visible on the dashboard. Clamped here in the same non-failure
+        # category as (a) above: a corrected quantile value is valid output.
+        quantiles = cleaned.get("prob_quantiles")
+        if isinstance(quantiles, dict):
+            q_clamped = []
+            for q_key, q_val in list(quantiles.items()):
+                if not isinstance(q_val, (int, float)):
+                    continue
+                if q_val < 0.0:
+                    quantiles[q_key] = 0.0
+                    q_clamped.append(f"{q_key}:{q_val:.2f}→0.0")
+                elif q_val > 100.0:
+                    quantiles[q_key] = 100.0
+                    q_clamped.append(f"{q_key}:{q_val:.2f}→100.0")
+            if q_clamped:
+                range_clamped.append(f"prob_quantiles({', '.join(q_clamped)})")
+            cleaned["prob_quantiles"] = quantiles
+
+        if range_clamped:
+            warnings.append(f"Range clamped (output valid): {'; '.join(range_clamped[:10])}")
+        if range_invalid:
+            warnings.append(f"Uncorrectable violations: {'; '.join(range_invalid)}")
 
         # ── 3. Sudden jump detection ──
         jump_violations = []

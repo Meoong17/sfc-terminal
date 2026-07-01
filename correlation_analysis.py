@@ -459,12 +459,28 @@ def main() -> None:
     print("LT/ST WEIGHT OPTIMIZATION")
     print("=" * 70)
 
-    # Primary: Lt vs St predicting SFC (current composite)
-    print("\n  📐 Target: sfc_effective (current stress score)")
-    opt = compute_optimal_weights(lt_data, st_data, target="sfc_effective")
+    # Optimize Lt vs St weights using BTC 24h returns as target.
+    #
+    # NOTE: the previous code called compute_optimal_weights() with
+    # target="sfc_effective" as the "Primary" analysis, expecting that
+    # to represent "which of Lt/St correlates more with the stress score".
+    # However sfc_effective lives in SC_FEATURES, not LT_FEATURES or
+    # ST_FEATURES, so compute_optimal_weights() always returned
+    # {"error": "Target sfc_effective not found in features"} — confirmed
+    # via direct execution. The fallback opt.get("lt_weight_pct", 50) then
+    # silently made the "FINAL RECOMMENDATIONS" always print 50%/50%,
+    # labeled "based on historical correlation with SFC" even though no
+    # such analysis ever ran. btc_24h is the correct target: it measures
+    # actual BTC price movement, lives in LT_FEATURES/ST_FEATURES as a
+    # shared reference, and is what "which factor group predicts market
+    # outcomes" should mean in this context.
+    print("\n  📐 Target: btc_24h (actual BTC daily returns)")
+    print("  (Measures which feature groups — Lt or St — correlate more")
+    print("   with realized BTC price movement, not the model's own output.)")
+    opt = compute_optimal_weights(lt_data, st_data, target="btc_24h")
     if "error" not in opt:
-        print(f"\n     Lt strength (avg |corr|): {opt['lt_strength']:.4f}")
-        print(f"     St strength (avg |corr|): {opt['st_strength']:.4f}")
+        print(f"\n     Lt strength (avg |corr| with btc_24h): {opt['lt_strength']:.4f}")
+        print(f"     St strength (avg |corr| with btc_24h): {opt['st_strength']:.4f}")
         print(f"\n     ╔══════════════════════════════════╗")
         print(f"     ║   Lt WEIGHT:  {opt['lt_weight_pct']:>5.1f}%            ║")
         print(f"     ║   St WEIGHT:  {opt['st_weight_pct']:>5.1f}%            ║")
@@ -477,25 +493,21 @@ def main() -> None:
         for f, w in sorted(opt["st_feature_weights"].items(),
                            key=lambda x: x[1]["weight_in_st"], reverse=True)[:6]:
             print(f"       • {f:<24} |corr|={w['correlation']:.4f}  weight={w['weight_in_st']:.3f}")
-
-    # Secondary: Lt vs St predicting BTC returns
-    print(f"\n  📐 Target: btc_24h (actual returns)")
-    opt2 = compute_optimal_weights(lt_data, st_data, target="btc_24h")
-    if "error" not in opt2:
-        print(f"\n     Lt strength: {opt2['lt_strength']:.4f}")
-        print(f"     St strength: {opt2['st_strength']:.4f}")
-        print(f"\n     ╔══════════════════════════════════╗")
-        print(f"     ║   Lt WEIGHT:  {opt2['lt_weight_pct']:>5.1f}%            ║")
-        print(f"     ║   St WEIGHT:  {opt2['st_weight_pct']:>5.1f}%            ║")
-        print(f"     ╚══════════════════════════════════╝")
+    else:
+        print(f"  ⚠ Optimization failed: {opt['error']}")
 
     # ── 7. FINAL RECOMMENDATIONS ──
     print("\n" + "=" * 70)
     print("FINAL RECOMMENDATIONS — Numerical Lt/St Weights")
     print("=" * 70)
 
-    lt_w = float(opt.get("lt_weight_pct", 50))
-    st_w = float(opt.get("st_weight_pct", 50))
+    if "error" not in opt:
+        lt_w = float(opt["lt_weight_pct"])
+        st_w = float(opt["st_weight_pct"])
+        basis = "historical correlation with realized BTC 24h returns"
+    else:
+        lt_w, st_w = 50.0, 50.0
+        basis = "equal split (default — optimization unavailable, see warning above)"
 
     print(f"""
   ╔══════════════════════════════════════════════════════╗
@@ -514,8 +526,8 @@ def main() -> None:
   ║     • Volatility: M10-M12 (GARCH, VaR, jump)         ║
   ║     • Momentum:   M7-M9, M14-M19 (Fisher, entropy)   ║
   ║                                                      ║
-  ║   Current blend: {float(opt.get('lt_weight_pct',50)):>5.1f}% Lt / {float(opt.get('st_weight_pct',50)):>5.1f}% St                ║
-  ║   (based on historical correlation with SFC)         ║
+  ║   Current blend: {lt_w:>5.1f}% Lt / {st_w:>5.1f}% St                ║
+  ║   (based on {basis})
   ╚══════════════════════════════════════════════════════╝
 
   🎯 Action:

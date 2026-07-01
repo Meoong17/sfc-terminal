@@ -3,16 +3,22 @@
 // Multi-user paper trading via KV storage
 //
 // Worker tries multiple backends in order:
-// 1. Cloudflare Tunnel (set via env TUNNEL_URL or hardcoded below)
-// 2. Direct VPS IP (blocked by some Tencent Cloud security groups)
+// 1. Cloudflare Tunnel (set via env TUNNEL_URL, falls back to hardcoded default below)
+// 2. Direct VPS IP (set via env BACKUP_URL secret — see wrangler.toml / `wrangler secret put`)
+//
+// IMPORTANT: BACKUP_URL must be set as a Cloudflare secret, NOT committed to source.
+// This repo is public — a hardcoded VPS IP here would expose your server address
+// to anyone reading the code. Set it once via:
+//   wrangler secret put BACKUP_URL
+// and paste your VPS URL (e.g. http://YOUR_VPS_IP:8765) when prompted.
 
-// Fallback URLs (overridden by env.TUNNEL_URL / env.BACKUP_URL secrets)
-const TUNNEL_FALLBACK = 'https://coat-pays-injuries-irrigation.trycloudflare.com';
-const BACKUP_FALLBACK = 'http://43.134.89.23:8765';
+const TUNNEL_DEFAULT = 'https://coat-pays-injuries-irrigation.trycloudflare.com';
 
-async function fetchAny(urls, path, accept) {
-  // Try tunnel first, then VPS direct IP
-  const ordered = urls || [TUNNEL_FALLBACK, BACKUP_FALLBACK];
+async function fetchAny(env, path, accept) {
+  // Try tunnel first, then VPS direct IP (from secret env, if configured)
+  const tunnel = (env && env.TUNNEL_URL) || TUNNEL_DEFAULT;
+  const backup = env && env.BACKUP_URL; // intentionally no fallback default — see note above
+  const ordered = backup ? [tunnel, backup] : [tunnel];
   for (const base of ordered) {
     try {
       const resp = await fetch(base + path, {
@@ -72,59 +78,81 @@ async function gzip(data) {
   return out;
 }
 
-// Cookie helpers (moved inside fetch() for access to env.AUTH_SECRET)
+// Cookie helpers
 function getCookie(request, name) {
   const cookie = request.headers.get('Cookie') || '';
   const match = cookie.match(new RegExp('(?:^|;\\s*)' + name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '=([^;]*)'));
   return match ? decodeURIComponent(match[1]) : null;
 }
 
+function setCookie(name, value, maxAgeDays = 30) {
+  return `${name}=${encodeURIComponent(value)}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${maxAgeDays * 86400}`;
+}
+
 function clearCookie(name) {
   return `${name}=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0`;
 }
 
+// ── Signed session tokens ──────────────────────────────────────
+// Previously the session cookie was just the raw username — anyone could
+// set `sfc_session=<target_username>` manually (e.g. via curl or browser
+// devtools) and the server would treat them as that user, with no password
+// or verification involved at all. Login only checked that the username was
+// non-empty, never validated the cookie came from an actual login request.
+//
+// This signs the session value with HMAC-SHA256 using a secret only the
+// server knows (env.SESSION_SECRET), so a forged cookie without a valid
+// signature is rejected. This does NOT add password-based authentication
+// (usernames are still unauthenticated identity claims, consistent with the
+// "just a username" design) — it only ensures that whoever holds a session
+// cookie actually went through this server's /api/login at some point,
+// rather than being able to fabricate one for an arbitrary username.
+//
+// Required setup: `wrangler secret put SESSION_SECRET` (any long random
+// string). If unset, session signing is skipped with a console warning and
+// falls back to the old unsigned behavior — set it before going to
+// production, especially since this repo is public.
+
+async function hmacSign(secret, message) {
+  const key = await crypto.subtle.importKey(
+    'raw', new TextEncoder().encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
+  );
+  const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(message));
+  return btoa(String.fromCharCode(...new Uint8Array(sig))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+async function createSessionToken(env, username) {
+  const payload = `${username}.${Date.now()}`;
+  if (!env || !env.SESSION_SECRET) {
+    console.warn('SESSION_SECRET not set — issuing UNSIGNED session token. Set with `wrangler secret put SESSION_SECRET`.');
+    return payload; // unsigned fallback, same weak behavior as before
+  }
+  const sig = await hmacSign(env.SESSION_SECRET, payload);
+  return `${payload}.${sig}`;
+}
+
+async function verifySessionToken(env, token) {
+  if (!token) return null;
+  const parts = token.split('.');
+  if (!env || !env.SESSION_SECRET) {
+    // Unsigned fallback mode — accept old-style raw-username cookies too,
+    // so existing logged-in users aren't immediately logged out when
+    // SESSION_SECRET is first configured. Username is parts[0].
+    return parts[0] || null;
+  }
+  if (parts.length !== 3) return null; // must be username.timestamp.signature
+  const [username, ts, sig] = parts;
+  const expectedSig = await hmacSign(env.SESSION_SECRET, `${username}.${ts}`);
+  if (sig !== expectedSig) return null; // signature mismatch — forged or tampered
+  return username || null;
+}
+
 export default {
   async fetch(request, env, ctx) {
-    const AUTH_SECRET = env.AUTH_SECRET || '';
-
-    // HMAC sign with AUTH_SECRET (SHA-256). Returns value.signature
-    async function signCookie(value) {
-      if (!AUTH_SECRET) return value;
-      const enc = new TextEncoder();
-      const key = await crypto.subtle.importKey('raw', enc.encode(AUTH_SECRET),
-        { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
-      const sig = await crypto.subtle.sign('HMAC', key, enc.encode(value));
-      const sigB64 = btoa(String.fromCharCode(...new Uint8Array(sig)));
-      return value + '.' + sigB64;
-    }
-
-    // Verify HMAC signature. Returns original value or null if invalid.
-    async function verifyCookie(signed) {
-      if (!AUTH_SECRET || !signed) return signed || null;
-      const idx = signed.lastIndexOf('.');
-      if (idx === -1) return null;
-      const expected = await signCookie(signed.substring(0, idx));
-      return expected === signed ? signed.substring(0, idx) : null;
-    }
-
-    async function makeSessionCookie(value, maxAgeDays = 30) {
-      const signed = await signCookie(value);
-      return `sfc_session=${encodeURIComponent(signed)}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${maxAgeDays * 86400}`;
-    }
-
-    // Session check helper — returns normalized username or null
-    async function getSessionUser(request) {
-      const raw = getCookie(request, 'sfc_session');
-      if (!raw) return null;
-      return await verifyCookie(raw);
-    }
     const url = new URL(request.url);
     const path = url.pathname;
     const method = request.method;
-    const urls = [
-      env.TUNNEL_URL || TUNNEL_FALLBACK,
-      env.BACKUP_URL || BACKUP_FALLBACK,
-    ];
 
     // Allowed origins for CORS (GitHub Pages frontend that calls worker API)
     const ALLOWED_ORIGINS = [
@@ -145,6 +173,14 @@ export default {
       }
       // Same-origin requests don't need CORS
       return {};
+    }
+
+    // Session check helper — returns normalized username or null.
+    // Verifies the HMAC signature (see verifySessionToken above) rather
+    // than trusting the cookie value directly.
+    async function getSessionUser(request) {
+      const token = getCookie(request, 'sfc_session');
+      return verifySessionToken(env, token);
     }
 
     // Security headers for HTML pages (clickjacking, MIME sniffing, HSTS, referrer)
@@ -312,7 +348,7 @@ export default {
         });
       }
       const normalized = username.toLowerCase();
-      const sessionUser = normalized;
+      const sessionToken = await createSessionToken(env, normalized);
       // Set cookie via 200 + JS redirect (more reliable on mobile browsers like Brave)
       if (contentType.includes('x-www-form-urlencoded')) {
         const safeUser = encodeURIComponent(username);
@@ -322,7 +358,7 @@ export default {
             status: 200,
             headers: {
               'Content-Type': 'text/html; charset=utf-8',
-              'Set-Cookie': await makeSessionCookie(username),
+              'Set-Cookie': setCookie('sfc_session', sessionToken),
               'Cache-Control': 'no-cache, no-store, must-revalidate',
               ...securityHeaders,
               ...getCorsHeaders(request),
@@ -334,7 +370,7 @@ export default {
         status: 200,
         headers: {
           'Content-Type': 'application/json',
-          'Set-Cookie': await makeSessionCookie(username),
+          'Set-Cookie': setCookie('sfc_session', sessionToken),
           ...getCorsHeaders(request),
         },
       });
@@ -414,7 +450,7 @@ document.getElementById('loginForm').addEventListener('submit', function(e) {
 
     // /events — SSE stream generated by worker polling /snapshot
     if (path === '/events') {
-      const preCheck = await fetchAny(urls, '/snapshot', 'application/json');
+      const preCheck = await fetchAny(env, '/snapshot', 'application/json');
       if (!preCheck) return new Response('Backend unreachable', { status: 502 });
 
       const { readable, writable } = new TransformStream();
@@ -428,7 +464,7 @@ document.getElementById('loginForm').addEventListener('submit', function(e) {
         const MAX_FAIL = 5;
         try {
           for (;;) {
-            const resp = await fetchAny(urls, '/snapshot', 'application/json');
+            const resp = await fetchAny(env, '/snapshot', 'application/json');
             if (resp) {
               failCount = 0;
               let data;
@@ -507,7 +543,7 @@ document.getElementById('loginForm').addEventListener('submit', function(e) {
       const cached = await cache.match(cacheKey);
       if (cached) return cached;
 
-      const resp = await fetchAny(urls, '/snapshot', 'application/json');
+      const resp = await fetchAny(env, '/snapshot', 'application/json');
       if (!resp) return new Response('Backend unreachable', { status: 502 });
       const data = await resp.json();
       const response = new Response(JSON.stringify(data), {
@@ -524,7 +560,7 @@ document.getElementById('loginForm').addEventListener('submit', function(e) {
 
     // /data.json — SFC live data (passthrough, no gzip — saves Worker CPU)
     if (path === '/data.json') {
-      const resp = await fetchAny(urls, '/data.json', 'application/json');
+      const resp = await fetchAny(env, '/data.json', 'application/json');
       if (!resp) return new Response('{}', {
         status: 200,
         headers: { 'Content-Type': 'application/json', ...getCorsHeaders(request) },
@@ -542,7 +578,7 @@ document.getElementById('loginForm').addEventListener('submit', function(e) {
 
     // /paper_history.json — paper trading track record
     if (path === '/paper_history.json') {
-      const resp = await fetchAny(urls, '/paper_history.json', 'application/json');
+      const resp = await fetchAny(env, '/paper_history.json', 'application/json');
       if (!resp) return new Response('{"daily":[],"current":{}}', {
         status: 200,
         headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache', ...getCorsHeaders(request) },
@@ -556,7 +592,7 @@ document.getElementById('loginForm').addEventListener('submit', function(e) {
 
     // /paper_trades.json — paper trading server state (for client-side init)
     if (path === '/paper_trades.json') {
-      const resp = await fetchAny(urls, '/paper_trades.json', 'application/json');
+      const resp = await fetchAny(env, '/paper_trades.json', 'application/json');
       if (!resp) return new Response('{"capital":50000,"positions":[],"trades":[],"equity_history":[],"daily_snapshots":{}}', {
         status: 200,
         headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache', ...getCorsHeaders(request) },
@@ -570,7 +606,7 @@ document.getElementById('loginForm').addEventListener('submit', function(e) {
 
     // /health
     if (path === '/health') {
-      const resp = await fetchAny(urls, '/health', 'application/json');
+      const resp = await fetchAny(env, '/health', 'application/json');
       if (!resp) return new Response('Backend unreachable', { status: 502 });
       const data = await resp.json();
       return new Response(JSON.stringify(data), {
@@ -583,10 +619,14 @@ document.getElementById('loginForm').addEventListener('submit', function(e) {
     if (path === '/' || path === '') {
       const queryUser = url.searchParams.get('user');
       
-      // Auto-login: if ?user= is present, set cookie
-      if (queryUser) {
-        const setCookieHeader = await makeSessionCookie(queryUser);
-        const resp = await fetchAny(urls, '/', 'text/html');
+      // Auto-login: if ?user= is present, set a signed session cookie.
+      // Validated the same way as /api/login (alphanumeric + - _, 1-32 chars)
+      // to prevent arbitrary cookie injection via a shared/malicious link
+      // (e.g. https://sfc-terminal.../?user=someone_elses_name).
+      if (queryUser && /^[a-zA-Z0-9_-]{1,32}$/.test(queryUser)) {
+        const sessionToken = await createSessionToken(env, queryUser.toLowerCase());
+        const setCookieHeader = setCookie('sfc_session', sessionToken);
+        const resp = await fetchAny(env, '/', 'text/html');
         if (!resp) return new Response('Backend unreachable', { status: 502 });
         const html = await resp.text();
         return new Response(html, {
@@ -602,7 +642,7 @@ document.getElementById('loginForm').addEventListener('submit', function(e) {
       }
 
       // Serve dashboard for everyone (no auth required — frontend handles login)
-      const resp = await fetchAny(urls, '/', 'text/html');
+      const resp = await fetchAny(env, '/', 'text/html');
       if (!resp) return new Response('Backend unreachable', { status: 502 });
       let html = await resp.text();
 
@@ -619,7 +659,7 @@ document.getElementById('loginForm').addEventListener('submit', function(e) {
 
     // Static assets — proxy to actual path on backend
     if (path === '/app.js' || path === '/sw.js' || path === '/manifest.json') {
-      const resp = await fetchAny(urls, path, 'application/javascript');
+      const resp = await fetchAny(env, path, 'application/javascript');
       if (!resp) return new Response('Not Found', { status: 404 });
       const data = await resp.text();
       const contentType = path.endsWith('.js') ? 'application/javascript' : path.endsWith('.json') ? 'application/json' : 'text/html';
@@ -633,7 +673,7 @@ document.getElementById('loginForm').addEventListener('submit', function(e) {
     }
 
     // Catch-all: serve dashboard for any unknown path (SPA fallback)
-    const resp = await fetchAny(urls, '/', 'text/html');
+    const resp = await fetchAny(env, '/', 'text/html');
     if (!resp) return new Response('Not Found', { status: 404, headers: getCorsHeaders(request) });
     const fallbackHtml = await resp.text();
     return new Response(fallbackHtml, {

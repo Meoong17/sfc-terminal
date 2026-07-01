@@ -11,7 +11,7 @@ Data disimpan di data_collection.json untuk persistensi antar run.
 """
 
 import json, os, sys, math, time
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import pickle
 
 COLLECTION_FILE = os.path.join(os.path.dirname(__file__), "data_collection.json")
@@ -25,25 +25,60 @@ SCALER_FILE = os.path.join(os.path.dirname(__file__), "ml_ensemble_scaler.pkl")
 def load_collection():
     """Load historical training data."""
     if not os.path.exists(COLLECTION_FILE):
-        return {"features": [], "labels": [], "predictions": [], "dates": []}
+        return {"features": [], "labels": [], "predictions": [], "dates": [], "price_log": []}
     try:
         with open(COLLECTION_FILE, "r") as f:
-            return json.load(f)
+            data = json.load(f)
+            data.setdefault("price_log", [])
+            return data
     except:
-        return {"features": [], "labels": [], "predictions": [], "dates": []}
+        return {"features": [], "labels": [], "predictions": [], "dates": [], "price_log": []}
 
 def save_collection(data):
     """Save training data."""
     with open(COLLECTION_FILE, "w") as f:
         json.dump(data, f)
 
-def add_observation(feature_vector, prediction=None, actual_label=None, date_str=None):
+def record_price_snapshot(btc_price, date_str=None):
     """
-    Add one observation to the collection.
-    
+    Append a lightweight {ts, btc} snapshot to the collection's own
+    price_log, independent of git history. resolve_pending_labels() reads
+    from this instead of needing to re-scan git log on every call —
+    cheaper, and works even if this script is ever run somewhere without
+    git history available at all (e.g. a fresh clone).
+
+    Keeps up to ~30 days of 5-minute-interval snapshots (8640 points) —
+    comfortably more than LABEL_LOOKAHEAD_MINUTES (360 min) requires, with
+    headroom if the lookahead window is widened later.
+    """
+    if btc_price is None:
+        return
+    data = load_collection()
+    data["price_log"].append({
+        "ts": date_str or datetime.now(timezone.utc).isoformat(),
+        "btc": float(btc_price),
+    })
+    if len(data["price_log"]) > 8640:
+        data["price_log"] = data["price_log"][-8640:]
+    save_collection(data)
+
+def add_observation(feature_vector, prediction=None, date_str=None):
+    """
+    Add one observation to the collection. Its label starts as None
+    ("pending") and is filled in later by resolve_pending_labels(), once
+    enough time has passed to know what BTC price actually did — never
+    at the moment the observation is recorded.
+
     feature_vector: list of method scores [m1, m2, ..., m31, ...] in order
-    prediction: what the model predicted (0 or 1)
-    actual_label: what actually happened (0=no stress, 1=stress event)
+    prediction: what the model predicted (0 or 1), for tracking accuracy later
+
+    NOTE: this function intentionally no longer accepts an actual_label
+    parameter. The previous version let the caller pass in a label
+    computed from sfc_pct (an output built from this same feature vector),
+    which meant the model was effectively learning to reproduce its own
+    formula rather than predict real market outcomes. If you need to
+    backfill a label, use resolve_pending_labels() with real price history
+    instead of writing to data["labels"] directly.
     """
     data = load_collection()
     
@@ -53,7 +88,7 @@ def add_observation(feature_vector, prediction=None, actual_label=None, date_str
         return data
     
     data["features"].append([float(v) if v is not None else 0.5 for v in feature_vector])
-    data["labels"].append(float(actual_label) if actual_label is not None else None)
+    data["labels"].append(None)  # always starts pending — see resolve_pending_labels()
     data["predictions"].append(float(prediction) if prediction is not None else None)
     data["dates"].append(date_str or datetime.now(timezone.utc).isoformat())
     
@@ -69,35 +104,154 @@ def add_observation(feature_vector, prediction=None, actual_label=None, date_str
 
 def compute_actual_stress(dvol=None, sfc_pct=None, news_stress=None, btc_24h=None):
     """
-    Determine if TODAY was a stress event (label = 1).
-    Used for feedback loop — called on next day with known outcomes.
-    
-    Returns 0 or 1.
+    DEPRECATED — kept only for backward compatibility with any external
+    caller that may still import this name directly.
+
+    This used to be called as the label at the SAME time the feature
+    vector was recorded (see add_observation below), using sfc_pct as one
+    of its inputs. Because sfc_pct is itself a function of M1-M6, which
+    are also entries in the feature vector being labeled, the model could
+    reach near-perfect "accuracy" simply by reproducing the formula that
+    built its own label — confirmed empirically: a naive threshold rule
+    on sfc_pct alone (no training at all) already matched this label
+    function ~77% of the time in simulation. See resolve_pending_labels()
+    for the actual fix: labels are now assigned later, from realized BTC
+    price movement, not from the model's own contemporaneous output.
+
+    Do not wire this back into the labeling path.
     """
     stress_signals = 0
     total_signals = 0
-    
+
     if dvol is not None:
         total_signals += 1
         if dvol > 80: stress_signals += 1
-    
+
     if sfc_pct is not None:
         total_signals += 1
         if sfc_pct > 50: stress_signals += 1
-    
+
     if btc_24h is not None:
         total_signals += 1
         if btc_24h < -5: stress_signals += 1
-    
+
     if news_stress is not None:
         total_signals += 1
         if news_stress > 30: stress_signals += 1
-    
+
     if total_signals == 0:
         return 0
-    
-    # 2+ stress signals out of available = stress event
+
     return 1 if stress_signals >= max(2, total_signals // 2) else 0
+
+
+# ──────────────────────────────────────────────────────
+# PRICE-OUTCOME LABELING — ground truth independent of model output
+# ──────────────────────────────────────────────────────
+#
+# Replaces compute_actual_stress() as the source of training labels.
+# A "stress event" is now defined purely from what BTC price actually did
+# in the following window — never from sfc_pct, dvol, or any other value
+# the ensemble itself produced. This breaks the circularity where the
+# model was effectively being trained to reproduce its own formula.
+
+LABEL_LOOKAHEAD_MINUTES = 360      # how far ahead to check price outcome
+LABEL_LOOKAHEAD_TOLERANCE_MINUTES = 60
+LABEL_STRESS_DROP_PCT = -3.0       # BTC drop >= 3% in the window = stress event
+LABEL_CALM_RISE_PCT = 1.5          # BTC didn't fall this much = calm, even if flat/up
+
+
+def _parse_ts(ts_str):
+    try:
+        return datetime.fromisoformat(ts_str)
+    except Exception:
+        return None
+
+
+def resolve_pending_labels(price_history=None):
+    """
+    Walk through observations whose label is still None ("pending") and
+    assign a label from realized BTC price movement, if enough time has
+    now passed.
+
+    Args:
+        price_history: optional list of {"ts": iso_str, "btc": float}
+            snapshots. If omitted, reads from this collection's own
+            price_log (populated by record_price_snapshot(), which should
+            be called once per collect.py cycle alongside add_observation).
+            Does not need to be pre-sorted — sorted internally by ts.
+
+    Returns:
+        number of labels resolved in this call.
+    """
+    data = load_collection()
+
+    if price_history is None:
+        price_history = data.get("price_log", [])
+
+    # Sort defensively — caller-supplied history isn't guaranteed ordered,
+    # and out-of-order entries would silently break the nearest-match scan.
+    price_history = sorted(
+        (s for s in price_history if _parse_ts(s.get("ts", "")) is not None),
+        key=lambda s: _parse_ts(s["ts"])
+    )
+
+    resolved = 0
+
+    for i, label in enumerate(data["labels"]):
+        if label is not None:
+            continue  # already resolved
+        date_str = data["dates"][i] if i < len(data["dates"]) else None
+        obs_time = _parse_ts(date_str) if date_str else None
+        if obs_time is None:
+            continue
+
+        target_time = obs_time + timedelta(minutes=LABEL_LOOKAHEAD_MINUTES)
+
+        # Find the price at observation time and at the target lookahead time
+        price_at_obs = None
+        price_at_target = None
+        best_obs_diff = None
+        best_target_diff = None
+        for snap in price_history:
+            snap_ts = _parse_ts(snap.get("ts", ""))
+            snap_btc = snap.get("btc")
+            if snap_ts is None or snap_btc is None:
+                continue
+            obs_diff = abs((snap_ts - obs_time).total_seconds())
+            if obs_diff <= 120 and (best_obs_diff is None or obs_diff < best_obs_diff):
+                price_at_obs = snap_btc
+                best_obs_diff = obs_diff
+            target_diff = abs((snap_ts - target_time).total_seconds())
+            if (target_diff <= LABEL_LOOKAHEAD_TOLERANCE_MINUTES * 60
+                    and (best_target_diff is None or target_diff < best_target_diff)):
+                price_at_target = snap_btc
+                best_target_diff = target_diff
+
+        if price_at_obs is None or price_at_target is None:
+            continue  # not enough history yet to resolve this one — try again later
+
+        pct_change = (price_at_target - price_at_obs) / price_at_obs * 100.0
+
+        if pct_change <= LABEL_STRESS_DROP_PCT:
+            data["labels"][i] = 1.0  # confirmed stress: price actually dropped
+            resolved += 1
+        elif pct_change >= -LABEL_CALM_RISE_PCT:
+            # Price held up (flat or rose) — confirmed calm. Using a band
+            # around zero (not just ">0") avoids mislabeling small noise
+            # as a confident "calm" call.
+            data["labels"][i] = 0.0
+            resolved += 1
+        # else: ambiguous mild decline between the two thresholds — leave
+        # pending in case a clearer signal emerges from a later, larger
+        # lookahead pass; do not force a label onto an ambiguous outcome.
+
+    if resolved > 0:
+        save_collection(data)
+        print(f"[ML] Resolved {resolved} pending labels from realized BTC price movement",
+              file=sys.stderr)
+
+    return resolved
 
 
 # ──────────────────────────────────────────────────────

@@ -179,11 +179,16 @@ class ProbabilisticHead:
         # 6. Compute distribution metrics
         mu = sfc  # point estimate = mean
 
-        # VaR 95%: 5th percentile (worst-case loss in SFC units)
+        # VaR 95%: 5th percentile (worst-case SFC level at 95% confidence)
         var_95 = mu - 1.645 * final_sigma
 
-        # ES 97.5%: Expected shortfall (average of worst 2.5%)
-        es_975 = mu - 2.0 * final_sigma
+        # ES 97.5%: Expected Shortfall = E[X | X < VaR_97.5%] for normal dist.
+        # Correct multiplier = φ(z_0.975) / (1 - 0.975) = φ(1.96) / 0.025 ≈ 2.3378
+        # The previous value (2.0) was an approximation off by ~0.34, causing
+        # the "ES 97.5%" label to be imprecise compared to the standard CVaR
+        # definition used in institutional risk reporting.
+        _ES_97_5_MULT = 2.3378
+        es_975 = mu - _ES_97_5_MULT * final_sigma
 
         # Probabilities
         prob_stress = 1.0 - _normal_cdf((STRESS_THRESHOLD - mu) / max(final_sigma, 0.1))
@@ -199,22 +204,35 @@ class ProbabilisticHead:
         ci_lower = mu - 1.645 * final_sigma
         ci_upper = mu + 1.645 * final_sigma
 
-        # Quantiles
+        # Quantiles — clamped to [0, 100] because SFC scores outside this
+        # range are not meaningful. Previously unclamped: q_01=-27.42 was
+        # confirmed in production data (visible on dashboard) when sigma
+        # was large and mu was near zero. var_95/es_975/ci_90 were already
+        # clamped in the return dict below; now quantiles are consistent.
+        def _clamp_sfc(v):
+            return max(0.0, min(100.0, v))
+
         quantiles = {
-            "q_01": round(mu - 2.326 * final_sigma, 2),
-            "q_05": round(mu - 1.645 * final_sigma, 2),
-            "q_10": round(mu - 1.282 * final_sigma, 2),
-            "q_25": round(mu - 0.674 * final_sigma, 2),
-            "q_50": round(mu, 2),
-            "q_75": round(mu + 0.674 * final_sigma, 2),
-            "q_90": round(mu + 1.282 * final_sigma, 2),
-            "q_95": round(mu + 1.645 * final_sigma, 2),
-            "q_99": round(mu + 2.326 * final_sigma, 2),
+            "q_01": round(_clamp_sfc(mu - 2.326 * final_sigma), 2),
+            "q_05": round(_clamp_sfc(mu - 1.645 * final_sigma), 2),
+            "q_10": round(_clamp_sfc(mu - 1.282 * final_sigma), 2),
+            "q_25": round(_clamp_sfc(mu - 0.674 * final_sigma), 2),
+            "q_50": round(_clamp_sfc(mu), 2),
+            "q_75": round(_clamp_sfc(mu + 0.674 * final_sigma), 2),
+            "q_90": round(_clamp_sfc(mu + 1.282 * final_sigma), 2),
+            "q_95": round(_clamp_sfc(mu + 1.645 * final_sigma), 2),
+            "q_99": round(_clamp_sfc(mu + 2.326 * final_sigma), 2),
         }
 
-        # Risk metrics
-        sharpe_ratio = (50.0 - mu) / max(final_sigma, 0.1)  # distance from neutral 50
-        sortino_ratio = sharpe_ratio * 1.5  # approximate
+        # Normalized distance from neutral SFC (50) in sigma units.
+        # NOTE: labeled "stress_distance_sigma" not "sharpe_ratio" /
+        # "sortino_ratio" — the Sharpe/Sortino naming was a misnomer: those
+        # ratios are defined on portfolio returns (excess return / return
+        # volatility), not on a stress index. This field measures how many
+        # standard deviations the current SFC score sits below or above the
+        # neutral midpoint (50), which is a useful diagnostic but a
+        # different concept entirely.
+        stress_distance_sigma = (50.0 - mu) / max(final_sigma, 0.1)
 
         return {
             "predicted_mean": round(mu, 2),
@@ -228,8 +246,13 @@ class ProbabilisticHead:
             "prob_crash_10pct": round(prob_crash_10pct, 4),
             "prob_calm": round(prob_calm, 4),
             "quantiles": quantiles,
-            "sharpe_ratio": round(sharpe_ratio, 3),
-            "sortino_ratio": round(sortino_ratio, 3),
+            # Renamed from sharpe_ratio/sortino_ratio — those names imply
+            # portfolio return metrics (excess return / return volatility),
+            # but this measures SFC's distance from neutral in sigma units.
+            # kept as-is in JSON for backward compat; see note in compute().
+            "sharpe_ratio": round(stress_distance_sigma, 3),
+            "sortino_ratio": round(stress_distance_sigma * 1.5, 3),
+            "stress_distance_sigma": round(stress_distance_sigma, 3),
             "uncertainty_breakdown": {
                 "method_disagreement_sigma": round(method_sigma, 2),
                 "confidence_sigma": round(conf_sigma, 2),

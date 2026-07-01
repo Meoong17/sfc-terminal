@@ -173,84 +173,81 @@ def compute_stablecoin_liquidity_index(
     if m80_score is not None:
         component_scores["dominance"] = (m80_score, 0.10)
 
-    # 6. Per-coin growth split (NEW)
+    # 6. Per-coin growth split
     per_coin = _fetch_per_coin_data()
     usdt_growth = usdc_growth = None
     if "tether" in per_coin:
-        _, _, m30 = per_coin["tether"]
-        m30 = m30 or 1
-        # Use existing latest mcap
-        if existing_sc_details and "m76_detail" in existing_sc_details:
-            usdt_growth = existing_sc_details["m76_detail"].get("growth_30d_pct")
+        latest_usdt, _, m30_usdt = per_coin["tether"]
+        # Previously this read from existing_sc_details["m76_detail"]["growth_30d_pct"]
+        # which is the total stablecoin MARKET growth (all coins combined), not
+        # USDT-specific growth — so growth_divergence was comparing apples to
+        # oranges: total-market-growth vs USDC-specific-growth. Now both sides
+        # use per_coin data consistently with the same calculation method.
+        if m30_usdt and m30_usdt > 0 and latest_usdt:
+            usdt_growth = (latest_usdt - m30_usdt) / m30_usdt * 100
     if "usd-coin" in per_coin:
-        _, _, m30 = per_coin["usd-coin"]
-        if m30 and m30 > 0:
-            latest = per_coin["usd-coin"][0]
-            usdc_growth = (latest - m30) / m30 * 100 if m30 else 0
+        latest_usdc, _, m30_usdc = per_coin["usd-coin"]
+        if m30_usdc and m30_usdc > 0 and latest_usdc:
+            usdc_growth = (latest_usdc - m30_usdc) / m30_usdc * 100
 
     # Growth divergence: USDT growing much faster than USDC = risk signal
     # (capital fleeing regulated into offshore)
     growth_divergence = 0.5  # default neutral when data unavailable
     if usdt_growth is not None and usdc_growth is not None:
         diff = usdt_growth - usdc_growth
-        if diff > 5:       # USDT growing much faster
-            growth_divergence = 0.70  # bearish signal
+        if diff > 5:
+            growth_divergence = 0.70  # USDT dominates = bearish
         elif diff > 2:
             growth_divergence = 0.55
-        elif diff < -2:    # USDC growing faster = regulatory confidence
-            growth_divergence = 0.30  # bullish
+        elif diff < -2:
+            growth_divergence = 0.30  # USDC dominates = regulatory confidence
         else:
-            growth_divergence = 0.45  # neutral
+            growth_divergence = 0.45
     component_scores["growth_divergence"] = (growth_divergence, 0.10)
 
-    # 7. Mint/Burn ratio approximation (from supply changes)
-    mint_burn_score = 0.5
+    # 7. Exchange reserve / supply ratio
+    # Previously this was split into two separate components ("mint_burn" and
+    # "reserve_ratio") both deriving their score from the same input variable
+    # (exchange_reserve / total_mcap_now). Giving both a 0.10 weight effectively
+    # double-counted a single signal with 0.20 total weight. Merged here into
+    # one "reserve_ratio" component (weight 0.20) with a more granular 5-tier
+    # scale that preserves the full resolution of the original two components
+    # without rewarding the same data point twice.
+    reserve_ratio_score = 0.5
     total_mcap_now = existing_sc_details.get("m76_detail", {}).get("latest_mcap") if existing_sc_details else None
     if total_mcap_now and onchain_details:
-        exchange_reserve = onchain_details.get("stablecoin_reserve", {}).get("value") if isinstance(onchain_details.get("stablecoin_reserve"), dict) else None
-        if exchange_reserve and exchange_reserve > 0:
-            # If exchange reserve is growing faster than total supply = bearish
-            # (stablecoins accumulating on exchanges = potential sell pressure)
-            reserve_ratio = exchange_reserve / total_mcap_now
-            if reserve_ratio > 0.15:    # >15% on exchanges
-                mint_burn_score = 0.65
-            elif reserve_ratio > 0.10:
-                mint_burn_score = 0.55
-            elif reserve_ratio < 0.05:  # <5% = mostly in cold storage = bullish
-                mint_burn_score = 0.35
-            else:
-                mint_burn_score = 0.45
-    # Also trend-based: if total supply growing fast, check if it's mint-driven
-    if existing_sc_details and "m76_detail" in existing_sc_details:
-        g30 = existing_sc_details["m76_detail"].get("growth_30d_pct")
-        if g30 is not None:
-            if g30 > 10:     # Very fast growth = potential minting = frothy
-                mint_burn_score = max(mint_burn_score, 0.60)
-            elif g30 < -3:   # Shrinking = redemptions = bearish for liquidity
-                mint_burn_score = max(mint_burn_score, 0.65)
-    component_scores["mint_burn"] = (mint_burn_score, 0.10)
-
-    # 8. Exchange reserve ratio (from onchain)
-    reserve_ratio_score = 0.5
-    if onchain_details:
         reserve = onchain_details.get("stablecoin_reserve", {})
         if isinstance(reserve, dict):
             r_val = reserve.get("value")
-            if r_val and total_mcap_now and total_mcap_now > 0:
+            if r_val and r_val > 0 and total_mcap_now > 0:
                 rr = r_val / total_mcap_now
-                # Low reserve ratio = coins in cold storage = bullish
-                # High reserve ratio = coins on exchanges = potential sell pressure
+                # Low ratio = coins in cold storage / DeFi = capital deployed = bullish
+                # High ratio = coins sitting on exchanges = potential sell pressure = bearish
                 if rr < 0.03:
-                    reserve_ratio_score = 0.20
+                    reserve_ratio_score = 0.20   # very low exchange concentration
                 elif rr < 0.06:
                     reserve_ratio_score = 0.35
                 elif rr < 0.10:
-                    reserve_ratio_score = 0.50
+                    reserve_ratio_score = 0.45
                 elif rr < 0.15:
-                    reserve_ratio_score = 0.65
+                    reserve_ratio_score = 0.60
                 else:
-                    reserve_ratio_score = 0.80
-    component_scores["reserve_ratio"] = (reserve_ratio_score, 0.10)
+                    reserve_ratio_score = 0.75   # high concentration on exchanges
+
+    # Additionally factor in total supply momentum (a genuinely separate signal
+    # from the reserve ratio): rapid supply growth can indicate speculative
+    # minting; rapid contraction indicates redemptions. This was previously mixed
+    # into the "mint_burn" component alongside the reserve ratio calculation.
+    if existing_sc_details and "m76_detail" in existing_sc_details:
+        g30 = existing_sc_details["m76_detail"].get("growth_30d_pct")
+        if g30 is not None:
+            if g30 > 10:      # Very fast growth → frothy, nudge score upward
+                reserve_ratio_score = min(0.80, reserve_ratio_score + 0.10)
+            elif g30 < -3:    # Shrinking supply → liquidity withdrawal signal
+                reserve_ratio_score = min(0.80, reserve_ratio_score + 0.10)
+
+    # Use the full 0.20 combined weight (was 0.10 + 0.10 for two redundant components)
+    component_scores["reserve_ratio"] = (reserve_ratio_score, 0.20)
 
     # ── Compute weighted SLI score ──
     if not component_scores:

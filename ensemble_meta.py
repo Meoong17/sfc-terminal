@@ -17,6 +17,7 @@ Usage:
 """
 
 import json, os, sys, subprocess, logging, traceback
+from datetime import datetime, timedelta
 import numpy as np
 from pathlib import Path
 
@@ -305,25 +306,112 @@ def build_method_scores_array(snapshots):
 
     For each snapshot:
       - Features: m1_klr through m31_altman fields (31 features)
-      - Target: sfc_effective / 100 (normalized to 0-1)
+      - Target: realized BTC price movement over the next
+        TARGET_LOOKAHEAD_MINUTES, expressed as a 0-1 "stress probability"
+        proxy (1.0 = price dropped >= TARGET_STRESS_DROP_PCT, 0.0 = price
+        held up, linear interpolation in between).
+
+    IMPORTANT — why this changed from the original "target = sfc_effective":
+    M1-M6 (a subset of METHOD_FIELDS used as features here) are themselves
+    the dominant inputs to sfc_effective via calculate_sfc_ensemble() in
+    collect.py (p_ens = 0.19*p_klr + 0.16*p_logit + ... ). Training XGBoost
+    to predict sfc_effective from features that mostly built sfc_effective
+    in the first place meant the model could reach near-perfect validation
+    error simply by re-deriving that formula — confirmed empirically via a
+    simple linear regression on simulated data reaching R²=1.000 exactly
+    this way. Worse, predict_ensemble()'s output is blended back into
+    effective_sfc in collect.py, so this wasn't just a misleading metric —
+    it was an echo chamber amplifying the ensemble's existing belief about
+    itself rather than adding independent predictive signal from M7-M31.
+
+    Using realized future BTC price movement as the target instead means
+    the model is now actually rewarded for finding which method scores
+    (including M7-M31, previously redundant under the old target) precede
+    real price drops — not for reproducing a formula made of its own inputs.
 
     Missing method scores default to 0.0.
-    Missing sfc_effective falls back to sfc_base.
+    Snapshots too close to the end of history (no future snapshot far
+    enough ahead within tolerance) are skipped, not given a guessed label.
 
     Args:
-        snapshots: List of data dicts from git history.
+        snapshots: List of data dicts from git history, oldest first.
 
     Returns:
         (X, y) tuple of numpy arrays.
         X: (n, 31) float32
-        y: (n,) float32  (0-1 normalized)
+        y: (n,) float32  (0-1, price-outcome based — see above)
     """
+    TARGET_LOOKAHEAD_MINUTES = 360
+    TARGET_LOOKAHEAD_TOLERANCE_MINUTES = 60
+    TARGET_STRESS_DROP_PCT = -3.0   # >= 3% drop maps to y=1.0
+    TARGET_CALM_FLOOR_PCT = 1.0     # <= +1% (or any rise) maps to y=0.0
+
+    def _parse_ts(snap):
+        ts_str = snap.get("ts")
+        if not ts_str:
+            return None
+        try:
+            return datetime.fromisoformat(ts_str)
+        except (ValueError, TypeError):
+            return None
+
+    # Pre-parse timestamps once; snapshots without a usable ts/btc pair
+    # can't be used as a *future* reference point, but can still be used
+    # as input rows if a later snapshot within tolerance exists.
+    parsed_times = [_parse_ts(s) for s in snapshots]
+    btc_prices = [s.get("btc") for s in snapshots]
+
     X_list = []
     y_list = []
-    skipped = 0
+    skipped_no_future = 0
 
     for i, snap in enumerate(snapshots):
-        # Feature vector: method scores
+        obs_time = parsed_times[i]
+        obs_price = btc_prices[i]
+        if obs_time is None or obs_price is None:
+            continue
+
+        target_time = obs_time + timedelta(minutes=TARGET_LOOKAHEAD_MINUTES)
+
+        # Find the closest future snapshot to target_time, searching only
+        # forward from i (this list is oldest-first) within tolerance.
+        best_diff = None
+        future_price = None
+        for j in range(i + 1, len(snapshots)):
+            t_j = parsed_times[j]
+            if t_j is None:
+                continue
+            if t_j < obs_time:
+                continue  # shouldn't happen given oldest-first ordering, but guard anyway
+            diff_minutes = abs((t_j - target_time).total_seconds()) / 60.0
+            if diff_minutes <= TARGET_LOOKAHEAD_TOLERANCE_MINUTES:
+                if best_diff is None or diff_minutes < best_diff:
+                    best_diff = diff_minutes
+                    future_price = btc_prices[j]
+            # Once we've moved well past the tolerance window on the late
+            # side, no later snapshot will be closer — stop scanning early.
+            if (t_j - target_time).total_seconds() / 60.0 > TARGET_LOOKAHEAD_TOLERANCE_MINUTES:
+                break
+
+        if future_price is None:
+            skipped_no_future += 1
+            continue  # no usable future reference point yet (e.g. tail of history)
+
+        pct_change = (future_price - obs_price) / obs_price * 100.0
+
+        if pct_change <= TARGET_STRESS_DROP_PCT:
+            target_01 = 1.0
+        elif pct_change >= -TARGET_CALM_FLOOR_PCT:
+            target_01 = 0.0
+        else:
+            # Linear interpolation between the calm floor and stress drop
+            # thresholds, rather than a hard cutoff, so the model sees a
+            # graded signal instead of an arbitrary binary boundary.
+            span = TARGET_STRESS_DROP_PCT - (-TARGET_CALM_FLOOR_PCT)  # negative span
+            target_01 = (pct_change - (-TARGET_CALM_FLOOR_PCT)) / span
+            target_01 = max(0.0, min(1.0, target_01))
+
+        # Feature vector: method scores (unchanged from original)
         vec = []
         for field in METHOD_FIELDS:
             val = snap.get(field)
@@ -334,26 +422,16 @@ def build_method_scores_array(snapshots):
             except (ValueError, TypeError):
                 vec.append(0.0)
 
-        # Target: sfc_effective (normalized to 0-1)
-        target_val = snap.get("sfc_effective")
-        if target_val is None:
-            target_val = snap.get("sfc_base", 50.0)
-
-        try:
-            target_01 = float(target_val) / 100.0
-        except (ValueError, TypeError):
-            target_01 = 0.5
-
-        target_01 = max(0.0, min(1.0, target_01))
-
         X_list.append(vec)
         y_list.append(target_01)
 
         if (i + 1) % 500 == 0:
             log.info(f"  Processed {i+1}/{len(snapshots)}...")
 
+    log.info(f"Skipped {skipped_no_future} snapshot(s) with no future reference point in range")
+
     if len(X_list) == 0:
-        log.warning("No valid snapshots with method scores found")
+        log.warning("No valid snapshots with method scores + resolvable price outcome found")
         return np.empty((0, len(METHOD_FIELDS)), dtype=np.float32), np.empty(0, dtype=np.float32)
 
     X = np.array(X_list, dtype=np.float32)

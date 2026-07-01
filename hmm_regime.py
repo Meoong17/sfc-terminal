@@ -5,7 +5,7 @@ hmm_regime.py — Hidden Markov Model Regime Detection for SFC
 Trains a Gaussian HMM on 5 market features to detect 4 regimes:
   BULL, BEAR, SIDEWAYS, CRISIS
 
-Features (5): [daily_return, dvol/100, sfc_effective/100, rsi_14/100, fng/100]
+Features (5): [daily_return, dvol/100, m2_yoy/15, rsi_14/100, fng/100]
 
 Usage:
     # Standalone training
@@ -43,10 +43,22 @@ REGIME_MAP = {"BULL": 0, "BEAR": 1, "SIDEWAYS": 2, "CRISIS": 3}
 FEATURE_COLS = [
     "daily_return",    # btc_24h (daily % change)
     "dvol",            # dvol / 100
-    "sfc_effective",   # sfc_effective / 100
+    "m2_yoy",          # global M2 money supply YoY% (Lt factor proxy) — see note below
     "rsi_14",          # rsi_14 / 100
     "fng",             # fng / 100
 ]
+# NOTE: sfc_effective was previously one of these 5 features. It was
+# replaced with m2_yoy because sfc_effective is the SFC ensemble's own
+# output (built from M1-M31, including the same composite scores this
+# detector's regime labels feed back into via collect.py's
+# "if _hmm_regime in ('CRISIS','BEAR') and regime == 'NORMAL': regime =
+# _hmm_regime" override). The CRISIS regime would partly be detecting
+# "sfc_effective is already high" rather than confirming it via an
+# independent signal — not full circularity (this is unsupervised
+# clustering, not a trained label), but it reduced the value of HMM
+# regime detection as a genuinely separate check.
+# m2_yoy (global M2 growth, from global_liquidity_engine.py) is computed
+# entirely from FRED macro data — independent of any M1-M31 method score.
 N_FEATURES = len(FEATURE_COLS)  # 5
 
 # ── LOGGING ──
@@ -84,7 +96,7 @@ class HMMRegimeDetector:
 
         Args:
             features: (n_samples, n_features) numpy array.
-                      Columns: [daily_return, dvol/100, sfc_effective/100,
+                      Columns: [daily_return, dvol/100, m2_yoy/15,
                                 rsi_14/100, fng/100]
 
         Returns:
@@ -206,7 +218,7 @@ class HMMRegimeDetector:
         """Extract historical snapshots from git and train the HMM.
 
         Parses all data.json snapshots from git history and builds a feature
-        matrix from [btc_24h, dvol/100, sfc_effective/100, rsi_14/100, fng/100].
+        matrix from [btc_24h, dvol/100, m2_yoy/15, rsi_14/100, fng/100].
 
         Returns:
             self (fitted) or None on failure.
@@ -296,8 +308,14 @@ class HMMRegimeDetector:
     def _build_feature_matrix(self, snapshots: list) -> np.ndarray:
         """Build 5-feature matrix from snapshot dicts.
 
-        Extracts: [btc_24h, dvol/100, sfc_effective/100,
-                   rsi_14/100, fng/100]
+        Extracts: [btc_24h, dvol/100, m2_yoy/15, rsi_14/100, fng/100]
+
+        m2_yoy is normalized by /15 rather than /100 like the other
+        fields: it's a YoY percentage growth figure (typically in the
+        -5%..+15% range historically), not a 0-100 scaled score, so /100
+        would compress nearly all real-world values into a narrow band
+        near zero and reduce its influence on the HMM relative to the
+        other 4 features.
 
         Args:
             snapshots: List of parsed data.json dicts.
@@ -312,11 +330,11 @@ class HMMRegimeDetector:
             try:
                 daily_return = float(snap.get("btc_24h", 0.0) or 0.0)
                 dvol = float(snap.get("dvol", 0.0) or 0.0) / 100.0
-                sfc = float(snap.get("sfc_effective", 50.0) or 50.0) / 100.0
+                m2 = float(snap.get("m2_yoy", 5.0) or 5.0) / 15.0
                 rsi = float(snap.get("rsi_14", 50.0) or 50.0) / 100.0
                 fng = float(snap.get("fng", 50.0) or 50.0) / 100.0
 
-                X_list.append([daily_return, dvol, sfc, rsi, fng])
+                X_list.append([daily_return, dvol, m2, rsi, fng])
 
             except (ValueError, TypeError):
                 skipped += 1
@@ -506,7 +524,7 @@ def main():
 
             daily_return = float(latest.get("btc_24h", 0.0) or 0.0)
             dvol = float(latest.get("dvol", 0.0) or 0.0) / 100.0
-            sfc = float(latest.get("sfc_effective", 50.0) or 50.0) / 100.0
+            m2 = float(latest.get("m2_yoy", 5.0) or 5.0) / 15.0
             rsi = float(latest.get("rsi_14", 50.0) or 50.0) / 100.0
             fng = float(latest.get("fng", 50.0) or 50.0) / 100.0
 

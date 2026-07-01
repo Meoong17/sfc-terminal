@@ -33,7 +33,22 @@ EXECUTION_DELAY_MINUTES = 5       # Simulated delay between signal and execution
 BTC_MINUTE_VOLATILITY = 0.000167  # ~1% hourly / 60 = 0.0167% per minute
 MIN_SLIPPAGE = 0.0001             # Minimum slippage floor (0.01%)
 _MAX_SLIPPAGE = 0.05              # Cap at 5% adverse move
-_SLIPPAGE_RNG = random.Random(42)  # Reproducible seed
+
+# RNG for execution slippage simulation.
+# NOTE: this intentionally does NOT use a fixed seed (seed=42 was the
+# previous behavior). A fixed seed in a module-level global is only
+# "reproducible" within a single process lifetime — and because
+# paper_trader.py is invoked as a fresh process by sfc-pipeline.sh on
+# every cycle, a fixed seed means the slippage drift sequence resets
+# to the exact same values every time. In practice this makes the
+# "random walk during execution delay" deterministic and constant:
+# every BUY or SELL always experiences the same drift direction and
+# magnitude rather than sampling from the intended distribution of
+# plausible market moves. This caused a systematic bias in paper
+# trading results (consistently same-direction slippage), not the
+# neutral-on-average distribution the delay model was designed for.
+# os.urandom-seeded RNG varies per-process as intended.
+_SLIPPAGE_RNG = random.Random()   # seeded from OS entropy at import time
 
 # ── Market Impact Model (optional — silent fallback) ──
 _MI_AVAILABLE = False
@@ -368,16 +383,34 @@ class PaperTrader:
         wins = [t for t in closed if t.get("pnl", 0) > 0]
         win_rate = len(wins) / len(closed) if closed else 0
 
-        # Sharpe from equity history
-        rets = []
-        for i in range(1, len(self.equity_history)):
-            prev = self.equity_history[i-1]["equity"]
-            cur = self.equity_history[i]["equity"]
-            if prev > 0:
-                rets.append((cur - prev) / prev)
-        mean_ret = sum(rets) / len(rets) if rets else 0
-        std_ret = math.sqrt(sum((r - mean_ret)**2 for r in rets) / len(rets)) if rets else 1
-        sharpe = mean_ret / std_ret * math.sqrt(252) if std_ret > 0 else 0
+        # Sharpe from DAILY snapshots (not per-trade equity_history).
+        # Using equity_history would compute inter-trade returns which cannot
+        # be annualized with √252 (that assumes daily returns) — if trades
+        # happen every 5 minutes, √252 understates the factor by ~20x.
+        # Crypto markets run 24/7 so annualization uses √365, not √252.
+        daily_equities = sorted(self.daily_snapshots.values(), key=lambda x: x["date"])
+        daily_rets = []
+        for i in range(1, len(daily_equities)):
+            prev_eq = daily_equities[i-1]["equity"]
+            cur_eq = daily_equities[i]["equity"]
+            if prev_eq > 0:
+                daily_rets.append((cur_eq - prev_eq) / prev_eq)
+        if daily_rets:
+            mean_ret = sum(daily_rets) / len(daily_rets)
+            std_ret = math.sqrt(sum((r - mean_ret)**2 for r in daily_rets) / len(daily_rets))
+            sharpe = mean_ret / std_ret * math.sqrt(365) if std_ret > 0 else 0
+        else:
+            # Fall back to inter-trade returns if no daily data yet (early
+            # cycles before first daily snapshot exists); label it clearly.
+            rets = []
+            for i in range(1, len(self.equity_history)):
+                prev = self.equity_history[i-1]["equity"]
+                cur = self.equity_history[i]["equity"]
+                if prev > 0:
+                    rets.append((cur - prev) / prev)
+            mean_ret = sum(rets) / len(rets) if rets else 0
+            std_ret = math.sqrt(sum((r - mean_ret)**2 for r in rets) / len(rets)) if len(rets) > 1 else 1
+            sharpe = mean_ret / std_ret * math.sqrt(365) if std_ret > 0 else 0
 
         # Max drawdown
         mdd = 0
