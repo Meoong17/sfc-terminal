@@ -13,7 +13,7 @@
 | Dashboard | 🟢 Live | GitHub Pages, tab-based layout |
 | Paper trader | 🟢 Running | Simulated trades in paper_history.json |
 
-## Current File Inventory (56 Python modules)
+## Current File Inventory (56 root + 5 in subdirectories = 61 Python modules)
 
 ### Root — Core Pipeline (56 flat files)
 ```
@@ -102,16 +102,18 @@ merge_env.py                # environment variable merger
 
 ### Subdirectories (existing)
 ```
-models/
-  cnn_attention_module.py   # CNN + Attention stress scorer
-risk/
-  gnn_module.py             # GNN systemic risk
-optimization/
-  genetic_algorithm.py      # genetic algorithm optimizer
-trading/
-  drl_agent.py              # DRL trading signals (M68)
-data_augmentation/
-  timegan_module.py         # TimeGAN synthetic data
+models/cnn_attention_module.py   # CNN + Attention stress scorer
+risk/gnn_module.py               # GNN systemic risk
+optimization/genetic_algorithm.py # genetic algorithm optimizer
+trading/drl_agent.py             # DRL trading signals (M68)
+data_augmentation/timegan_module.py # TimeGAN synthetic data
+```
+
+### Root — Utility & Uncategorized (3)
+```
+backtest_script.py             # historical backtesting utility
+binance_ws.py                  # Binance WebSocket feed
+check_cards.py                 # dashboard card validation utility
 ```
 
 ## Known Issues
