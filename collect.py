@@ -47,7 +47,7 @@ def _get_adv_features():
             return None
     if _ADV_FEATURES_MODULE is None or _ADV_FEATURES_MODULE is False:
         try:
-            import feature_engineering as m
+            import ml.feature_engineering as m
             _ADV_FEATURES_MODULE = m
         except Exception:
             _ADV_FEATURES_MODULE = False
@@ -92,7 +92,7 @@ def _get_adv_mtf():
             return None
     if _ADV_MTF_MODULE is None or _ADV_MTF_MODULE is False:
         try:
-            import multi_timeframe as m
+            import analysis.multi_timeframe as m
             _ADV_MTF_MODULE = m
         except Exception:
             _ADV_MTF_MODULE = False
@@ -190,7 +190,7 @@ except ImportError as e:
 
 # ── NEW: Dynamic Feature Weighting (regime-adaptive weights) ──
 try:
-    from dynamic_feature_weighting import (
+    from ml.dynamic_feature_weighting import (
         get_regime_weights, apply_dynamic_weights,
         get_feature_group_weights, get_sfc_effective_with_dynamic_weights,
     )
@@ -223,7 +223,7 @@ except ImportError as e:
 
 # ── NEW: Dynamic Feature Selector (DFS) ──
 try:
-    from dynamic_feature_selector import DynamicFeatureSelector
+    from ml.dynamic_feature_selector import DynamicFeatureSelector
     _DFS_SELECTOR = DynamicFeatureSelector()
     DFS_AVAILABLE = True
 except ImportError as e:
@@ -251,7 +251,7 @@ def _get_advanced():
         return _advanced_cache
     
     try:
-        from sfc_advanced import (
+        from ml.sfc_advanced import (
             RegimeDetector, UncertaintyQuantifier, AutoFeatureEngineer,
             fetch_all_alternative_data, compute_all_advanced, WalkForwardBacktest
         )
@@ -448,14 +448,14 @@ _PROADAPT_FINAL = None
 # Import news aggregator
 sys.path.insert(0, os.path.dirname(__file__))
 try:
-    from news_sources import get_news_stress_v2, detect_black_swan_v2
+    from data_sources.news_sources import get_news_stress_v2, detect_black_swan_v2
 except ImportError:
     def get_news_stress_v2(*a, **k): return 0.0, [], 0.0, [], {}
     def detect_black_swan_v2(*a, **k): return 0.0, None, "NONE"
 
 # Import Q9 news scoring system (hybrid VADER+TextBlob, free)
 try:
-    from news_processor import get_news_impact as get_q9_news_impact
+    from data_sources.news_processor import get_news_impact as get_q9_news_impact
     Q9_AVAILABLE = True
 except ImportError:
     Q9_AVAILABLE = False
