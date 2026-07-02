@@ -1,164 +1,118 @@
 # SFC Terminal — Project Status
 
-> Last updated: 2026-07-02
+_Last updated: 2026-07-02_
 
-## Health
+## Model focus
 
-| Component | Status | Notes |
-|-----------|--------|-------|
-| Pipeline (collect.py) | 🟢 Running | Auto-commit every ~6 min |
-| QLSTM inference | 🟡 Early stage | Trained on 36 labels, 0% stress rate — needs more stress data |
-| QLSTM daemon | 🟢 Ready | Watchdog monitors + auto-restarts |
-| XAI (M70-M71) | 🟢 Fixed | `xai_explainer_q5.py` restored from BackupSFC (was broken) |
-| Dashboard | 🟢 Live | GitHub Pages, tab-based layout |
-| Paper trader | 🟢 Running | Simulated trades in paper_history.json |
+Global liquidity analysis as a predictive factor for BTC price behavior.
+Non-liquidity ML overlays (CNN pattern recognition, GNN cross-asset risk,
+DRL trading signals) exist but are explicitly out of the primary scope —
+see `docs/ARCHITECTURE.md` §9 for their status.
 
-## Current File Inventory (56 root + 5 in subdirectories = 61 Python modules)
+## Audit summary
 
-### Root — Core Pipeline (56 flat files)
-```
-collect.py                  # entry point (3,742 lines)
-post_process.py             # final score adjustments
-feature_engineering.py      # feature transforms
-market_impact.py            # market impact estimation
-sfc_advanced.py             # RegimeDetector, UncertaintyQuantifier
-probabilistic_output.py     # probability distributions
-```
+A full audit (42+ findings) was completed covering every module in this
+repo. Categories, with counts:
 
-### Root — Liquidity & Market Data (15)
-```
-global_liquidity_engine.py  # global liquidity factor
-stablecoin_intelligence.py  # stablecoin metrics aggregation
-stablecoin_liquidity.py     # stablecoin liquidity index
-fiscal_liquidity.py         # fiscal liquidity metrics
-etf_flow.py                 # ETF flow analysis
-liquidity_momentum.py       # liquidity momentum metrics
-market_positioning_index.py # market positioning
-market_data_fetcher.py      # cross-asset data (FRED, CMC, CoinGecko)
-repo_market_stress.py       # repo market stress
-onchain_fetch.py            # on-chain metrics (22)
-liquidity_lag_analysis.py   # lag correlation analysis
-liquidity_zscore_calibration.py # z-score calibration
-m2_analysis.py              # M2 money supply analysis
-multi_timeframe.py          # multi-timeframe signals
-correlation_analysis.py     # correlation analysis
-```
+| Category | Count | Status |
+|---|---|---|
+| Circular labeling (model trained to predict its own input) | 5 | All fixed — see below |
+| Unit-scaling bugs (threshold mismatched to actual data range) | 2 | Fixed |
+| Safety layer computed but not wired to the value it should protect | 3 | Fixed |
+| Security (session forgery, exposed infrastructure) | 2 | Fixed |
+| Formula/calibration errors (ES multiplier, quantile clamping, etc.) | 6 | Fixed |
+| Code smell / minor inconsistency | ~15 | Mostly left as-is (documented, non-breaking) |
 
-### Root — ML & Models (9)
-```
-ml_ensemble.py              # ensemble model
-ensemble_meta.py            # meta-ensemble (XGBoost)
-train_mamba.py              # Mamba SSM training
-mamba_encoder.py            # Mamba inference encoder
-hmm_regime.py               # Hidden Markov Model regime detection
-causal_inference.py         # causal inference filter
-dynamic_feature_weighting.py # adaptive feature weights
-dynamic_feature_selector.py # feature selection
-online_learning.py          # EWMA online learning
-```
+### Circular labeling — the most significant category
 
-### Root — QLSTM Subsystem (7)
-```
-qlstm_enhanced.py           # inference module (label-based ProAdapt)
-qlstm_model.py              # model definition + training (v3, Pennylane)
-qlstm_daemon.py             # background daemon (30-min cycle)
-qlstm_watchdog.py           # health monitor + auto-restart
-hybrid_correction.py        # QLSTM + GARCH hybrid
-proadapt.py                 # online learning weight adaptation
-xai_explainer.py            # QLSTM feature importance
-```
+Five independent modules were found to be trained (or evaluated) using a
+label/target derived from their own input features, rather than from an
+independent ground truth. This is the single most important thing to
+understand about this codebase's history:
 
-### Root — Safety & Quality (4)
-```
-circuit_breaker.py          # trading circuit breaker
-drift_detection.py          # feature/concept drift detection
-confidence_calibration.py   # prediction confidence calibration
-data_quality.py             # data integrity validation
-```
+1. **`ml_ensemble.py`** — label computed from `sfc_pct`, which is itself
+   built from the same method scores used as training features. Verified
+   empirically: a naive threshold rule with zero training reached ~77%
+   agreement with this label.
+2. **`ensemble_meta.py`** (XGBoost) — target was `sfc_effective`, built
+   from a subset of the same features (M1-M6). A linear regression on
+   simulated data reached R²=1.000 exactly this way.
+3. **`train_mamba.py`** — same pattern, target = `sfc_effective`, which
+   is also one of the 39 input features.
+4. **`hmm_regime.py`** — lighter version: `sfc_effective` was one of 5
+   clustering features, meaning CRISIS regime detection partly "knew its
+   own answer." Not a trained label (HMM is unsupervised), so lower
+   severity than #1-3.
+5. **`qlstm_model.py`** — target was `features[:, :6] @ weights`, a fixed
+   linear combination of M1-M6, which are also part of the LSTM's input
+   sequence.
 
-### Root — Data Sources & Fetching (6)
-```
-news_processor.py           # news impact scoring
-news_sources.py             # 23-source RSS aggregator
-liquidation_client.py       # exchange liquidation data
-methods_institutional.py    # institutional flow metrics
-update_etf_cache.py         # ETF cache updater
-build_etf_cache.py          # ETF cache builder
-```
+**Fix applied to all five**: replaced the self-referential target with
+labels derived from realized BTC price outcome (a lookahead window,
+independent of any method score), sourced from `ml_ensemble.py`'s
+`resolve_pending_labels()` — one shared source of truth rather than five
+separate reimplementations.
 
-### Root — Trading & Web (4)
-```
-paper_trader.py             # simulated trading engine
-inject_data.py              # data injection (legacy — page fetches data.json live)
-sse_server.py               # Server-Sent Events
-fetch_historical_btc.py     # historical BTC data fetcher
-```
+**What this means practically**: any historical accuracy/MAE/Sharpe
+figures produced before this fix are not meaningful and should not be
+compared against post-fix numbers. All affected models need to be
+retrained from data collected after the fix (`data_collection.json`'s
+`labels` field, populated going forward).
 
-### Root — XAI & Explainability (2)
-```
-xai_explainer_q5.py         # SHAP + LIME (M70-M71) — restored 2026-07-02
-merge_env.py                # environment variable merger
-```
+## Why the repo isn't fully reorganized into subfolders
 
-### Subdirectories (existing)
-```
-models/cnn_attention_module.py   # CNN + Attention stress scorer
-risk/gnn_module.py               # GNN systemic risk
-optimization/genetic_algorithm.py # genetic algorithm optimizer
-trading/drl_agent.py             # DRL trading signals (M68)
-data_augmentation/timegan_module.py # TimeGAN synthetic data
-```
+A dependency review found that many modules use `__file__`-relative paths
+to locate their own cache/model/data files. An independent re-verification
+(grepping every root `.py` file for `__file__` usage, then classifying
+each match as a genuine resource-path lookup vs. incidental use) found
+**43 of 55 root files** have this dependency — higher than the initial
+review's estimate of 24/47, because that review undercounted files using
+`SFC_DIR = os.path.dirname(os.path.abspath(__file__))`-style module-level
+constants. Two additional files (`build_etf_cache.py`, `check_cards.py`)
+were found to use **hardcoded absolute paths** (`/home/ubuntu/sfc/...`)
+instead of `__file__`-relative ones — these are arguably more dangerous
+to move, since they'd silently keep reading from the OLD location without
+raising any error at all, rather than failing to find the file.
 
-### Root — Utility & Uncategorized (3)
-```
-backtest_script.py             # historical backtesting utility
-binance_ws.py                  # Binance WebSocket feed
-check_cards.py                 # dashboard card validation utility
-```
+**10 files were confirmed to have neither dependency** and were physically
+moved, with `collect.py`'s imports updated accordingly:
 
-## Known Issues
+| Moved to | Files |
+|---|---|
+| `ml/` | `dynamic_feature_selector.py`, `dynamic_feature_weighting.py`, `feature_engineering.py`, `sfc_advanced.py` |
+| `analysis/` | `multi_timeframe.py`, `liquidity_zscore_calibration.py`, `post_process.py` |
+| `data_sources/` | `news_processor.py`, `news_sources.py` |
 
-### 1. QLSTM training data imbalance
-- 36 resolved labels, **0% stress rate** (all calm)
-- Model predicts ~0 constantly — not useful until stress events accumulate
-- Labels resolve ~6 hours after observation via `ml_ensemble.py` `resolve_pending_labels()`
-- **Mitigation:** schedule weekly retraining; distribution will improve with more data
+`inject_data.py` was evaluated but kept at root — `sfc-pipeline.sh` calls
+it directly by filename (`$PYTHON inject_data.py data.json index.html`),
+so moving it would require a shell script change too, for no benefit
+since it isn't imported by any other Python module anyway.
 
-### 2. Flat directory structure
-- 56 Python files in root — hard to navigate
-- Cannot simply `mv` to subdirs: 24 files use `__file__` for resource paths (cache files, model paths, data paths)
-- `collect.py` has 94 `try/except` blocks — broken imports fail silently
-- **Status:** restructuring deferred (see ARCHITECTURE.md for details)
+**Verification performed**: `py_compile` on every touched file, plus a
+runtime `import` test from `collect.py`'s own directory context (with
+external libraries the sandbox lacked — `ta`, `vaderSentiment` — mocked
+out to isolate whether the *path* resolution specifically worked, since
+those import failures are pre-existing environment gaps unrelated to the
+move). All 7 relocated-and-imported modules resolved correctly.
 
-### 3. collect.py monolithic
-- 3,742 lines, single file
-- All methods scored inline, no modular decomposition
-- Hard to test individual components in isolation
+The remaining 45 files stay at root. Moving them would additionally
+require rewriting each one's path constant (not just `collect.py`'s
+import line) — a much larger, higher-risk change deferred for now.
+`docs/ARCHITECTURE.md` provides the same organizational clarity via
+documentation instead.
 
-### 4. Silent failure patterns
-- `collect.py` pattern: `try: from X import Y ... except ImportError: Y = fallback`
-- If a file is moved/deleted, pipeline doesn't crash — silently uses neutral fallback
-- No monitoring for which modules are actually running vs falling back
+## Known limitations / open items
 
-## Recent Changes
-
-| Date | Change | Commit |
-|------|--------|--------|
-| 2026-07-02 | QLSTM v3 integration (label-based target, watchdog, local deps) | `6f41e10` |
-| 2026-07-02 | Fix: restore xai_explainer_q5.py (M70 SHAP + M71 LIME) | `b94c332` |
-| 2026-07-02 | Retrained qlstm_model.pt with real labels | `6f41e10` |
-| 2026-07-02 | Added pennylane + pennylane-lightning to .venv | `6f41e10` |
-
-## Dependencies Added
-
-```
-pennylane==0.45.1
-pennylane-lightning==0.45.0
-```
-
-## Next Steps (Deferred)
-
-- [ ] Restructure into subdirectories (requires 24+ path fixes + 30+ import updates)
-- [ ] Add monitoring for module availability (which modules are in fallback mode)
-- [ ] Schedule QLSTM weekly retraining via cron
-- [ ] Wait for more stress labels to accumulate before relying on QLSTM signal
+- `qlstm_daemon.py`, `qlstm_model.py`, `qlstm_enhanced.py`,
+  `hybrid_correction.py`, `proadapt.py` live in a separate `sfc2/`
+  directory not included in this repo's zip exports — audited via
+  individually uploaded files, not the full extracted archive.
+- China M2 liquidity component (`global_liquidity_engine.py`) uses FRED
+  series ID `MYAGM2CNM189N`, added without live network verification —
+  confirm this resolves on FRED before relying on it; the code fails
+  safe (component simply excluded) if the ID is wrong.
+- `correlation_analysis.py` requires live git commit history to run
+  (`extract_snapshots()` calls `git log`) — needs to be run on the VPS,
+  not from an extracted zip without `.git`.
+- No cron/scheduler for `update_etf_cache.py` exists in this repo — ETF
+  flow data (M81/M82) is manually maintained via Farside CSV entry.
