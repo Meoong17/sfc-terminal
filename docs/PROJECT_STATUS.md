@@ -101,6 +101,39 @@ import line) — a much larger, higher-risk change deferred for now.
 `docs/ARCHITECTURE.md` provides the same organizational clarity via
 documentation instead.
 
+## Shell scripts — evaluated for relocation, kept at root
+
+All 5 `.sh` files (`sfc-pipeline.sh`, `mamba-weekly-train.sh`,
+`weekly-model-train.sh`, `ws-watchdog.sh`, `update-tunnel-url.sh`) use
+`REPO_DIR="$HOME/sfc"`-style absolute paths and `cd` into that directory
+before doing anything — so unlike the Python modules, their own physical
+location on disk doesn't actually matter to their internal logic.
+
+They were NOT moved into `scripts/` anyway, because of a more important
+finding: `sfc-pipeline.sh` contains the comment
+`# Cron runs ~/.hermes/scripts/sfc-pipeline.sh — sync both when editing`.
+This means the version cron actually executes is a **separate copy** at
+`~/.hermes/scripts/`, not the one in this git repo. Moving the repo copy
+into a subfolder would do nothing to what cron runs, but would make it
+easier to forget that a second copy exists and needs manual syncing —
+increasing the risk of the two versions silently diverging, which is a
+worse failure mode than a cosmetic root-level file list. Left as-is
+intentionally; if this project moves to sourcing cron directly from the
+git repo path instead of a separate `~/.hermes/` copy, revisit this.
+
+## Dead code removed
+
+- `xai_explainer_q5.py` — confirmed via `grep` that its output fields
+  (`m70_shap_*`, `m71_lime_*`) appear only inside `index.html`/`app.js`'s
+  embedded data blob (`var __EMBEDDED_DATA = {...}`, i.e. raw JSON
+  `collect.py` produces), never in actual rendering code (no
+  `d.m70_shap...` template reference exists, unlike `d.xai_top_features`
+  which does appear twice in both files). Removed.
+- `xai_shap_runner.py`, `xai_explorer_fix.py` — referenced in earlier
+  audit notes as also unused, but were not present in the repo snapshot
+  this cleanup was performed against (may have been removed in an earlier
+  session, or never committed).
+
 ## Known limitations / open items
 
 - `qlstm_daemon.py`, `qlstm_model.py`, `qlstm_enhanced.py`,
