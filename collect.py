@@ -912,17 +912,18 @@ def score_factors_from_market(btc, btc_24h, dom, dvol, fng, pc_oi, m2_yoy, dxy, 
         factors["St"] += ms_adj
         print(f"[OnChain] Market structure={onchain_market_structure:.1f} → St adj={ms_adj:+.3f}", file=sys.stderr)
 
-    # ── REPO MARKET STRESS FACTOR ADJUSTMENT ──
-    # Applied to Ft (Systemic/Funding), not Lt — repo stress measures whether
-    # funding markets are transmitting liquidity smoothly RIGHT NOW, a
-    # different dimension from Lt's central-bank-balance-sheet liquidity
-    # LEVEL. See repo_market_stress.py module docstring for the full
-    # rationale (Sept 2019 repo crisis as the reference case: ample Fed
-    # liquidity coexisting with a funding-market seizure).
-    if _m86_score != 0.5:
-        repo_adj = (_m86_score - 0.5) * 1.5  # higher stress score -> positive Ft adjustment (more systemic risk)
-        factors["Ft"] += max(-1.5, min(1.5, repo_adj))
-        print(f"[REPO] Factor adj: Ft={repo_adj:+.3f}", file=sys.stderr)
+    # NOTE: M86 (repo market stress) factor adjustment used to live here,
+    # inside this function definition — but this function is called
+    # (line ~2012) BEFORE _m86_score is actually computed (previously at
+    # line ~3211, over a thousand lines later). Since _m86_score's
+    # module-level default is 0.5 until that later computation runs, the
+    # `if _m86_score != 0.5:` check here was ALWAYS False at call time,
+    # meaning this adjustment silently never executed with a real value —
+    # found during a fresh audit of factor-adjustment ordering. Moved to a correctly
+    # ordered position: computed before this function is called, applied
+    # after it returns (see "REPO MARKET STRESS FACTOR ADJUSTMENT" below
+    # score_factors_from_market()'s call site), matching how ETF/Fiscal
+    # adjustments are already (correctly) structured.
 
     # Clamp all factors to [-3, 3]
     for k in factors:
@@ -1999,6 +2000,21 @@ if FISCAL_AVAILABLE:
     except Exception as e:
         print(f"[FISCAL] Error: {e}", file=sys.stderr)
 
+# ── REPO MARKET STRESS (M86 — SOFR-EFFR spread) ──
+# Moved here (was previously computed much later, at a point AFTER
+# score_factors_from_market() had already been called and consumed the
+# stale default value) — see the note left in score_factors_from_market()
+# itself for the full explanation of the bug this fixes.
+_m86_score = 0.5
+_m86_details = {"status": "unavailable"}
+if REPO_STRESS_AVAILABLE:
+    try:
+        _m86_score, _m86_details = compute_repo_stress()
+        print(f"[REPO] M86(SOFR-EFFR)={_m86_score:.3f} | spread={_m86_details.get('spread_bps')}bp "
+              f"label={_m86_details.get('label','?')}", file=sys.stderr)
+    except Exception as e:
+        print(f"[REPO] Error: {e}", file=sys.stderr)
+
 # Score factors from market data (using 30d rolling averages + on-chain)
 factors = score_factors_from_market(btc, _factors_btc_24h, _factors_dom, _factors_dvol, _factors_fng, _factors_pc, _factors_m2, _factors_dxy,
                                      onchain_whale=whale_pressure, onchain_value=onchain_value, onchain_buy=buying_power,
@@ -2018,6 +2034,22 @@ if _m83_score != 0.5 or _m84_score != 0.5:
     rrp_adj = (0.5 - _m84_score) * 1.0
     factors["Lt"] += max(-1.0, min(1.0, tga_adj + rrp_adj))
     print(f"[FISCAL] Factor adj: TGA={tga_adj:+.3f} RRP={rrp_adj:+.3f} Lt_total={tga_adj+rrp_adj:+.3f}", file=sys.stderr)
+
+# ── REPO MARKET STRESS FACTOR ADJUSTMENT (M86) ──
+# Applied to Ft (Systemic/Funding), not Lt — repo stress measures whether
+# funding markets are transmitting liquidity smoothly RIGHT NOW, a
+# different dimension from Lt's central-bank-balance-sheet liquidity
+# LEVEL. See repo_market_stress.py module docstring for the full
+# rationale (Sept 2019 repo crisis as the reference case: ample Fed
+# liquidity coexisting with a funding-market seizure). This block is now
+# correctly positioned AFTER score_factors_from_market() returns and
+# AFTER the real _m86_score was computed above — previously this logic
+# lived inside the function definition itself, where it silently never
+# fired (see the note left at that old location for the full bug).
+if _m86_score != 0.5:
+    repo_adj = (_m86_score - 0.5) * 1.5
+    factors["Ft"] += max(-1.5, min(1.5, repo_adj))
+    print(f"[REPO] Factor adj: Ft={repo_adj:+.3f}", file=sys.stderr)
 
 # Re-clamp factors after all adjustments
 for k in factors:
@@ -3199,17 +3231,14 @@ _m69_btc = _m69_result.get("btc_systemic_risk", 0.5)
 _m69_regime = _m69_result.get("market_regime", "NORMAL")
 _m69_breakdown = _m69_result.get("correlation_breakdown", False)
 
-# M86: Repo Market Stress (SOFR-EFFR spread)
-_m86_score = 0.5
-_m86_details = {"status": "unavailable"}
-if REPO_STRESS_AVAILABLE:
-    try:
-        _m86_score, _m86_details = compute_repo_stress()
-        print(f"[REPO] M86(SOFR-EFFR)={_m86_score:.3f} | spread={_m86_details.get('spread_bps')}bp "
-              f"label={_m86_details.get('label','?')}", file=sys.stderr)
-    except Exception as e:
-        print(f"[REPO] Error: {e}", file=sys.stderr)
-
+# NOTE: M86 (repo stress) is now computed earlier in this script (see
+# "REPO MARKET STRESS (M86 — SOFR-EFFR spread)" near the Fiscal Liquidity
+# block above), so its factor adjustment actually applies before
+# sfc_pct is finalized — this used to be computed a second time here,
+# re-fetching (from compute_repo_stress()'s own cache) and silently
+# overwriting the already-used value. Removed as redundant; _m86_score
+# and _m86_details remain valid module-level globals from the earlier
+# computation for the JSON output further below.
 # M70-M71: XAI Explainability (SHAP + LIME) — runs every cycle, cached by function
 _xai_result = run_all_xai() if XAI_AVAILABLE else {"m70_shap_ok": False, "m71_lime_ok": False, "m70_shap_features": [], "m71_lime_features": []}
 _m70_shap_features = _xai_result.get("m70_shap_features", [])
