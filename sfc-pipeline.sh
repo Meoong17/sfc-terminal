@@ -19,9 +19,7 @@ cd "$REPO_DIR" || { log "FATAL: Cannot cd to $REPO_DIR"; exit 1; }
 COLLECT_RESULT="skipped"
 GIT_RESULT="skipped"
 
-PYTHON="/usr/bin/python3"
-SFC2_VENV="/home/ubuntu/sfc2/venv/lib/python3.12/site-packages"
-[ -d "$SFC2_VENV" ] && export PYTHONPATH="${SFC2_VENV}:${PYTHONPATH:-}"
+PYTHON="/home/ubuntu/sfc2/venv/bin/python3"
 
 MAX_RETRIES=2; RETRY_DELAY=10; COLLECT_TIMEOUT=150
 

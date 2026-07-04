@@ -3340,6 +3340,37 @@ except Exception as _drift_e:
     print(f"[Drift] Drift detection failed: {_drift_e}", file=sys.stderr)
     _DRIFT_RESULT = {"drift_available": False}
 
+# ── REGIME vs ZONE DIVERGENCE CHECK ──
+# `regime` (BULL/NORMAL/STRESS/BEAR/CRISIS/CAPITULATION) comes from
+# detect_regime() + HMM pattern-based override; `zone`
+# (NORMAL/ELEVATED/HIGH/CRITICAL) comes purely from effective_sfc's
+# numeric threshold. These are genuinely different axes — regime
+# classifies market STATE/PATTERN, zone classifies STRESS SEVERITY by
+# score — and CAN legitimately diverge: HMM can override regime to
+# CRISIS/BEAR based on pattern recognition across multiple signals, while
+# effective_sfc's own numeric boost from that same regime detection is
+# capped (see "Capped boost: full boost if DW unavailable, otherwise max
+# +2pp" a few hundred lines above) and may not be large enough to push
+# the score across zone's own threshold. Verified via simulation: a
+# regime override to CRISIS with effective_sfc starting at 15 and a
+# realistic +1.5pp regime boost lands at effective_sfc=16.5, still
+# "NORMAL" zone — meaning the dashboard could show "CRISIS · NORMAL Zone"
+# side by side with no indication these come from different
+# methodologies, which reads as an internal contradiction to anyone
+# looking at it rather than the two-different-axes situation it actually
+# is. This flag lets the frontend show an explanatory note instead of a
+# silent, confusing juxtaposition.
+_REGIME_SEVERITY = {"BULL": 0, "NORMAL": 0, "STRESS": 1, "BEAR": 1, "CRISIS": 2, "CAPITULATION": 3}
+_ZONE_SEVERITY = {"NORMAL": 0, "ELEVATED": 1, "HIGH": 2, "CRITICAL": 3}
+_regime_sev = _REGIME_SEVERITY.get(str(regime).upper(), 0)
+_zone_sev = _ZONE_SEVERITY.get(str(zone).upper(), 0)
+regime_zone_divergence = abs(_regime_sev - _zone_sev) >= 2
+regime_zone_divergence_note = (
+    f"Regime ({regime}) and Zone ({zone}) disagree in severity — Regime reflects "
+    f"HMM/pattern-based market state, Zone reflects the numeric stress score "
+    f"threshold. Both can be independently correct; this isn't a data error."
+) if regime_zone_divergence else None
+
 # Build output
 out = {
     "ts": datetime.now(timezone.utc).isoformat(),
@@ -3365,6 +3396,8 @@ out = {
     "floor_buffer": fb,
     "floor_total": ft,
     "regime": regime,
+    "regime_zone_divergence": regime_zone_divergence,
+    "regime_zone_divergence_note": regime_zone_divergence_note,
     "regime_prob": regime_prob,
     "transition_risk": transition_risk,
     "dxy": dxy,
