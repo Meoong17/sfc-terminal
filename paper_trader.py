@@ -34,6 +34,49 @@ BTC_MINUTE_VOLATILITY = 0.000167  # ~1% hourly / 60 = 0.0167% per minute
 MIN_SLIPPAGE = 0.0001             # Minimum slippage floor (0.01%)
 _MAX_SLIPPAGE = 0.05              # Cap at 5% adverse move
 
+# ── Risk Management Config (NEW) ──
+# Previously there was NO price-based exit mechanism at all — positions
+# only closed when the SFC signal itself flipped to CASH or the opposite
+# direction. This meant a position could stay open indefinitely
+# accumulating losses if the signal simply didn't change (e.g. stuck in
+# a regime that doesn't flip), which is a real gap given the model's
+# actual prediction horizon is 6 hours (LABEL_LOOKAHEAD_MINUTES=360 in
+# ml_ensemble.py) — holding a position for days on a signal designed to
+# mean something over 6 hours isn't what the model was built to support.
+STOP_LOSS_PCT = 0.08           # Force-close if unrealized loss exceeds 8%
+MAX_HOLDING_HOURS = 24          # Force-close after 24h regardless of signal —
+                                 # ~4x the model's own 6h prediction horizon,
+                                 # not an arbitrary round number; a position
+                                 # the signal hasn't already exited by then is
+                                 # outside what the model was validated to say
+                                 # anything about.
+
+# ── Position Sizing Config (NEW) ──
+# Previously used data.json's "kelly_fraction" directly — this is FULL
+# Kelly (not kelly_half, despite kelly_half already being computed and
+# available in the same data.json). Full Kelly is known to produce high
+# variance in realized returns even when the edge estimate is exactly
+# correct, and confidence_calibration.py's own measurement found
+# ECE=0.216 ("poorly calibrated") for the confidence feeding into this
+# edge estimate — betting FULL Kelly on top of a poorly-calibrated edge
+# compounds two sources of risk rather than hedging either one. Half
+# Kelly is the standard practitioner adjustment for exactly this
+# situation (edge estimation uncertainty), trading some expected growth
+# for meaningfully lower variance.
+USE_HALF_KELLY = True
+DRAWDOWN_SIZE_REDUCTION_THRESHOLD = 0.15  # if current drawdown exceeds 15%...
+DRAWDOWN_SIZE_REDUCTION_FACTOR = 0.5      # ...cut position size in half
+LOSING_STREAK_THRESHOLD = 3               # if last N closed trades were all losses...
+LOSING_STREAK_SIZE_REDUCTION_FACTOR = 0.5 # ...cut position size in half
+
+# ── Execution Cost Config (NEW) ──
+# Previously only modeled time-delay slippage + Almgren-Chriss market
+# impact — missing the bid-ask spread itself, which is a real, distinct
+# cost component on every trade (you cross the spread on entry AND
+# exit) independent of order size or execution delay.
+BID_ASK_SPREAD_PCT = 0.0005   # ~0.05% half-spread for BTC on major venues;
+                                # applied once per side (entry, exit)
+
 # RNG for execution slippage simulation.
 # NOTE: this intentionally does NOT use a fixed seed (seed=42 was the
 # previous behavior). A fixed seed in a module-level global is only
@@ -114,6 +157,29 @@ class PaperTrader:
         try: return float(v)
         except (TypeError, ValueError): return default
 
+    def _current_drawdown_pct(self) -> float:
+        """Current drawdown from peak_capital, as a positive fraction
+        (0.15 = 15% drawdown). Used to scale down position size during
+        a losing period — see DRAWDOWN_SIZE_REDUCTION_THRESHOLD."""
+        equity = self.get_equity()
+        if self.peak_capital <= 0:
+            return 0.0
+        dd = (self.peak_capital - equity) / self.peak_capital
+        return max(0.0, dd)
+
+    def _recent_losing_streak(self) -> int:
+        """Count consecutive losing trades ending at the most recent
+        CLOSED trade (0 if the most recent closed trade was a win, or
+        if there are no closed trades yet)."""
+        closed = [t for t in self.trades if t.get("pnl") is not None]
+        streak = 0
+        for t in reversed(closed):
+            if t.get("pnl", 0) < 0:
+                streak += 1
+            else:
+                break
+        return streak
+
     def _get_execution_price(self, signal_price: float) -> float:
         """Simulate execution delay with realistic price drift.
 
@@ -150,7 +216,17 @@ class PaperTrader:
         """
         sfc = PaperTrader._safe_float(data.get("sfc_effective", 0), 0) / 100.0
         conf = PaperTrader._safe_float(data.get("composite_confidence", 0.3), 0.3)
-        kelly = PaperTrader._safe_float(data.get("kelly_fraction", 0), 0)
+        # Switched from "kelly_fraction" (Full Kelly) to "kelly_half" — see
+        # USE_HALF_KELLY config comment above for the full reasoning.
+        # Falls back to computing half of kelly_fraction manually if
+        # kelly_half isn't present in an older data.json (defensive, not
+        # expected to trigger against a current pipeline).
+        if USE_HALF_KELLY:
+            kelly = PaperTrader._safe_float(data.get("kelly_half"), None)
+            if kelly is None:
+                kelly = PaperTrader._safe_float(data.get("kelly_fraction", 0), 0) / 2.0
+        else:
+            kelly = PaperTrader._safe_float(data.get("kelly_fraction", 0), 0)
         fng = PaperTrader._safe_float(data.get("fng", 50), 50)
         cascade = PaperTrader._safe_float(data.get("cascade_risk", 0), 0)
         regime = data.get("regime", "NORMAL")
@@ -189,17 +265,37 @@ class PaperTrader:
 
         # Position sizing
         size_pct = 0
+        size_reduction_reason = None
         if action in ("BUY", "SELL"):
-            # Use Kelly fraction capped at MAX_POSITION_PCT
+            # Use Kelly fraction (half-Kelly, see USE_HALF_KELLY) capped at MAX_POSITION_PCT
             size_pct = min(kelly, self.MAX_POSITION_PCT)
             # Scale down with confidence
             size_pct *= min(conf * 2, 1.0)
+
+            # ── Drawdown-based size reduction (NEW) ──
+            # Standard risk management: reduce size while recovering from
+            # a drawdown, rather than sizing purely off the current
+            # signal's own Kelly/confidence — a losing period doesn't
+            # change what the SIGNAL says, but it's a real reason to bet
+            # smaller until the strategy demonstrates it's back on track.
+            current_dd = self._current_drawdown_pct()
+            if current_dd >= DRAWDOWN_SIZE_REDUCTION_THRESHOLD:
+                size_pct *= DRAWDOWN_SIZE_REDUCTION_FACTOR
+                size_reduction_reason = f"Drawdown {current_dd*100:.0f}% → size halved"
+
+            # ── Losing-streak-based size reduction (NEW) ──
+            elif self._recent_losing_streak() >= LOSING_STREAK_THRESHOLD:
+                size_pct *= LOSING_STREAK_SIZE_REDUCTION_FACTOR
+                size_reduction_reason = f"{LOSING_STREAK_THRESHOLD}+ losses in a row → size halved"
 
         size = round(self.capital * size_pct, 2)
 
         # Apply time slippage to execution price
         signal_price = btc
         exec_price = self._get_execution_price(signal_price)
+
+        if size_reduction_reason:
+            reason = f"{reason} · {size_reduction_reason}"
 
         return {
             "action": action,
@@ -218,6 +314,57 @@ class PaperTrader:
             "is_short": action == "SELL",
         }
 
+    def _check_risk_management_exit(self, price: float, daily_volume: float) -> bool:
+        """
+        Force-close the open position if either:
+        (a) unrealized loss exceeds STOP_LOSS_PCT, or
+        (b) the position has been held longer than MAX_HOLDING_HOURS.
+
+        This runs BEFORE signal-based close logic and takes priority over
+        it — previously there was NO price-based or time-based exit at
+        all, meaning a position could accumulate unbounded losses or sit
+        open indefinitely if the SFC signal simply never flipped. Given
+        this system's actual prediction horizon is 6 hours (see
+        ml_ensemble.py's LABEL_LOOKAHEAD_MINUTES), a position still open
+        well beyond that (MAX_HOLDING_HOURS=24, ~4x the horizon) is
+        outside anything the model was validated to say something about,
+        regardless of what the signal currently reads.
+
+        Returns True if a forced exit happened (caller should skip normal
+        signal-based open/close logic for this cycle, since we already
+        closed).
+        """
+        if not self.positions:
+            return False
+
+        pos = self.positions[0]
+        entry_price = pos["entry_price"]
+
+        if pos["type"] == "LONG":
+            unrealized_pct = (price - entry_price) / entry_price
+        else:  # SHORT
+            unrealized_pct = (entry_price - price) / entry_price
+
+        if unrealized_pct <= -STOP_LOSS_PCT:
+            self._close_all_positions(
+                price, f"Stop-loss triggered ({unrealized_pct*100:.1f}%)", daily_volume
+            )
+            return True
+
+        try:
+            entry_dt = datetime.fromisoformat(pos["entry_date"])
+            held_hours = (datetime.now(timezone.utc) - entry_dt).total_seconds() / 3600.0
+        except (ValueError, TypeError, KeyError):
+            held_hours = 0
+
+        if held_hours >= MAX_HOLDING_HOURS:
+            self._close_all_positions(
+                price, f"Max holding period reached ({held_hours:.0f}h)", daily_volume
+            )
+            return True
+
+        return False
+
     def execute(self, decision: dict):
         """Execute a trading decision against current state."""
         now = datetime.now(timezone.utc).isoformat()
@@ -230,8 +377,12 @@ class PaperTrader:
         # Estimate daily volume from data.json
         daily_volume = float(decision.get("daily_volume", 0) or 0)
 
+        # ── Risk management exit takes priority over signal-based logic ──
+        forced_exit = self._check_risk_management_exit(price, daily_volume)
+
         # Close positions if signal says CASH or opposite direction
-        if self.positions and (
+        # (skipped if we already force-closed above this cycle)
+        if not forced_exit and self.positions and (
             decision["action"] == "CASH"
             or (decision["action"] == "BUY" and self.positions[0]["type"] == "SHORT")
             or (decision["action"] == "SELL" and self.positions[0]["type"] == "LONG")
@@ -259,6 +410,12 @@ class PaperTrader:
             entry_cost = calculate_entry_cost(size, price, daily_volume)
             if entry_cost > size * 0.5:  # sanity: never lose >50% to slippage
                 entry_cost = size * 0.5
+        # ── Bid-ask spread cost (NEW) ──
+        # Previously only market impact + time-delay slippage were
+        # modeled — the spread itself (a cost on every trade regardless
+        # of size or delay) was missing entirely.
+        spread_cost = size * BID_ASK_SPREAD_PCT
+        entry_cost += spread_cost
         net_size = size - entry_cost
         if net_size <= 0:
             return  # slippage ate the whole position — skip
@@ -272,6 +429,7 @@ class PaperTrader:
             "sfc_at_entry": decision.get("sfc_pct"),
             "confidence_at_entry": decision.get("confidence"),
             "slippage_entry": round(entry_cost, 2),
+            "spread_cost_entry": round(spread_cost, 2),
             "time_slippage_pct": decision.get("time_slippage_pct", 0),
         })
         self.capital -= size  # commit full allocation
@@ -294,6 +452,8 @@ class PaperTrader:
                 exit_cost = calculate_exit_cost(pos["size"], price, daily_volume)
                 if exit_cost > pos["size"] * 0.5:
                     exit_cost = pos["size"] * 0.5
+            # Bid-ask spread cost on exit too (see BID_ASK_SPREAD_PCT config)
+            exit_cost += pos["size"] * BID_ASK_SPREAD_PCT
 
             gross_proceeds = pos["size"]
             if pos["type"] == "LONG":
