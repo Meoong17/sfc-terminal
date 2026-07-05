@@ -1592,7 +1592,16 @@ async function saveUserConfig() {
     max_allocation_pct: parseFloat(document.getElementById('userMaxAlloc')?.value) || 25,
     take_profit_pct: parseFloat(document.getElementById('userTP')?.value) || 0,
     trailing_stop_pct: parseFloat(document.getElementById('userTrail')?.value) || 15,
-    stop_loss_pct: parseFloat(document.getElementById('userSL')?.value) || 0,
+    // NOTE: previously used `parseFloat(...) || 8` here, but that has a
+    // classic JS falsy-zero bug — if the user deliberately types 0 to
+    // disable stop-loss, `0 || 8` evaluates to 8 (0 is falsy in JS),
+    // silently overriding their explicit choice. isNaN() check
+    // distinguishes "field genuinely empty/invalid" (→ default 8) from
+    // "user explicitly set 0" (→ respect that as 0/disabled).
+    stop_loss_pct: (() => {
+      const v = parseFloat(document.getElementById('userSL')?.value);
+      return isNaN(v) ? 8 : v;
+    })(),
     risk_per_trade: parseFloat(document.getElementById('userRisk')?.value) || 2,
   };
   paperTrader.userConfig = { ...(paperTrader.userConfig || {}), ...config };
@@ -1620,7 +1629,7 @@ function loadConfigToForm(config) {
   setVal('userMaxAlloc', config.max_allocation_pct || 25);
   setVal('userTP', config.take_profit_pct || 0);
   setVal('userTrail', config.trailing_stop_pct || 15);
-  setVal('userSL', config.stop_loss_pct || 0);
+  setVal('userSL', config.stop_loss_pct !== undefined ? config.stop_loss_pct : 8);
   setVal('userRisk', config.risk_per_trade || 2);
   // Show config panel in multi-user mode
   const panel = document.getElementById('paperConfigPanel');
@@ -2148,7 +2157,7 @@ function render(d) {
 
   <!-- STATUS BAND -->
   <div class="status-band">
-    <div class="s-chip"><span class="s-dot ${d.regime === 'CAPITULATION' || d.regime === 'CRISIS' ? 'dot-r' : d.regime === 'STRESS' || d.regime === 'BEAR' ? 'dot-a' : 'dot-g'}"></span><span style="color:${regimeColor}">${d.regime || 'NORMAL'}</span> · ${d.zone || 'NORMAL'} Zone</div>
+    <div class="s-chip" ${d.regime_zone_divergence ? `title="${d.regime_zone_divergence_note || 'Regime and Zone reflect different methodologies and can diverge'}"` : ''}><span class="s-dot ${d.regime === 'CAPITULATION' || d.regime === 'CRISIS' ? 'dot-r' : d.regime === 'STRESS' || d.regime === 'BEAR' ? 'dot-a' : 'dot-g'}"></span><span style="color:${regimeColor}">${d.regime || 'NORMAL'}</span> · ${d.zone || 'NORMAL'} Zone${d.regime_zone_divergence ? ' <span style="color:var(--amber)" title="' + (d.regime_zone_divergence_note || '') + '">⚠</span>' : ''}</div>
     <div class="s-chip"><span class="s-dot ${d.liq_pressure === 'LONG_SQUEEZE' ? 'dot-r' : d.liq_pressure === 'SHORT_SQUEEZE' ? 'dot-g' : 'dot-a'}"></span>${liqLabel}</div>
     <div class="s-chip"><span class="s-dot ${(d.sopr_signal||'').includes('CAPITULATION') ? 'dot-g' : (d.sopr_signal||'').includes('DISTRIBUTION') ? 'dot-r' : 'dot-a'}"></span>SOPR: ${(d.sopr_signal||'UNKNOWN').replace(/_/g,' ')}</div>
     <div class="s-chip"><span class="s-dot dot-b"></span>RSI ${fmtNum(rsi,1)}${rsi<=30?' · Oversold':rsi>=70?' · Overbought':''}</div>
@@ -3175,7 +3184,7 @@ function render(d) {
           <div><label style="font-size:8px;color:var(--text-3)">Take Profit (%)</label><br><input type="number" id="userTP" value="0" step="5" min="0" max="200" style="width:100%;padding:4px 6px;background:#131723;border:1px solid var(--border-2);border-radius:8px;color:var(--text-1);font-size:11px;outline:none"></div>
         </div>
         <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:6px">
-          <div><label style="font-size:8px;color:var(--text-3)">Stop Loss (%)</label><br><input type="number" id="userSL" value="0" step="5" min="0" max="50" style="width:100%;padding:4px 6px;background:#131723;border:1px solid var(--border-2);border-radius:8px;color:var(--text-1);font-size:11px;outline:none"></div>
+          <div><label style="font-size:8px;color:var(--text-3)">Stop Loss (%)</label><br><input type="number" id="userSL" value="8" step="1" min="0" max="50" style="width:100%;padding:4px 6px;background:#131723;border:1px solid var(--border-2);border-radius:8px;color:var(--text-1);font-size:11px;outline:none"></div>
           <div><label style="font-size:8px;color:var(--text-3)">Trail Stop (%)</label><br><input type="number" id="userTrail" value="15" step="5" min="0" max="50" style="width:100%;padding:4px 6px;background:#131723;border:1px solid var(--border-2);border-radius:8px;color:var(--text-1);font-size:11px;outline:none"></div>
           <div><label style="font-size:8px;color:var(--text-3)">Risk/Trade (%)</label><br><input type="number" id="userRisk" value="2" step="1" min="1" max="10" style="width:100%;padding:4px 6px;background:#131723;border:1px solid var(--border-2);border-radius:8px;color:var(--text-1);font-size:11px;outline:none"></div>
         </div>
@@ -3631,6 +3640,12 @@ async function fetchLiveData() {
 /* ── PAPER TRADING ENGINE (mirrors server paper_trader.py) ── */
 const PAPER_INITIAL_CAPITAL = 50000;
 const PAPER_MAX_POSITION_PCT = 0.25;
+// Mirrors paper_trader.py's MAX_HOLDING_HOURS and BID_ASK_SPREAD_PCT —
+// see that file's comments for the full reasoning (24h ≈ 4x the model's
+// own 6h prediction horizon; spread is a real per-trade cost previously
+// unmodeled on the JS side).
+const PAPER_MAX_HOLDING_HOURS = 24;
+const PAPER_BID_ASK_SPREAD_PCT = 0.0005;
 
 class PaperTrader {
   constructor(capital = PAPER_INITIAL_CAPITAL, state = null) {
@@ -3666,7 +3681,16 @@ class PaperTrader {
   evaluateSignal(d) {
     const sfc = (d.sfc_effective || 0) / 100;
     const conf = d.composite_confidence || 0.3;
-    const kelly = d.kelly_fraction || 0;
+    // Switched from d.kelly_fraction (Full Kelly) to d.kelly_half — matches
+    // the same change made in paper_trader.py (server-side). Full Kelly
+    // combined with confidence_calibration.py's own measured ECE=0.216
+    // ("poorly calibrated") compounds two sources of risk: an aggressive
+    // bet size on top of an edge estimate that isn't reliably accurate.
+    // Falls back to computing half manually if kelly_half is missing from
+    // an older/cached data.json (defensive, shouldn't trigger normally).
+    const kelly = (d.kelly_half !== undefined && d.kelly_half !== null)
+      ? d.kelly_half
+      : (d.kelly_fraction || 0) / 2;
     const fng = d.fng || 50;
     const cascade = d.cascade_risk || 0;
     const regime = d.regime || 'NORMAL';
@@ -3676,6 +3700,7 @@ class PaperTrader {
 
     const isExtremeFear = fng < 15;
     const hasCascade = cascade > 0.5;
+    const bearConf = d.prob_stress || 0;  // matches Python's bear_conf (prob_stress)
 
     let action, reason;
     if (kelly <= 0) {
@@ -3687,6 +3712,11 @@ class PaperTrader {
     } else if (sfc < 0.25 && conf > 0.15) {
       action = 'BUY';
       reason = `SFC ${(sfc*100).toFixed(0)}% · Conf ${(conf*100).toFixed(0)}%`;
+    } else if (sfc >= 0.45 && bearConf > 0.4) {
+      // Strong bearish signal + bearish confidence → SHORT — mirrors
+      // paper_trader.py's SELL branch (uses prob_stress as bear_conf).
+      action = 'SELL';
+      reason = `SFC ${(sfc*100).toFixed(0)}% · Bear ${(bearConf*100).toFixed(0)}%`;
     } else if (sfc >= 0.45) {
       action = 'CASH';
       reason = `SFC ${(sfc*100).toFixed(0)}% · Stress too high`;
@@ -3696,7 +3726,7 @@ class PaperTrader {
     }
 
     let sizePct = 0;
-    if (action === 'BUY') {
+    if (action === 'BUY' || action === 'SELL') {
       sizePct = Math.min(kelly, PAPER_MAX_POSITION_PCT);
       sizePct *= Math.min(conf * 2, 1.0);
     }
@@ -3705,7 +3735,7 @@ class PaperTrader {
 
     return {
       action,
-      size: action === 'BUY' ? size : 0,
+      size: (action === 'BUY' || action === 'SELL') ? size : 0,
       reason,
       btc_price: btc,
       sfc_pct: Math.round(sfc * 1000) / 10,
@@ -3714,6 +3744,7 @@ class PaperTrader {
       regime,
       zone,
       signal_type: signalType,
+      is_short: action === 'SELL',
     };
   }
 
@@ -3721,34 +3752,64 @@ class PaperTrader {
     const price = decision.btc_price || 0;
     if (!price || price <= 0) return;
 
+    const isShort = decision.is_short || false;
+
     // Get user's TP/SL config
     const tpPct = (this.userConfig?.take_profit_pct || 0) / 100;
     const slPct = (this.userConfig?.stop_loss_pct || 0) / 100;
 
-    // Check TAKE PROFIT for each position
+    // Check TAKE PROFIT for each position — direction depends on LONG vs
+    // SHORT (previously assumed LONG only: `price >= tpTarget` is only
+    // correct for LONG, where profit comes from price rising; a SHORT
+    // profits from price FALLING, so its TP target must be BELOW entry).
     if (tpPct > 0 && this.positions.length > 0) {
-      const tpTarget = this.positions[0].entry_price * (1 + tpPct);
-      if (price >= tpTarget) {
+      const pos = this.positions[0];
+      const tpTarget = pos.type === 'SHORT'
+        ? pos.entry_price * (1 - tpPct)
+        : pos.entry_price * (1 + tpPct);
+      const tpHit = pos.type === 'SHORT' ? (price <= tpTarget) : (price >= tpTarget);
+      if (tpHit) {
         this._closeAllPositions(price, 'Take Profit ' + (tpPct * 100).toFixed(0) + '% · Hit $' + Math.round(price));
       }
     }
 
-    // Check STOP LOSS for each position
+    // Check STOP LOSS for each position — same LONG/SHORT direction fix as TP above.
     if (slPct > 0 && this.positions.length > 0) {
-      const slTarget = this.positions[0].entry_price * (1 - slPct);
-      if (price <= slTarget) {
+      const pos = this.positions[0];
+      const slTarget = pos.type === 'SHORT'
+        ? pos.entry_price * (1 + slPct)
+        : pos.entry_price * (1 - slPct);
+      const slHit = pos.type === 'SHORT' ? (price >= slTarget) : (price <= slTarget);
+      if (slHit) {
         this._closeAllPositions(price, 'Stop Loss ' + (slPct * 100).toFixed(0) + '% · Hit $' + Math.round(price));
       }
     }
 
-    // Close positions if signal says CASH and we have positions
-    if (decision.action === 'CASH' && this.positions.length > 0) {
-      this._closeAllPositions(price, 'Signal CASH');
+    // ── Max holding period (NEW) — mirrors paper_trader.py's
+    // MAX_HOLDING_HOURS=24. Previously a position could stay open
+    // indefinitely if neither the signal flipped nor TP/SL/trailing-stop
+    // triggered; given the model's own prediction horizon is 6 hours
+    // (ml_ensemble.py's LABEL_LOOKAHEAD_MINUTES), 24h is ~4x that as a hard cap.
+    if (this.positions.length > 0) {
+      const pos = this.positions[0];
+      const heldHours = (Date.now() - new Date(pos.entry_date).getTime()) / 3600000;
+      if (heldHours >= PAPER_MAX_HOLDING_HOURS) {
+        this._closeAllPositions(price, `Max holding period reached (${Math.round(heldHours)}h)`);
+      }
     }
 
-    // Open new position if signal says BUY and we're flat
-    if (decision.action === 'BUY' && this.positions.length === 0 && decision.size >= 10) {
-      this._openPosition(decision.size, price, decision);
+    // Close positions if signal says CASH or opposite direction
+    if (this.positions.length > 0 && (
+      decision.action === 'CASH'
+      || (decision.action === 'BUY' && this.positions[0].type === 'SHORT')
+      || (decision.action === 'SELL' && this.positions[0].type === 'LONG')
+    )) {
+      this._closeAllPositions(price, decision.action === 'CASH' ? 'Signal CASH' : 'Signal reversed');
+    }
+
+    // Open new position if signal says BUY/SELL and we're flat
+    if ((decision.action === 'BUY' || decision.action === 'SELL') && this.positions.length === 0 && decision.size >= 10) {
+      this._openPosition(decision.size, price, decision, isShort ? 'SHORT' : 'LONG');
     }
 
     // Update PnL for reporting
@@ -3759,24 +3820,36 @@ class PaperTrader {
     this._dailySnapshot();
   }
 
-  _openPosition(size, price, decision) {
+  _openPosition(size, price, decision, posType = 'LONG') {
+    // Bid-ask spread cost (NEW) — mirrors paper_trader.py's
+    // BID_ASK_SPREAD_PCT. Previously no spread cost was modeled at all
+    // on the JS side; net_size reduces the effective position size the
+    // same way the Python engine does.
+    const spreadCost = size * PAPER_BID_ASK_SPREAD_PCT;
+    const netSize = size - spreadCost;
+    if (netSize <= 0) return; // spread ate the whole position — skip
+
     this.positions.push({
-      type: 'LONG',
+      type: posType,
       entry_price: price,
       highest_price: price,
-      size: size,
+      lowest_price: price,
+      size: netSize,
       entry_date: new Date().toISOString(),
       reason: decision.reason || '',
       sfc_at_entry: decision.sfc_pct,
       confidence_at_entry: decision.confidence,
+      spread_cost_entry: Math.round(spreadCost * 100) / 100,
     });
     this.capital -= size;
     this.trades.push({
       id: this.trades.length + 1,
       type: 'OPEN',
+      direction: posType,
       date: new Date().toISOString(),
       price: price,
-      size: size,
+      size: netSize,
+      slippage: Math.round(spreadCost * 100) / 100,
       reason: decision.reason || '',
     });
     this.status = 'IN_MARKET';
@@ -3784,16 +3857,25 @@ class PaperTrader {
 
   _closeAllPositions(price, reason) {
     for (const pos of this.positions) {
-      const pnl = (price - pos.entry_price) / pos.entry_price * pos.size;
+      // Bid-ask spread cost on exit too.
+      const spreadCost = pos.size * PAPER_BID_ASK_SPREAD_PCT;
+      const grossPnl = pos.type === 'SHORT'
+        ? (pos.entry_price - price) / pos.entry_price * pos.size
+        : (price - pos.entry_price) / pos.entry_price * pos.size;
+      const pnl = grossPnl - spreadCost;
       this.capital += pos.size + pnl;
       this.trades.push({
         id: this.trades.length + 1,
         type: 'CLOSE',
+        direction: pos.type,
         date: new Date().toISOString(),
         price: price,
         size: pos.size,
         pnl: Math.round(pnl * 100) / 100,
-        pnl_pct: Math.round((price - pos.entry_price) / pos.entry_price * 10000) / 100,
+        pnl_pct: Math.round((pos.type === 'SHORT'
+          ? (pos.entry_price - price) / pos.entry_price
+          : (price - pos.entry_price) / pos.entry_price) * 10000) / 100,
+        slippage_exit: Math.round(spreadCost * 100) / 100,
         reason: reason,
       });
     }
@@ -3805,26 +3887,46 @@ class PaperTrader {
     const TRAILING_PCT = (this.userConfig?.trailing_stop_pct || 15) / 100; // From user config, default 15%
     const toClose = [];
     for (const pos of this.positions) {
-      // Update highest price seen
-      if (price > pos.highest_price) {
-        pos.highest_price = price;
-      }
-      // Check if price dropped from peak
-      const dropPct = (pos.highest_price - price) / pos.highest_price;
-      if (dropPct >= TRAILING_PCT) {
-        toClose.push(pos);
+      if (pos.type === 'SHORT') {
+        // SHORT profits from price falling — track the LOWEST price seen,
+        // trigger if price rises back up from that low by TRAILING_PCT
+        // (previously this function only handled LONG direction, tracking
+        // highest_price and triggering on drops — silently wrong/inactive
+        // for SHORT positions, which didn't exist in this file before).
+        if (pos.lowest_price === undefined || price < pos.lowest_price) {
+          pos.lowest_price = price;
+        }
+        const risePct = (price - pos.lowest_price) / pos.lowest_price;
+        if (risePct >= TRAILING_PCT) {
+          toClose.push(pos);
+        }
+      } else {
+        // Update highest price seen
+        if (price > pos.highest_price) {
+          pos.highest_price = price;
+        }
+        // Check if price dropped from peak
+        const dropPct = (pos.highest_price - price) / pos.highest_price;
+        if (dropPct >= TRAILING_PCT) {
+          toClose.push(pos);
+        }
       }
     }
     if (toClose.length > 0) {
       this._trailingStopTriggered = true;
-      this._closeAllPositions(price, `Trailing Stop ${(TRAILING_PCT*100).toFixed(0)}% · Drop ${Math.round(toClose[0].highest_price)}→${Math.round(price)}`);
+      const pos = toClose[0];
+      const refPrice = pos.type === 'SHORT' ? pos.lowest_price : pos.highest_price;
+      const arrow = pos.type === 'SHORT' ? '→' : '→';
+      this._closeAllPositions(price, `Trailing Stop ${(TRAILING_PCT*100).toFixed(0)}% · ${pos.type === 'SHORT' ? 'Rise' : 'Drop'} ${Math.round(refPrice)}${arrow}${Math.round(price)}`);
     }
   }
 
   _updatePnL(price) {
     let unrealized = 0;
     for (const pos of this.positions) {
-      if (pos.type === 'LONG') {
+      if (pos.type === 'SHORT') {
+        unrealized += (pos.entry_price - price) / pos.entry_price * pos.size;
+      } else {
         unrealized += (price - pos.entry_price) / pos.entry_price * pos.size;
       }
     }
@@ -3845,7 +3947,9 @@ class PaperTrader {
     if (this.positions.length === 0) return this.capital;
     let unrealized = 0;
     for (const pos of this.positions) {
-      if (pos.type === 'LONG') {
+      if (pos.type === 'SHORT') {
+        unrealized += (pos.entry_price - price) / pos.entry_price * pos.size;
+      } else {
         unrealized += (price - pos.entry_price) / pos.entry_price * pos.size;
       }
     }
