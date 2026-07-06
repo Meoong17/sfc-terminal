@@ -3685,9 +3685,9 @@ out = {
     "shock_event": shock_event,
     "shock_severity": shock_severity,
     "sec_events": sec_events,
-    # ── Q9 News Scoring System ──
-    "q9_available": Q9_AVAILABLE,
-    "q9_articles": _q9_data.get("article_count", 0) if Q9_AVAILABLE and _q9_data else 0,
+    # ── Q9 News Scoring System (module not implemented yet) ──
+    "q9_available": False,
+    "q9_articles": 0,
     # ── Q5 Advanced Methods: M65-M69 ──
     "m65_cnn_attention": round(_m65_stress, 4),
     "m65_pattern_type": _m65_pattern,
