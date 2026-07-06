@@ -453,13 +453,6 @@ except ImportError:
     def get_news_stress_v2(*a, **k): return 0.0, [], 0.0, [], {}
     def detect_black_swan_v2(*a, **k): return 0.0, None, "NONE"
 
-# Import Q9 news scoring system (hybrid VADER+TextBlob, free)
-try:
-    from data_sources.news_processor import get_news_impact as get_q9_news_impact
-    Q9_AVAILABLE = True
-except ImportError:
-    Q9_AVAILABLE = False
-    def get_q9_news_impact(): return {"news_stress": 0.0, "sentiment_avg": 0.0, "article_count": 0}
 
 # ============================================================
 # 1. LIVE DATA COLLECTION
@@ -2452,17 +2445,6 @@ print("[SFC] Aggregating news...", file=sys.stderr)
 cp_key = os.getenv("CRYPTOPANIC_KEY", "")
 news_stress, news_headlines, news_sentiment, articles_scored, news_stats = get_news_stress_v2(cp_key, max_workers=6)
 
-# ── Q9 News Scoring (hybrid VADER+TextBlob, free sources) ──
-_q9_data = get_q9_news_impact()
-if _q9_data.get("article_count", 0) > 0:
-    _q9_stress = _q9_data["news_stress"]
-    _q9_sentiment = _q9_data["sentiment_avg"]
-    # Blend: use Q9 if it has data, otherwise keep existing
-    if _q9_stress > 0:
-        news_stress = _q9_stress
-    if _q9_sentiment != 0:
-        news_sentiment = _q9_sentiment
-    print(f"[Q9] News stress={_q9_stress}% sentiment={_q9_sentiment} articles={_q9_data['article_count']}", file=sys.stderr)
 
 # Black swan detection
 shock_factor, shock_event, shock_severity = detect_black_swan_v2(articles_scored)
@@ -3797,7 +3779,7 @@ qlstm_str = f" QLSTM={qlstm_pred*100:.1f}" if qlstm_pred is not None else ""
 m65_str = f" CNN={_m65_stress:.2f}" if CNN_ATTENTION_AVAILABLE else ""
 m68_str = f" DRL={_m68_signal}" if DRL_AVAILABLE else ""
 m69_str = f" SYS={_m69_overall:.2f}" if GNN_AVAILABLE else ""
-print(f"\n✅ BTC={btc_str} | SFC={effective_sfc:.1f}% | Zone={zone} | RSI-14M={rsi_str} | SOPR={sopr_str} | News={news_stress:.1f} | {regime} | TF=MONTHLY | Q9={'✓' if Q9_AVAILABLE else '✗'} | Methods={total_active_methods}/42 | Macro={_macro_active}/4 | SC={sc_active}/5{qlstm_str}{m65_str}{m68_str}{m69_str}", file=sys.stderr)
+print(f"\n✅ BTC={btc_str} | SFC={effective_sfc:.1f}% | Zone={zone} | RSI-14M={rsi_str} | SOPR={sopr_str} | News={news_stress:.1f} | {regime} | TF=MONTHLY | Methods={total_active_methods}/42 | Macro={_macro_active}/4 | SC={sc_active}/5{qlstm_str}{m65_str}{m68_str}{m69_str}", file=sys.stderr)
 
 # Paper trading moved to pipeline script (sfc-pipeline.sh) to avoid
 # race condition: collect.py stdout > data.json is still buffered
