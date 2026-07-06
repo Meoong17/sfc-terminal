@@ -119,4 +119,53 @@ self.addEventListener("message", e => {
   }
 });
 
+// ── Push notification support (NEW) ──
+// The browser wakes this Service Worker when a push message arrives from
+// the push service (e.g. Chrome/FCM, Firefox's push service) — this is
+// purely event-driven, not a poll loop. The actual DECISION about when
+// to send a push (i.e. "a BUY signal just appeared") happens server-side
+// in the Cloudflare Worker's Cron Trigger (see worker/index.js), which
+// calls the Web Push protocol to deliver the message that ends up here.
+self.addEventListener("push", (event) => {
+  let payload;
+  try {
+    payload = event.data ? event.data.json() : {};
+  } catch (e) {
+    payload = { title: "SFC Terminal", body: event.data ? event.data.text() : "New signal update" };
+  }
+
+  const title = payload.title || "SFC Terminal — BUY Signal";
+  const options = {
+    body: payload.body || "A new BUY signal has been detected.",
+    icon: payload.icon || "/icon-192.png",
+    badge: payload.badge || "/icon-96.png",
+    tag: "sfc-buy-signal", // reuses the same notification slot instead of stacking duplicates
+    renotify: true,        // but DOES alert again even if reusing the tag (vs silently updating)
+    data: { url: payload.url || "/" },
+    requireInteraction: false,
+  };
+
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+// Clicking the notification focuses an existing tab if one is open, or
+// opens a new one — standard PWA notification-click pattern.
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const targetUrl = (event.notification.data && event.notification.data.url) || "/";
+
+  event.waitUntil(
+    clients.matchAll({ type: "window", includeUncontrolled: true }).then((windowClients) => {
+      for (const client of windowClients) {
+        if (client.url.includes(self.location.origin) && "focus" in client) {
+          return client.focus();
+        }
+      }
+      if (clients.openWindow) {
+        return clients.openWindow(targetUrl);
+      }
+    })
+  );
+});
+
 console.log("[SW] Service Worker v9 loaded");

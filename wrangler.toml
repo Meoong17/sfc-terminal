@@ -9,8 +9,23 @@ enabled = false
 binding = "SFC_USER_STATE"
 id = "384c3b360c92484a84eb3e1ecad18a4d"
 
+# Cron Trigger for BUY-signal push notifications — runs independent of
+# HTTP requests, checking data.json every 5 minutes (matches collect.py's
+# own cycle interval, no point checking more often than the data changes).
+# See worker/index.js's scheduled() handler + checkSignalAndNotify().
+[triggers]
+crons = ["*/5 * * * *"]
+
 [env.production]
 name = "sfc-terminal"
 [[env.production.kv_namespaces]]
 binding = "SFC_USER_STATE"
 id = "384c3b360c92484a84eb3e1ecad18a4d"
+[env.production.triggers]
+crons = ["*/5 * * * *"]
+
+# ── Required secrets for push notifications (set via `wrangler secret put`, not here) ──
+#   wrangler secret put VAPID_PUBLIC_KEY    # same value as index.html's VAPID_PUBLIC_KEY constant
+#   wrangler secret put VAPID_PRIVATE_KEY   # keep this one truly secret — never in client-side code
+#   wrangler secret put VAPID_SUBJECT       # e.g. mailto:you@example.com — required by the VAPID spec
+#                                           # so push services can contact you if something's wrong

@@ -290,6 +290,63 @@ export default {
       });
     }
 
+    // POST /api/push-subscribe — store a browser push subscription.
+    // Deliberately NOT gated behind the username login system — push
+    // notifications are a device/browser-level feature (anyone visiting
+    // the dashboard can opt in), independent of the multi-user paper
+    // trading state. Subscriptions are keyed by a hash of the push
+    // endpoint URL (unique per browser+device registration), so the same
+    // browser subscribing twice just overwrites its own entry rather than
+    // creating duplicates.
+    if (path === '/api/push-subscribe' && method === 'POST') {
+      let body;
+      try {
+        body = await request.json();
+      } catch (e) {
+        return new Response('Invalid JSON', { status: 400, headers: getCorsHeaders(request) });
+      }
+      const subscription = body.subscription;
+      if (!subscription || !subscription.endpoint) {
+        return new Response('Missing subscription', { status: 400, headers: getCorsHeaders(request) });
+      }
+      // Hash the endpoint URL to get a stable, KV-safe key (endpoint URLs
+      // can be long and contain characters not ideal for direct key use).
+      const encoder = new TextEncoder();
+      const digest = await crypto.subtle.digest('SHA-256', encoder.encode(subscription.endpoint));
+      const hashHex = [...new Uint8Array(digest)].map(b => b.toString(16).padStart(2, '0')).join('').slice(0, 32);
+      const key = `push:subscription:${hashHex}`;
+      await env.SFC_USER_STATE.put(key, JSON.stringify({
+        subscription,
+        subscribed_at: new Date().toISOString(),
+      }));
+      return new Response(JSON.stringify({ status: 'ok' }), {
+        headers: { 'Content-Type': 'application/json', ...getCorsHeaders(request) },
+      });
+    }
+
+    // POST /api/push-unsubscribe — remove a stored subscription (called
+    // when a user disables notifications, or the browser reports the
+    // subscription as expired).
+    if (path === '/api/push-unsubscribe' && method === 'POST') {
+      let body;
+      try {
+        body = await request.json();
+      } catch (e) {
+        return new Response('Invalid JSON', { status: 400, headers: getCorsHeaders(request) });
+      }
+      const endpoint = body.endpoint;
+      if (!endpoint) {
+        return new Response('Missing endpoint', { status: 400, headers: getCorsHeaders(request) });
+      }
+      const encoder = new TextEncoder();
+      const digest = await crypto.subtle.digest('SHA-256', encoder.encode(endpoint));
+      const hashHex = [...new Uint8Array(digest)].map(b => b.toString(16).padStart(2, '0')).join('').slice(0, 32);
+      await env.SFC_USER_STATE.delete(`push:subscription:${hashHex}`);
+      return new Response(JSON.stringify({ status: 'ok' }), {
+        headers: { 'Content-Type': 'application/json', ...getCorsHeaders(request) },
+      });
+    }
+
     // GET /user/:username/status — quick summary (no full state transfer)
     const userStatusMatch = path.match(/^\/user\/([^\/]+)\/status$/);
     if (userStatusMatch && method === 'GET') {
@@ -686,4 +743,276 @@ document.getElementById('loginForm').addEventListener('submit', function(e) {
       },
     });
   },
+
+  // ── Cron Trigger: BUY signal push notifications ──
+  // Configured via wrangler.toml's [triggers] crons — runs on a schedule
+  // INDEPENDENT of any HTTP request, which is what makes "notify even
+  // when no tab is open" possible. Each run: fetch current data.json,
+  // check if the signal just became BUY (edge-triggered, compared
+  // against the last-known signal stored in KV — NOT a level check,
+  // to avoid re-notifying every run while the signal stays BUY), and if
+  // so, send a push message to every stored subscription.
+  //
+  // ⚠️ IMPORTANT — NOT TESTED END-TO-END: the Web Push protocol
+  // implementation below (VAPID JWT signing + RFC8291 payload
+  // encryption) was written carefully following the relevant RFCs, but
+  // could not be verified against a real push service from the sandbox
+  // this was developed in (no network egress available). Test this
+  // thoroughly against your own subscribed device before relying on it —
+  // if notifications don't arrive, check wrangler tail logs for errors
+  // from sendWebPush() below first.
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(checkSignalAndNotify(env));
+  },
 };
+
+async function checkSignalAndNotify(env) {
+  try {
+    const resp = await fetchAny(env, '/data.json', 'application/json');
+    if (!resp) {
+      console.log('[Cron] Could not fetch data.json — skipping this cycle');
+      return;
+    }
+    const data = await resp.json();
+    const currentSignal = data.signal_type || data.action || null;
+    if (!currentSignal) return;
+
+    const lastSignalRaw = await env.SFC_USER_STATE.get('push:last_signal');
+    const lastSignal = lastSignalRaw ? JSON.parse(lastSignalRaw).signal : null;
+
+    // Edge-triggered: only notify when the signal TRANSITIONS into BUY,
+    // not on every cycle it happens to still be BUY (which would spam a
+    // notification every ~5 minutes for as long as the signal holds).
+    const justBecameBuy = currentSignal === 'BUY' && lastSignal !== 'BUY';
+
+    await env.SFC_USER_STATE.put('push:last_signal', JSON.stringify({
+      signal: currentSignal,
+      updated_at: new Date().toISOString(),
+    }));
+
+    if (!justBecameBuy) return;
+
+    if (!env.VAPID_PRIVATE_KEY || !env.VAPID_PUBLIC_KEY || !env.VAPID_SUBJECT) {
+      console.log('[Cron] VAPID secrets not configured — cannot send push. '
+        + 'Set via: wrangler secret put VAPID_PRIVATE_KEY / VAPID_PUBLIC_KEY, '
+        + 'and VAPID_SUBJECT (e.g. mailto:you@example.com)');
+      return;
+    }
+
+    const list = await env.SFC_USER_STATE.list({ prefix: 'push:subscription:' });
+    const payload = JSON.stringify({
+      title: 'SFC Terminal — BUY Signal',
+      body: `SFC ${data.sfc_effective != null ? data.sfc_effective.toFixed(1) + '%' : ''} · BTC $${Math.round(data.btc || 0).toLocaleString()}`,
+      url: '/',
+    });
+
+    let sent = 0, failed = 0;
+    for (const item of list.keys) {
+      const raw = await env.SFC_USER_STATE.get(item.name);
+      if (!raw) continue;
+      const { subscription } = JSON.parse(raw);
+      try {
+        await sendWebPush(subscription, payload, env);
+        sent++;
+      } catch (err) {
+        failed++;
+        console.log(`[Cron] Push failed for ${item.name}: ${err.message}`);
+        // 410 Gone / 404 means the subscription is no longer valid (user
+        // uninstalled, cleared browser data, etc.) — clean it up so future
+        // cycles don't keep trying a dead endpoint.
+        if (err.message.includes('410') || err.message.includes('404')) {
+          await env.SFC_USER_STATE.delete(item.name);
+        }
+      }
+    }
+    console.log(`[Cron] BUY signal notification: ${sent} sent, ${failed} failed`);
+  } catch (err) {
+    console.log('[Cron] checkSignalAndNotify error:', err.message);
+  }
+}
+
+// ── Web Push protocol implementation ──
+// Sends a single push message per RFC8030 (Web Push protocol) with
+// RFC8291 (message encryption, aes128gcm) and RFC8292 (VAPID auth).
+// This is a from-scratch implementation using only the Web Crypto API
+// available in the Workers runtime (no external npm packages, since
+// this worker is deployed as a single file with no build step) —
+// see the scheduled() handler's warning above about live-testing this.
+
+async function sendWebPush(subscription, payloadString, env) {
+  const endpoint = subscription.endpoint;
+  const p256dhKey = subscription.keys.p256dh;
+  const authSecret = subscription.keys.auth;
+
+  const audience = new URL(endpoint).origin;
+  const vapidHeaders = await buildVapidHeaders(audience, env.VAPID_SUBJECT, env.VAPID_PUBLIC_KEY, env.VAPID_PRIVATE_KEY);
+  const encrypted = await encryptPayload(payloadString, p256dhKey, authSecret);
+
+  const resp = await fetch(endpoint, {
+    method: 'POST',
+    headers: {
+      'TTL': '86400', // push service may drop the message after this many seconds if undelivered
+      'Content-Encoding': 'aes128gcm',
+      'Content-Type': 'application/octet-stream',
+      ...vapidHeaders,
+    },
+    body: encrypted,
+  });
+
+  if (!resp.ok) {
+    throw new Error(`Push service responded ${resp.status}: ${await resp.text()}`);
+  }
+}
+
+// Base64url helpers (Web Push uses unpadded base64url throughout)
+function base64urlToBytes(base64url) {
+  const padding = '='.repeat((4 - base64url.length % 4) % 4);
+  const base64 = (base64url + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const binary = atob(base64);
+  return Uint8Array.from([...binary].map(c => c.charCodeAt(0)));
+}
+
+function bytesToBase64url(bytes) {
+  let binary = '';
+  for (const b of bytes) binary += String.fromCharCode(b);
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+// VAPID (RFC8292): a JWT signed with the VAPID private key (ES256/ECDSA
+// P-256), proving to the push service that this server is authorized to
+// send to this subscription.
+async function buildVapidHeaders(audience, subject, publicKeyB64, privateKeyB64) {
+  const header = { typ: 'JWT', alg: 'ES256' };
+  const exp = Math.floor(Date.now() / 1000) + 12 * 3600; // 12h, well under the spec's 24h max
+  const claims = { aud: audience, exp, sub: subject };
+
+  const encoder = new TextEncoder();
+  const headerB64 = bytesToBase64url(encoder.encode(JSON.stringify(header)));
+  const claimsB64 = bytesToBase64url(encoder.encode(JSON.stringify(claims)));
+  const unsignedToken = `${headerB64}.${claimsB64}`;
+
+  const privateKeyBytes = base64urlToBytes(privateKeyB64);
+  const publicKeyBytes = base64urlToBytes(publicKeyB64); // 65 bytes, uncompressed point (0x04 + X + Y)
+  const x = publicKeyBytes.slice(1, 33);
+  const y = publicKeyBytes.slice(33, 65);
+
+  const jwk = {
+    kty: 'EC',
+    crv: 'P-256',
+    x: bytesToBase64url(x),
+    y: bytesToBase64url(y),
+    d: bytesToBase64url(privateKeyBytes),
+    ext: true,
+  };
+
+  const cryptoKey = await crypto.subtle.importKey(
+    'jwk', jwk, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['sign']
+  );
+
+  const signature = await crypto.subtle.sign(
+    { name: 'ECDSA', hash: 'SHA-256' }, cryptoKey, encoder.encode(unsignedToken)
+  );
+
+  const jwt = `${unsignedToken}.${bytesToBase64url(new Uint8Array(signature))}`;
+
+  return {
+    'Authorization': `vapid t=${jwt}, k=${publicKeyB64}`,
+  };
+}
+
+// RFC8291 message encryption (aes128gcm content-coding). This derives a
+// shared secret via ECDH between an ephemeral server keypair and the
+// subscription's p256dh public key, combines it with the subscription's
+// auth secret via HKDF, and encrypts the payload with AES-128-GCM.
+async function encryptPayload(payloadString, p256dhKeyB64, authSecretB64) {
+  const encoder = new TextEncoder();
+  const plaintext = encoder.encode(payloadString);
+
+  const clientPublicKeyBytes = base64urlToBytes(p256dhKeyB64);
+  const authSecret = base64urlToBytes(authSecretB64);
+
+  // Import the CLIENT's public key (from the subscription) for ECDH
+  const clientX = clientPublicKeyBytes.slice(1, 33);
+  const clientY = clientPublicKeyBytes.slice(33, 65);
+  const clientPublicKey = await crypto.subtle.importKey(
+    'jwk',
+    { kty: 'EC', crv: 'P-256', x: bytesToBase64url(clientX), y: bytesToBase64url(clientY), ext: true },
+    { name: 'ECDH', namedCurve: 'P-256' }, false, []
+  );
+
+  // Generate an ephemeral SERVER keypair for this one message
+  const serverKeyPair = await crypto.subtle.generateKey(
+    { name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits']
+  );
+  const serverPublicKeyRaw = new Uint8Array(
+    await crypto.subtle.exportKey('raw', serverKeyPair.publicKey)
+  );
+
+  // ECDH shared secret
+  const sharedSecretBits = await crypto.subtle.deriveBits(
+    { name: 'ECDH', public: clientPublicKey }, serverKeyPair.privateKey, 256
+  );
+  const sharedSecret = new Uint8Array(sharedSecretBits);
+
+  // salt: 16 random bytes, sent alongside the ciphertext so the client
+  // can reverse the key derivation
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+
+  // HKDF per RFC8291 section 3.3-3.4
+  const prkKey = await crypto.subtle.importKey('raw', authSecret, { name: 'HKDF' }, false, ['deriveBits']);
+  const keyInfo = concatBytes(
+    encoder.encode('WebPush: info\0'), clientPublicKeyBytes, serverPublicKeyRaw
+  );
+  const ikm = new Uint8Array(await crypto.subtle.deriveBits(
+    { name: 'HKDF', hash: 'SHA-256', salt: sharedSecret.buffer, info: keyInfo }, prkKey, 256
+  ));
+  // NOTE: this uses sharedSecret as the HKDF "salt" input for the PRK
+  // derivation step (per RFC8291's two-stage HKDF: auth_secret extracts
+  // a PRK from the ECDH shared secret, keyed by "WebPush: info"+keys) —
+  // this is the step most likely to have a subtle bug if something's
+  // wrong, since it's the least commonly hand-implemented part of the spec.
+
+  const prk2Key = await crypto.subtle.importKey('raw', ikm, { name: 'HKDF' }, false, ['deriveBits']);
+  const cekInfo = encoder.encode('Content-Encoding: aes128gcm\0');
+  const cekBits = await crypto.subtle.deriveBits(
+    { name: 'HKDF', hash: 'SHA-256', salt: salt.buffer, info: cekInfo }, prk2Key, 128
+  );
+  const contentEncryptionKey = new Uint8Array(cekBits);
+
+  const nonceInfo = encoder.encode('Content-Encoding: nonce\0');
+  const nonceBits = await crypto.subtle.deriveBits(
+    { name: 'HKDF', hash: 'SHA-256', salt: salt.buffer, info: nonceInfo }, prk2Key, 96
+  );
+  const nonce = new Uint8Array(nonceBits);
+
+  // Padding: a single 0x02 delimiter byte + no extra padding (minimal,
+  // valid per spec — padding is optional, used here for simplicity).
+  const paddedPlaintext = concatBytes(plaintext, new Uint8Array([2]));
+
+  const aesKey = await crypto.subtle.importKey('raw', contentEncryptionKey, { name: 'AES-GCM' }, false, ['encrypt']);
+  const ciphertext = new Uint8Array(
+    await crypto.subtle.encrypt({ name: 'AES-GCM', iv: nonce }, aesKey, paddedPlaintext)
+  );
+
+  // aes128gcm content-coding header: salt(16) + record size(4, big-endian)
+  // + key id length(1) + key id (server's ephemeral public key, 65 bytes)
+  const recordSize = new Uint8Array(4);
+  new DataView(recordSize.buffer).setUint32(0, 4096, false);
+  const header = concatBytes(
+    salt, recordSize, new Uint8Array([serverPublicKeyRaw.length]), serverPublicKeyRaw
+  );
+
+  return concatBytes(header, ciphertext);
+}
+
+function concatBytes(...arrays) {
+  const total = arrays.reduce((sum, a) => sum + a.length, 0);
+  const result = new Uint8Array(total);
+  let offset = 0;
+  for (const arr of arrays) {
+    result.set(arr, offset);
+    offset += arr.length;
+  }
+  return result;
+}
+
