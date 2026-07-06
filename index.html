@@ -4399,7 +4399,12 @@ async function bootSFC() {
     render(data);
   } else {
     // No SSE server — fetch data.json directly (10-15KB, fast)
-    await fetchLiveData();
+    const _fetched = await fetchLiveData();
+    // Fallback: if data.json empty/missing, render embedded data from HTML
+    if (!_fetched && window.__EMBEDDED_DATA) {
+      currentData = window.__EMBEDDED_DATA;
+      render(window.__EMBEDDED_DATA);
+    }
   }
 
   // Now init paper trader in background
