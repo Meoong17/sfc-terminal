@@ -3,7 +3,7 @@ news_sources.py — Multi-source free news aggregator
 23 sources: crypto RSS, Reddit, Google News, market macro feeds
 """
 
-import os, re, html, time, hashlib
+import os, re, html, time, hashlib, sys
 from datetime import datetime, timezone, timedelta
 
 try:
@@ -11,6 +11,16 @@ try:
     HAS_FEEDPARSER = True
 except ImportError:
     HAS_FEEDPARSER = False
+    # Previously a silent `except:` with no logging — this meant all 23 RSS
+    # sources would return 0 articles with zero indication WHY, visible only
+    # as "news_headlines: []" and "news_stats.sources_hit: 0" in data.json,
+    # with nothing in the collect.py logs pointing to the actual cause
+    # (feedparser missing from the active Python environment). Confirmed
+    # this exact scenario via a live data.json showing total_articles=0,
+    # sources_hit=0 — traced back to this import silently failing.
+    print("[NewsSources] WARNING: feedparser not installed — ALL RSS feeds "
+          "(23 sources) will silently return 0 articles. Run: "
+          "pip install feedparser --break-system-packages", file=sys.stderr)
 
 try:
     import requests
@@ -157,12 +167,26 @@ def get_news_stress_v2(cryptopanic_key=None, max_workers=8):
     
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as ex:
         results = list(ex.map(fetch_one, RSS_FEEDS))
+    rss_count = sum(len(r) for r in results)
     for r in results:
         all_articles.extend(r)
-    
+
     cp = get_cryptopanic(cryptopanic_key)
     all_articles.extend(cp)
-    
+
+    # Previously no visibility at all into WHY news_headlines might end up
+    # empty in data.json — a silent [] here looks identical whether caused
+    # by feedparser missing, all 23 RSS feeds genuinely being down, or
+    # CryptoPanic failing, making it hard to diagnose from logs alone.
+    # Confirmed via a real data.json showing total_articles=0, sources_hit=0
+    # with nothing in the collect.py log pointing to the cause.
+    if not all_articles:
+        print(f"[NewsSources] WARNING: 0 articles fetched this cycle "
+              f"(RSS: {rss_count} from {len(RSS_FEEDS)} feeds, "
+              f"CryptoPanic: {len(cp)}). feedparser available: {HAS_FEEDPARSER}. "
+              f"If this persists, check network egress and feedparser install.",
+              file=sys.stderr)
+
     seen = set()
     unique = []
     for a in all_articles:
