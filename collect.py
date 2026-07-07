@@ -3198,7 +3198,7 @@ if _get_cnn_attention():
         _m65_input = _build_m65_input_window()
         _m65_result = calculate_cnn_attention_stress(_m65_input)
     except Exception as _m65_e:
-        _m65_result = {"m65_cnn_attention": 0.5, "attention_focus": [], "pattern_type": f"FALLBACK — {_m65_e}"}
+        _m65_result = {"m65_cnn_attention": 0.5, "attention_focus": [], "pattern_type": "FALLBACK"}
 else:
     _m65_result = {"m65_cnn_attention": 0.5, "attention_focus": [], "pattern_type": "FALLBACK — CNN not available"}
 _m65_stress = _m65_result.get("m65_cnn_attention", 0.5)
