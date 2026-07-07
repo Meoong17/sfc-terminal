@@ -2635,9 +2635,33 @@ all_method_scores = []
 for s in [m1_klr, m2_logit, m3_bayes, m4_ewc, m5_qreg/100, m6_regime/100,
           m7_s, m9_s, m10_s, m11_s, m12_s, m13_s, m14_s, m15_s, m16_s, m17_s, m18_s, m19_s]:
     all_method_scores.append(s if s is not None else 0.5)
-# Add institutional method scores
-for name in sorted(inst_results.keys()):
-    v = inst_results[name]
+# Add institutional method scores.
+#
+# IMPORTANT FIX: this previously used `for name in sorted(inst_results.keys())`
+# — but methods_institutional.py's compute_all_institutional() only adds a
+# key to inst_results AT ALL if that method's calculation succeeded that
+# cycle (`if s is not None: results[key] = s`, otherwise the key is simply
+# ABSENT, not present with a neutral fallback). This meant the SET of keys
+# in inst_results could vary cycle to cycle (e.g. Binance API hiccup drops
+# m20_obi/m21_trade_flow for one cycle), so `sorted(inst_results.keys())`
+# could produce a shorter or differently-ordered list — meaning column
+# position 18 in the resulting feature vector might mean "m20_obi" in one
+# row of data_collection.json and "m22_spread" in another row from a
+# different cycle. Any model treating feature position as stationary in
+# meaning across a sequence (Mamba, QLSTM, and any hierarchical/clustering
+# analysis keyed by column index) would silently learn from a corrupted,
+# shifting feature space. Fixed by iterating a FIXED, explicit method
+# order and using .get(name, 0.5) — same neutral-fallback pattern already
+# used correctly for the first 18 columns above — so column position is
+# now stable regardless of which institutional methods succeeded this
+# specific cycle.
+INSTITUTIONAL_METHOD_ORDER = [
+    "m20_obi", "m21_trade_flow", "m22_spread", "m23_liquidity",
+    "m24_cape", "m25_minsky", "m26_kahneman", "m27_taleb",
+    "m28_summers", "m29_debt", "m30_rajan", "m31_altman",
+]
+for name in INSTITUTIONAL_METHOD_ORDER:
+    v = inst_results.get(name)
     all_method_scores.append(v if v is not None else 0.5)
 
 total_methods = len(all_method_scores)
