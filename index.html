@@ -2042,6 +2042,63 @@ function render(d) {
   else if (sigClass === 'sp-cash') { topPillClass = 'pill-cash'; topPillText = 'CASH'; }
 
   const regimeColor = d.regime === 'CAPITULATION' || d.regime === 'CRISIS' ? 'var(--red)' : d.regime === 'STRESS' || d.regime === 'BEAR' ? 'var(--amber)' : 'var(--green)';
+
+  // ── GLF contribution breakdown (NEW) ──
+  // The backend's glf_component_detail already has {z_score, weight, raw}
+  // per component (global_liquidity_engine.py) — this converts that into
+  // the same "points contributed to the 0-100 GLF score" view suggested
+  // as a dashboard improvement, computed client-side from data already
+  // present rather than requiring a backend change. Formula matches
+  // compute_global_liquidity_factor() exactly: glf_score = 55 + (Σ z·w /
+  // total_w) × 17.5, so each component's point contribution is
+  // (z·w / total_w) × 17.5 — verified by hand against a real snapshot
+  // (sum of contributions + 55 reproduced the actual glf_score to within
+  // rounding).
+  const glfContributions = (() => {
+    const detail = d.glf_component_detail;
+    if (!detail || typeof detail !== 'object') return [];
+    const totalW = Object.values(detail).reduce((sum, c) => sum + (c.weight || 0), 0);
+    if (totalW <= 0) return [];
+    const labels = { fed: 'Fed', ecb: 'ECB', jpn: 'BOJ', china: 'China', m2: 'M2', tga: 'TGA', rrp: 'RRP', dxy: 'DXY' };
+    return Object.entries(detail)
+      .map(([key, c]) => ({
+        label: labels[key] || key.toUpperCase(),
+        points: (c.z_score * c.weight / totalW) * 17.5,
+      }))
+      .sort((a, b) => Math.abs(b.points) - Math.abs(a.points)); // most impactful first
+  })();
+
+  // SLI and MPI already have a pre-computed "contribution" field per
+  // component in the backend (stablecoin_intelligence.py /
+  // market_positioning_index.py) — unlike GLF, no z_score*weight math
+  // needed here, just the right SCALE FACTOR to convert that stored
+  // value into "points contributed to the final 0-100 score":
+  //   SLI: sli_score = 55 + sli_z*62.5, where sli_z = Σ(contribution field)
+  //        → points = contribution * 62.5
+  //   MPI: mpi_score = (1 - mpi_raw)*100, where mpi_raw = 0.5 + Σ(contribution field)
+  //        → points = -contribution * 100  (note the sign flip — MPI's
+  //        score is INVERTED relative to its raw weighted average,
+  //        unlike SLI/GLF which aren't; verified against a real
+  //        snapshot: contribution sum -0.06 → mpi_score 56.0 via
+  //        50 - (-0.06*100), confirming the -100 factor before this was
+  //        shipped, not assumed)
+  const sliContributions = (() => {
+    const detail = d.sli_components;
+    if (!detail || typeof detail !== 'object') return [];
+    const labels = { dominance: 'Dominance', exchange_flow: 'ExFlow', growth_divergence: 'GrowthDiv', reserve_ratio: 'Reserve', ssr: 'SSR', supply_growth: 'Supply', velocity: 'Velocity' };
+    return Object.entries(detail)
+      .map(([key, c]) => ({ label: labels[key] || key, points: (c.contribution || 0) * 62.5 }))
+      .sort((a, b) => Math.abs(b.points) - Math.abs(a.points));
+  })();
+
+  const mpiContributions = (() => {
+    const detail = d.mpi_components;
+    if (!detail || typeof detail !== 'object') return [];
+    const labels = { funding_rate: 'Funding', put_call: 'P/C', liquidation: 'Liq', basis: 'Basis', open_interest: 'OI' };
+    return Object.entries(detail)
+      .map(([key, c]) => ({ label: labels[key] || key, points: -(c.contribution || 0) * 100 }))
+      .sort((a, b) => Math.abs(b.points) - Math.abs(a.points));
+  })();
   const liqLabel = d.liq_pressure === 'LONG_SQUEEZE' ? 'Long Squeeze' : d.liq_pressure === 'SHORT_SQUEEZE' ? 'Short Squeeze' : 'Balanced';
   const liqColor = d.liq_pressure === 'LONG_SQUEEZE' ? 'var(--red)' : d.liq_pressure === 'SHORT_SQUEEZE' ? 'var(--green)' : 'var(--amber)';
 
@@ -2161,7 +2218,7 @@ function render(d) {
     <div class="s-chip"><span class="s-dot ${d.liq_pressure === 'LONG_SQUEEZE' ? 'dot-r' : d.liq_pressure === 'SHORT_SQUEEZE' ? 'dot-g' : 'dot-a'}"></span>${liqLabel}</div>
     <div class="s-chip"><span class="s-dot ${(d.sopr_signal||'').includes('CAPITULATION') ? 'dot-g' : (d.sopr_signal||'').includes('DISTRIBUTION') ? 'dot-r' : 'dot-a'}"></span>SOPR: ${(d.sopr_signal||'UNKNOWN').replace(/_/g,' ')}</div>
     <div class="s-chip"><span class="s-dot dot-b"></span>RSI ${fmtNum(rsi,1)}${rsi<=30?' · Oversold':rsi>=70?' · Overbought':''}</div>
-    <div class="s-chip"><span class="s-dot dot-c"></span>DVOL ${fmtNum(d.dvol,1)}%</div>
+    <div class="s-chip" ${d.dvol_is_fallback ? `title="Live DVOL fetch failed this cycle — showing 30-day rolling average instead"` : ''}><span class="s-dot dot-c"></span>DVOL ${fmtNum(d.dvol,1)}%${d.dvol_is_fallback ? ' <span style="color:var(--amber)">~</span>' : ''}</div>
     <div class="s-chip"><span class="s-dot ${advDotColor}"></span>ADV: ${advLabel}</div>
     ${d.shock_severity && d.shock_severity !== 'NONE' ? `<div class="s-chip"><span class="s-dot dot-r"></span>⚠ ${d.shock_severity} SHOCK</div>` : ''}
     <div class="s-chip" style="margin-left:auto;cursor:pointer;color:var(--text-2)" onclick="toggleChartVisibility()">
@@ -2865,21 +2922,34 @@ function render(d) {
             <div class="stat-val" style="color:${(d.glf_score||50)>60?'var(--green)':(d.glf_score||50)>40?'var(--amber)':'var(--red)'}">${d.glf_score!=null?fmtNum(d.glf_score,1):'—'}</div>
             <div class="stat-note">${d.glf_regime||'—'} · stress ${d.glf_stress!=null?fmtNum(d.glf_stress,2):'—'}</div>
             <div class="prog-track mt-4"><div class="prog-fill ${(d.glf_score||50)>60?'pf-green':(d.glf_score||50)>40?'pf-amber':'pf-red'}" style="width:${d.glf_score||50}%"></div></div>
-            <div style="font-size:8px;color:var(--text-3);margin-top:4px;line-height:1.4">Fed+ECB+BOJ+M2+TGA+RRP+DXY · ${d.glf_active_components||0}/7 active</div>
+            <div style="font-size:8px;color:var(--text-3);margin-top:4px;line-height:1.6">
+              ${glfContributions.length > 0
+                ? glfContributions.map(c => `<span style="color:${c.points>0?'var(--green)':c.points<0?'var(--red)':'var(--text-3)'}">${c.label} ${c.points>=0?'+':''}${c.points.toFixed(1)}</span>`).join(' &nbsp;·&nbsp; ')
+                : `Fed+ECB+BOJ+M2+TGA+RRP+DXY · ${d.glf_active_components||0}/7 active`}
+            </div>
           </div>
           <div class="stat-box">
             <div class="stat-label">💵 SLI — Stablecoin Index</div>
             <div class="stat-val" style="color:${(d.sli_score||50)>60?'var(--green)':(d.sli_score||50)>40?'var(--amber)':'var(--red)'}">${d.sli_score!=null?fmtNum(d.sli_score,1):'—'}</div>
             <div class="stat-note">${d.sli_label||'—'} · stress ${d.sli_stress!=null?fmtNum(d.sli_stress,2):'—'}</div>
             <div class="prog-track mt-4"><div class="prog-fill ${(d.sli_score||50)>60?'pf-green':(d.sli_score||50)>40?'pf-amber':'pf-red'}" style="width:${d.sli_score||50}%"></div></div>
-            <div style="font-size:8px;color:var(--text-3);margin-top:4px;line-height:1.4">Supply·SSR·Flow·Velocity·Mint/Burn·Reserve · ${d.sli_usdt_growth!=null?'USDT '+fmtNum(d.sli_usdt_growth,1)+'%':''} ${d.sli_usdc_growth!=null?'· USDC '+fmtNum(d.sli_usdc_growth,1)+'%':''}</div>
+            <div style="font-size:8px;color:var(--text-3);margin-top:4px;line-height:1.6">
+              ${sliContributions.length > 0
+                ? sliContributions.map(c => `<span style="color:${c.points>0?'var(--green)':c.points<0?'var(--red)':'var(--text-3)'}">${c.label} ${c.points>=0?'+':''}${c.points.toFixed(1)}</span>`).join(' &nbsp;·&nbsp; ')
+                : `Supply·SSR·Flow·Velocity·Mint/Burn·Reserve`}
+              ${d.sli_usdt_growth!=null?' &nbsp;·&nbsp; USDT '+fmtNum(d.sli_usdt_growth,1)+'%':''}
+            </div>
           </div>
           <div class="stat-box">
             <div class="stat-label">📈 MPI — Market Positioning</div>
             <div class="stat-val" style="color:${(d.mpi_score||50)>60?'var(--green)':(d.mpi_score||50)>40?'var(--amber)':'var(--red)'}">${d.mpi_score!=null?fmtNum(d.mpi_score,1):'—'}</div>
             <div class="stat-note">${d.mpi_label||'—'} · stress ${d.mpi_stress!=null?fmtNum(d.mpi_stress,2):'—'}</div>
             <div class="prog-track mt-4"><div class="prog-fill ${(d.mpi_score||50)>60?'pf-green':(d.mpi_score||50)>40?'pf-amber':'pf-red'}" style="width:${d.mpi_score||50}%"></div></div>
-            <div style="font-size:8px;color:var(--text-3);margin-top:4px;line-height:1.4">Funding·P/C·Liq·Basis·OI · ${d.mpi_available?'✓ active':'✗'}</div>
+            <div style="font-size:8px;color:var(--text-3);margin-top:4px;line-height:1.6">
+              ${mpiContributions.length > 0
+                ? mpiContributions.map(c => `<span style="color:${c.points>0?'var(--green)':c.points<0?'var(--red)':'var(--text-3)'}">${c.label} ${c.points>=0?'+':''}${c.points.toFixed(1)}</span>`).join(' &nbsp;·&nbsp; ')
+                : `Funding·P/C·Liq·Basis·OI · ${d.mpi_available?'✓ active':'✗'}`}
+            </div>
           </div>
         </div>
         <!-- LM + DFS row -->
