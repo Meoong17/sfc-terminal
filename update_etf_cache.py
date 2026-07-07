@@ -1,131 +1,154 @@
 #!/usr/bin/env python3
-"""Parse Farside ETF data and update the cache file."""
+"""Scrape ETF flow data from farside.co.uk and update the cache file."""
+
 import json
-import time
 import re
-from datetime import datetime
+import time
+from datetime import datetime, timezone
+from collections import OrderedDict
 
-# Read existing cache
-try:
-    with open('/home/ubuntu/sfc/.etf_cache.json', 'r') as f:
-        cache = json.load(f)
-    print(f"Existing cache: {len(cache['flows'])} flow entries")
-    existing_dates = {f['date'] for f in cache['flows']}
-    print(f"Existing dates: {sorted(existing_dates)}")
-except Exception as e:
-    print(f"Error reading cache: {e}")
-    cache = {"flows": [], "cumulative_btc": 0, "cumulative_usd": 0, "last_update": "", "cached_at": 0}
-    existing_dates = set()
+import cloudscraper
+from bs4 import BeautifulSoup
 
-# Parse Farside all-data page
-# Data from the scraped page (rows 657-679 of all-data page)
-raw_data = [
-    # date, IBIT, FBTC, BITB, ARKB, BTCO, EZBC, BRRR, HODL, BTCW, MSBT, GBTC, BTC, Total
-    ("2026-06-01", -440.3, -37.3, 0.0, -12.3, 0.0, 0.0, 0.0, 0.0, 0.0, 6.1, 0.0, 0.0, -483.8),
-    ("2026-06-02", -388.6, -45.1, 0.0, -16.7, 0.0, 0.0, 0.0, 0.0, 0.0, 14.8, -83.5, 0.0, -519.1),
-    ("2026-06-03", -342.3, -54.3, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -396.6),
-    ("2026-06-04", 47.7, -5.5, -15.6, -20.7, -12.6, 0.0, 0.0, 0.0, 0.0, 9.9, 0.0, 0.0, 3.2),
-    ("2026-06-05", -213.7, -59.7, 0.0, 0.0, 0.0, 0.0, 0.0, 4.2, 0.0, 4.3, -60.8, 0.0, -325.7),
-    ("2026-06-08", -232.9, 59.4, 14.1, 63.1, 0.0, 0.0, 0.0, 0.0, 0.0, 4.9, 0.0, 0.0, -91.4),
-    ("2026-06-09", -61.6, -20.2, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 4.4, -77.4),
-    ("2026-06-10", -148.5, 4.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, -87.9, 17.5, -213.9),
-    ("2026-06-11", 30.3, -5.5, -13.1, -27.2, 0.0, 0.0, 0.0, -14.8, 0.0, 2.2, 0.0, 5.6, -22.5),
-    ("2026-06-12", 57.7, 18.0, 5.2, 3.2, 0.0, 0.0, 0.0, 1.8, 0.0, 0.0, 0.0, 0.0, 85.9),
-    ("2026-06-15", 66.4, -8.7, 0.0, -6.6, 0.0, -5.8, 0.0, -6.1, 0.0, 9.4, -124.0, 10.6, -64.8),
-    ("2026-06-16", 16.4, 4.3, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.9, -16.8, 4.4, 10.2),
-    ("2026-06-17", -30.8, 14.0, 0.0, -43.5, -6.4, 0.0, 0.0, -4.1, 0.0, 4.1, -15.5, 0.0, -82.2),
-    ("2026-06-18", -96.7, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -4.4, 0.0, 10.4, 0.0, 0.0, -90.7),
-    ("2026-06-22", -172.0, 57.4, 0.0, 64.0, 0.0, 3.7, 0.0, 0.0, 3.4, 8.1, -81.0, 48.1, -68.3),
-    ("2026-06-23", -182.0, 23.0, 0.0, 31.0, 0.0, 0.0, 0.0, 5.3, 0.0, 8.9, 0.0, 0.0, -113.8),
-    ("2026-06-24", -239.3, -120.8, -27.5, -50.7, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -54.3, 23.6, -469.0),
-    ("2026-06-25", -265.7, -274.5, -7.1, -82.1, -53.0, -6.8, 0.0, -11.7, 0.0, 9.2, 0.0, 0.0, -691.7),
-    ("2026-06-26", -444.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -444.5),
-    ("2026-06-29", -300.4, -3.9, 0.0, 50.0, 0.0, 0.0, 0.0, 3.8, 0.0, 7.3, 35.1, -22.9, -231.0),
-    ("2026-06-30", -212.4, -10.2, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -222.6),
-    ("2026-07-01", -219.4, -51.0, 0.0, -39.9, 5.4, 3.5, 0.0, 2.1, 0.0, 29.8, -62.8, 36.3, -296.0),
-    ("2026-07-02", -40.4, 166.0, 0.0, 91.8, 0.0, 0.0, 1.7, 4.4, 0.0, 0.0, 0.0, 0.0, 223.5),
-]
+ETF_KEYS = ['IBIT', 'FBTC', 'BITB', 'ARKB', 'BTCO', 'EZBC', 'BRRR', 'HODL', 'BTCW', 'MSBT', 'GBTC', 'BTC']
 
-# Build lookup of existing flows by date
-existing_flow_map = {f['date']: f for f in cache['flows']}
-
-# Merge data
-updated_flows = []
-new_dates_added = 0
-existing_updated = 0
-
-for row in raw_data:
-    date = row[0]
-    ibit, fbtc, bitb, arkb, btco, ezbc, brrr, hodl, btcw, msbt, gbtc, btc, total = row[1:]
-    
-    flow_entry = {
-        "date": date,
-        "total_btc": None,  # Farside provides USD, not BTC
-        "total_usd": int(total * 1_000_000),
-        "etfs": {
-            "IBIT": ibit,
-            "FBTC": fbtc,
-            "BITB": bitb,
-            "ARKB": arkb,
-            "BTCO": btco,
-            "EZBC": ezbc,
-            "BRRR": brrr,
-            "HODL": hodl,
-            "BTCW": btcw,
-            "MSBT": msbt,
-            "GBTC": gbtc,
-            "BTC": btc
-        }
-    }
-    
-    if date in existing_flow_map:
-        old = existing_flow_map[date]
-        # Check if data changed
-        if old['total_usd'] != flow_entry['total_usd']:
-            print(f"UPDATED {date}: total_usd {old['total_usd']} -> {flow_entry['total_usd']}")
-            existing_updated += 1
-        updated_flows.append(flow_entry)
-        del existing_flow_map[date]
-    else:
-        print(f"NEW {date}: total_usd={flow_entry['total_usd']}")
-        new_dates_added += 1
-        updated_flows.append(flow_entry)
-
-# Add any remaining cached flows (not in Farside data but might exist)
-for date, flow in sorted(existing_flow_map.items()):
-    print(f"KEEP (from cache, not in Farside): {date}")
-    updated_flows.append(flow)
-
-# Sort by date
-updated_flows.sort(key=lambda x: x['date'])
-
-# Keep existing cumulative values (no explicit cumulative totals found on page)
-# Update timestamps
-now = time.time()
-now_dt = datetime.fromtimestamp(now)
-last_update_str = now_dt.strftime("%Y-%m-%dT%H:%M:%S")
-
-new_cache = {
-    "flows": updated_flows,
-    "cumulative_btc": cache.get("cumulative_btc", 0),
-    "cumulative_usd": cache.get("cumulative_usd", 0),
-    "last_update": last_update_str,
-    "cached_at": now
+MONTH_MAP = {
+    'Jan': '01', 'Feb': '02', 'Mar': '03', 'Apr': '04', 'May': '05', 'Jun': '06',
+    'Jul': '07', 'Aug': '08', 'Sep': '09', 'Oct': '10', 'Nov': '11', 'Dec': '12'
 }
 
-# Validate
-for f in new_cache['flows']:
-    # Verify total_usd matches sum of etfs * 1M
-    etf_sum_m = sum(f['etfs'].values())
-    expected_usd = int(etf_sum_m * 1_000_000)
-    if abs(f['total_usd'] - expected_usd) > 1000:  # allow small rounding diff
-        print(f"WARNING {f['date']}: total_usd={f['total_usd']} but etf sum={etf_sum_m} -> expected={expected_usd}")
+CACHE_FILE = '/home/ubuntu/sfc/.etf_cache.json'
 
-with open('/home/ubuntu/sfc/.etf_cache.json', 'w') as f:
-    json.dump(new_cache, f, indent=2)
 
-print(f"\nDone! Wrote {len(updated_flows)} flow entries")
-print(f"New dates added: {new_dates_added}")
-print(f"Existing updated: {existing_updated}")
-print(f"Last update: {last_update_str}")
-print(f"Cached at: {now}")
+def parse_value(val_str):
+    """Parse a value string like '(440.3)' -> -440.3, '57.4' -> 57.4, '0.0' -> 0.0"""
+    val_str = val_str.strip()
+    if val_str.startswith('(') and val_str.endswith(')'):
+        return -float(val_str[1:-1].replace(',', ''))
+    return float(val_str.replace(',', ''))
+
+
+def parse_date(date_str):
+    """Parse '18 Jun 2026' -> '2026-06-18'"""
+    parts = date_str.split()
+    if len(parts) == 3:
+        day, month_str, year = parts
+        if len(day) == 1:
+            day = '0' + day
+        month = MONTH_MAP.get(month_str, '01')
+        return f'{year}-{month}-{day}'
+    return date_str
+
+
+def main():
+    print("Fetching page...")
+    scraper = cloudscraper.create_scraper()
+    resp = scraper.get('https://farside.co.uk/btc/', timeout=30)
+    resp.raise_for_status()
+    print(f"Page fetched: {len(resp.text)} bytes, status={resp.status_code}")
+
+    soup = BeautifulSoup(resp.text, 'html.parser')
+    table = soup.find('table', class_='etf')
+    if not table:
+        print("ERROR: Table with class 'etf' not found!")
+        return
+
+    rows = table.find_all('tr')
+    print(f"Found {len(rows)} rows")
+
+    # Parse new data rows (skip header/fee/total/average/max/min rows)
+    new_flows = []
+    for row in rows:
+        tds = row.find_all('td')
+        if not tds:
+            continue
+        cols = [td.get_text(strip=True) for td in tds]
+        date_raw = cols[0]
+
+        # Skip non-date rows (Total, Average, Maximum, Minimum, Fee)
+        if date_raw in ('Total', 'Average', 'Maximum', 'Minimum', 'Fee'):
+            continue
+
+        date = parse_date(date_raw)
+        etfs = {}
+        for i, key in enumerate(ETF_KEYS):
+            if i + 1 < len(cols):
+                etfs[key] = parse_value(cols[i + 1])
+
+        total_usd = None
+        if len(cols) > len(ETF_KEYS) + 1:
+            total_val = parse_value(cols[len(ETF_KEYS) + 1])
+            total_usd = int(total_val * 1_000_000)
+
+        flow = {
+            'date': date,
+            'total_btc': None,
+            'total_usd': total_usd,
+            'etfs': etfs,
+        }
+        new_flows.append(flow)
+        print(f"  Parsed: {date} total={total_usd} etfs={len(etfs)}")
+
+    # Get cumulative from chart data dataPoints
+    cumulative_usd = None
+    cumulative_btc = None
+    m = re.search(r'const dataPoints = \[([^\]]+)\]', resp.text)
+    if m:
+        values = re.findall(r'[\d.]+', m.group(1))
+        if values:
+            last_val = float(values[-1])
+            cumulative_usd = int(last_val * 1_000_000)
+            print(f"Cumulative USD from chart: ${cumulative_usd:,}")
+
+    # Read existing cache
+    existing_data = {'flows': [], 'cumulative_btc': None, 'cumulative_usd': None, 'cached_at': time.time()}
+    try:
+        with open(CACHE_FILE, 'r') as f:
+            existing_data = json.load(f)
+            print(f"Existing cache: {len(existing_data.get('flows', []))} flows")
+    except (FileNotFoundError, json.JSONDecodeError) as e:
+        print(f"No existing cache or parse error: {e}")
+
+    # Merge: combine new_flows with existing flows, dedup by date (newer wins)
+    flow_map = OrderedDict()
+    # First add existing flows
+    for f in existing_data.get('flows', []):
+        flow_map[f['date']] = f
+    # Then add/update with new flows
+    for f in new_flows:
+        flow_map[f['date']] = f
+
+    merged_flows = list(flow_map.values())
+    # Sort by date
+    merged_flows.sort(key=lambda x: x['date'])
+    print(f"Merged: {len(merged_flows)} total flows")
+
+    # Keep existing cumulative values if we couldn't find new ones
+    if cumulative_usd is None:
+        cumulative_usd = existing_data.get('cumulative_usd')
+    if cumulative_btc is None:
+        cumulative_btc = existing_data.get('cumulative_btc')
+
+    # Build last_update timestamp
+    now = datetime.now(timezone.utc)
+    last_update = now.strftime('%Y-%m-%dT%H:%M:%S')
+
+    output = {
+        'flows': merged_flows,
+        'cumulative_btc': cumulative_btc,
+        'cumulative_usd': cumulative_usd,
+        'last_update': last_update,
+        'cached_at': time.time(),
+    }
+
+    with open(CACHE_FILE, 'w') as f:
+        json.dump(output, f, indent=2)
+    print(f"\nCache written to {CACHE_FILE}")
+    print(f"  Flows: {len(merged_flows)}")
+    print(f"  Cumulative USD: {cumulative_usd}")
+    print(f"  Cumulative BTC: {cumulative_btc}")
+    print(f"  Last update: {last_update}")
+
+
+if __name__ == '__main__':
+    main()
