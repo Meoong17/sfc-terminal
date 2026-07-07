@@ -165,6 +165,17 @@ except ImportError as e:
     print(f"[SFC] Repo market stress module unavailable: {e}", file=sys.stderr)
     def compute_repo_stress(*a, **k): return 0.5, {"status": "unavailable"}
 
+# Import Global Sovereign Liquidity Score module (M90 — consolidated
+# US/Japan/Europe/UK sovereign bond signal, replaces the earlier idea of
+# separate M88/M89/M90 methods per country — see module docstring)
+try:
+    from global_sovereign_liquidity import compute_global_sovereign_liquidity
+    GSLS_AVAILABLE = True
+except ImportError as e:
+    GSLS_AVAILABLE = False
+    print(f"[SFC] Global Sovereign Liquidity module unavailable: {e}", file=sys.stderr)
+    def compute_global_sovereign_liquidity(*a, **k): return 50.0, {"status": "unavailable"}
+
 # Early init: M86 score starts at neutral (updated later by execution block if available)
 _m86_score = 0.5
 
@@ -627,10 +638,15 @@ def get_dvol():
         dvol = data.get("result", {}).get("index_price")
         if dvol is not None:
             return round(dvol, 2)
-        print("[SFC] get_dvol(): API returned no index_price", file=sys.stderr)
+        print(f"[SFC] WARNING: Deribit DVOL response had no index_price "
+              f"(response: {str(data)[:200]}). Dashboard will fall back to "
+              f"30-day rolling average via _factors_dvol.", file=sys.stderr)
         return None
     except Exception as e:
-        print(f"[SFC] get_dvol() failed: {e}", file=sys.stderr)
+        print(f"[SFC] WARNING: get_dvol() failed ({type(e).__name__}: {e}). "
+              f"Dashboard will fall back to 30-day rolling average via "
+              f"_factors_dvol — check Deribit API status / network egress "
+              f"if this persists.", file=sys.stderr)
         return None
 
 def get_m2_data():
@@ -1881,8 +1897,8 @@ _factors_fng = _fng_30d if _fng_30d is not None else fng
 _factors_pc = _pc_30d if _pc_30d is not None else pc_oi
 _factors_m2 = _m2_30d if _m2_30d is not None else m2_yoy
 _factors_dxy = _dxy_30d if _dxy_30d is not None else dxy
-# Override raw vars with fallback so ALL downstream consumers (Mamba, output JSON)
-# get the rolling average instead of None when API fails
+# Override raw dvol with rolling fallback so ALL downstream consumers
+# (Mamba dict, output JSON) get the fallback instead of None when API fails
 dvol = _factors_dvol
 print(f"[SFC] 30d rolling averages: BTC24h={_factors_btc_24h} DOM={_factors_dom} DVOL={_factors_dvol} FnG={_factors_fng} M2={_factors_m2}", file=sys.stderr)
 
@@ -2013,6 +2029,23 @@ if REPO_STRESS_AVAILABLE:
     except Exception as e:
         print(f"[REPO] Error: {e}", file=sys.stderr)
 
+# ── GLOBAL SOVEREIGN LIQUIDITY SCORE (M90) ──
+# Consolidates US/Japan/Europe/UK sovereign bond signals into ONE score
+# (0-100) rather than separate M88/M89/M90 methods — see
+# global_sovereign_liquidity.py module docstring for the full design
+# rationale (consistent with method_independence_analysis.py's findings:
+# feeding many correlated raw indicators separately into the ensemble
+# double-counts shared information; one consolidated latent factor is
+# cleaner signal for QLSTM/probabilistic modules to learn from).
+_m90_score, _m90_details = 50.0, {"status": "unavailable"}
+if GSLS_AVAILABLE:
+    try:
+        _m90_score, _m90_details = compute_global_sovereign_liquidity()
+        print(f"[GSLS] M90(GlobalSovereignLiquidity)={_m90_score:.1f} | "
+              f"regime={_m90_details.get('regime','?')}", file=sys.stderr)
+    except Exception as e:
+        print(f"[GSLS] Error: {e}", file=sys.stderr)
+
 # Score factors from market data (using 30d rolling averages + on-chain)
 factors = score_factors_from_market(btc, _factors_btc_24h, _factors_dom, _factors_dvol, _factors_fng, _factors_pc, _factors_m2, _factors_dxy,
                                      onchain_whale=whale_pressure, onchain_value=onchain_value, onchain_buy=buying_power,
@@ -2048,6 +2081,20 @@ if _m86_score != 0.5:
     repo_adj = (_m86_score - 0.5) * 1.5
     factors["Ft"] += max(-1.5, min(1.5, repo_adj))
     print(f"[REPO] Factor adj: Ft={repo_adj:+.3f}", file=sys.stderr)
+
+# ── GLOBAL SOVEREIGN LIQUIDITY SCORE FACTOR ADJUSTMENT (M90) ──
+# Applied to Lt (Long-term/liquidity LEVEL), not Ft — GSLS captures
+# sovereign yield curve shape and carry-trade fragility across
+# US/Japan/Europe/UK, the same "central-bank-and-macro-driven liquidity
+# backdrop" dimension GLF's Fed/ECB/BOJ/M2 components already measure,
+# just from the yield-curve/term-structure angle rather than
+# balance-sheet-size. See global_sovereign_liquidity.py module docstring
+# for the full design rationale, including why repo stress (M86, already
+# feeding Ft above) is deliberately NOT duplicated inside GSLS.
+if _m90_score != 50.0:
+    gsls_adj = (_m90_score - 50.0) / 50.0 * 1.0  # normalize 0-100 scale to a comparable adjustment magnitude
+    factors["Lt"] += max(-1.0, min(1.0, gsls_adj))
+    print(f"[GSLS] Factor adj: Lt={gsls_adj:+.3f}", file=sys.stderr)
 
 # Re-clamp factors after all adjustments
 for k in factors:
@@ -3367,7 +3414,20 @@ out = {
     "fng": fng,
     "fng_cls": fcls,
     "dom": round(dom, 1) if dom else None,
-    "dvol": dvol,
+    # Previously this used the raw `dvol` variable directly, which is
+    # None whenever get_dvol()'s Deribit API call fails (network issue,
+    # rate limit, endpoint change) — a bare `except: return None` with no
+    # logging. The internal stress-score calculation (`_factors_dvol`)
+    # ALREADY had a fallback to the 30-day rolling average for exactly
+    # this situation, but that fallback was never applied to what the
+    # DASHBOARD displays — confirmed live: dvol showing "—" while sfc_pct
+    # itself was computed fine (via the rolling-average fallback). Now
+    # the displayed value uses the same fallback the score already relied
+    # on, so the dashboard and the internal calculation agree on what
+    # DVOL "is" this cycle rather than one silently being None while the
+    # other quietly recovers.
+    "dvol": round(_factors_dvol, 2) if _factors_dvol is not None else None,
+    "dvol_is_fallback": dvol is None and _factors_dvol is not None,
     "sfc_base": sfc_pct,
     "sfc_effective": effective_sfc,
     "news_stress": news_stress,
@@ -3711,6 +3771,10 @@ out = {
     "m86_repo_stress_score": round(_m86_score, 3),
     "m86_detail": _m86_details if _m86_details.get("status") == "ok" else None,
     "m86_available": REPO_STRESS_AVAILABLE,
+    # Global Sovereign Liquidity Score (M90 — consolidated US/Japan/Europe/UK)
+    "m90_gsls_score": round(_m90_score, 1),
+    "m90_detail": _m90_details if _m90_details.get("status") in ("ok", "partial") else None,
+    "m90_available": GSLS_AVAILABLE,
     # ── XAI Explainability: M70-M71 ──
     "m70_shap_ok": _xai_result.get("m70_shap_ok", False),
     "m70_shap_top_1": _m70_shap_features[0]["name"] if len(_m70_shap_features) > 0 else None,
