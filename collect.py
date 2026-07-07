@@ -627,8 +627,10 @@ def get_dvol():
         dvol = data.get("result", {}).get("index_price")
         if dvol is not None:
             return round(dvol, 2)
+        print("[SFC] get_dvol(): API returned no index_price", file=sys.stderr)
         return None
-    except:
+    except Exception as e:
+        print(f"[SFC] get_dvol() failed: {e}", file=sys.stderr)
         return None
 
 def get_m2_data():
@@ -1879,6 +1881,9 @@ _factors_fng = _fng_30d if _fng_30d is not None else fng
 _factors_pc = _pc_30d if _pc_30d is not None else pc_oi
 _factors_m2 = _m2_30d if _m2_30d is not None else m2_yoy
 _factors_dxy = _dxy_30d if _dxy_30d is not None else dxy
+# Override raw vars with fallback so ALL downstream consumers (Mamba, output JSON)
+# get the rolling average instead of None when API fails
+dvol = _factors_dvol
 print(f"[SFC] 30d rolling averages: BTC24h={_factors_btc_24h} DOM={_factors_dom} DVOL={_factors_dvol} FnG={_factors_fng} M2={_factors_m2}", file=sys.stderr)
 
 # ── DXY-BTC Correlation Gate (for Sc factor sign) ──
