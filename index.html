@@ -2113,11 +2113,19 @@ function render(d) {
   // groupings change, this must be updated to match, or the breakdown
   // shown here will silently misrepresent what's actually driving each
   // Q10 score.
+  //
+  // UPDATED: exchange_netflow / stablecoin_exchange_netflow removed from
+  // whale_pressure / buying_power respectively — confirmed these are
+  // mathematically identical to (inflow - outflow) for the same group,
+  // not independent signals (verified: stored netflow value matched
+  // inflow-outflow to within floating point rounding). Remaining weights
+  // renormalized — see onchain_fetch.py's own comment for the full
+  // reasoning.
   const Q10_GROUPS = {
     whale_pressure: {
-      metrics: ["exchange_netflow", "whale_ratio", "exchange_supply_ratio", "funding_rates", "exchange_inflow_total", "exchange_outflow_total"],
-      weights: [0.20, 0.20, 0.15, 0.10, 0.20, 0.15],
-      labels: { exchange_netflow: "NetFlow", whale_ratio: "WhaleRatio", exchange_supply_ratio: "SupplyRatio", funding_rates: "Funding", exchange_inflow_total: "Inflow", exchange_outflow_total: "Outflow" },
+      metrics: ["whale_ratio", "exchange_supply_ratio", "funding_rates", "exchange_inflow_total", "exchange_outflow_total"],
+      weights: [0.25, 0.1875, 0.125, 0.25, 0.1875],
+      labels: { whale_ratio: "WhaleRatio", exchange_supply_ratio: "SupplyRatio", funding_rates: "Funding", exchange_inflow_total: "Inflow", exchange_outflow_total: "Outflow" },
     },
     onchain_value: {
       metrics: ["mvrv_ratio", "puell_multiple", "miners_position", "miner_netflow_total"],
@@ -2125,9 +2133,9 @@ function render(d) {
       labels: { mvrv_ratio: "MVRV", puell_multiple: "Puell", miners_position: "MinerPos", miner_netflow_total: "MinerFlow" },
     },
     buying_power: {
-      metrics: ["stablecoin_reserve", "taker_buy_sell", "stablecoin_exchange_inflow", "stablecoin_exchange_outflow", "stablecoin_exchange_netflow", "exchange_stablecoins_ratio", "coinbase_premium_gap"],
-      weights: [0.15, 0.10, 0.15, 0.15, 0.15, 0.15, 0.15],
-      labels: { stablecoin_reserve: "StableRes", taker_buy_sell: "Taker", stablecoin_exchange_inflow: "SC-In", stablecoin_exchange_outflow: "SC-Out", stablecoin_exchange_netflow: "SC-Net", exchange_stablecoins_ratio: "SC-Ratio", coinbase_premium_gap: "CBPremium" },
+      metrics: ["stablecoin_reserve", "taker_buy_sell", "stablecoin_exchange_inflow", "stablecoin_exchange_outflow", "exchange_stablecoins_ratio", "coinbase_premium_gap"],
+      weights: [0.1765, 0.1176, 0.1765, 0.1765, 0.1765, 0.1765],
+      labels: { stablecoin_reserve: "StableRes", taker_buy_sell: "Taker", stablecoin_exchange_inflow: "SC-In", stablecoin_exchange_outflow: "SC-Out", exchange_stablecoins_ratio: "SC-Ratio", coinbase_premium_gap: "CBPremium" },
     },
     market_structure: {
       metrics: ["open_interest", "long_liquidations_usd", "short_liquidations_usd", "fund_flow_ratio", "korea_premium_index"],

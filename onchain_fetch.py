@@ -287,9 +287,31 @@ def compute_onchain_scores(raw_data=None):
         raw_data = cache.get("raw", {})
 
     # Group metrics by factor
+    #
+    # IMPORTANT FIX: "exchange_netflow" and "stablecoin_exchange_netflow"
+    # were previously included in these groups ALONGSIDE the raw
+    # inflow/outflow metrics they're mathematically derived from.
+    # Verified against real data: exchange_netflow's stored value matched
+    # (exchange_inflow_total - exchange_outflow_total) to within floating
+    # point rounding (1e-15), and stablecoin_exchange_netflow matched
+    # (stablecoin_exchange_inflow - stablecoin_exchange_outflow) EXACTLY
+    # — these aren't merely correlated, netflow IS DEFINED as inflow
+    # minus outflow. Including all three in the same weighted average
+    # meant 0.55 of whale_pressure's total weight, and 0.45 of
+    # buying_power's, was effectively the same underlying flow signal
+    # counted 2-3 times. Removed the netflow term from both groups (kept
+    # inflow/outflow separately, since together they preserve MORE
+    # information than netflow alone — e.g. high inflow AND high outflow
+    # simultaneously indicates high churn/liquidity, a genuinely
+    # different market condition from low inflow AND low outflow, even
+    # though both cases could produce netflow≈0). Remaining weights
+    # renormalized to sum to 1.0 — see module-level NOTE below for exact
+    # values. Individual netflow metrics are still fetched/scored
+    # (available in "details" for anyone inspecting raw sub-metrics),
+    # just no longer included in the GROUP weighted average.
     factor_groups = {
         "whale_pressure": [
-            "exchange_netflow", "whale_ratio", "exchange_supply_ratio",
+            "whale_ratio", "exchange_supply_ratio",
             "funding_rates", "exchange_inflow_total", "exchange_outflow_total",
         ],
         "onchain_value": [
@@ -299,8 +321,7 @@ def compute_onchain_scores(raw_data=None):
         "buying_power": [
             "stablecoin_reserve", "taker_buy_sell",
             "stablecoin_exchange_inflow", "stablecoin_exchange_outflow",
-            "stablecoin_exchange_netflow", "exchange_stablecoins_ratio",
-            "coinbase_premium_gap",
+            "exchange_stablecoins_ratio", "coinbase_premium_gap",
         ],
         "market_structure": [
             "open_interest", "long_liquidations_usd",
@@ -309,11 +330,16 @@ def compute_onchain_scores(raw_data=None):
         ],
     }
 
-    # Weights for each factor group (must match metric order above)
+    # Weights for each factor group (must match metric order above).
+    # whale_pressure and buying_power renormalized after removing
+    # netflow — original relative weights among the remaining metrics
+    # preserved (e.g. exchange_inflow_total and exchange_outflow_total
+    # still get proportionally more/less weight than funding_rates did
+    # before, just rescaled so the group still sums to 1.0).
     weights_map = {
-        "whale_pressure": [0.20, 0.20, 0.15, 0.10, 0.20, 0.15],
+        "whale_pressure": [0.25, 0.1875, 0.125, 0.25, 0.1875],
         "onchain_value": [0.30, 0.25, 0.25, 0.20],
-        "buying_power": [0.15, 0.10, 0.15, 0.15, 0.15, 0.15, 0.15],
+        "buying_power": [0.1765, 0.1176, 0.1765, 0.1765, 0.1765, 0.1765],
         "market_structure": [0.25, 0.25, 0.20, 0.15, 0.15],
     }
 
