@@ -311,14 +311,23 @@ export default {
       }
       // Hash the endpoint URL to get a stable, KV-safe key (endpoint URLs
       // can be long and contain characters not ideal for direct key use).
-      const encoder = new TextEncoder();
-      const digest = await crypto.subtle.digest('SHA-256', encoder.encode(subscription.endpoint));
-      const hashHex = [...new Uint8Array(digest)].map(b => b.toString(16).padStart(2, '0')).join('').slice(0, 32);
-      const key = `push:subscription:${hashHex}`;
-      await env.SFC_USER_STATE.put(key, JSON.stringify({
-        subscription,
-        subscribed_at: new Date().toISOString(),
-      }));
+      try {
+        const encoder = new TextEncoder();
+        const digest = await crypto.subtle.digest('SHA-256', encoder.encode(subscription.endpoint));
+        const hashHex = [...new Uint8Array(digest)].map(b => b.toString(16).padStart(2, '0')).join('').slice(0, 32);
+        const key = `push:subscription:${hashHex}`;
+        await env.SFC_USER_STATE.put(key, JSON.stringify({
+          subscription,
+          subscribed_at: new Date().toISOString(),
+        }));
+        console.log(`[Push] Subscribed ${subscription.endpoint.substring(0,40)}... as ${key}`);
+      } catch (err) {
+        console.log(`[Push] KV write failed: ${err.message}`);
+        return new Response(JSON.stringify({ status: 'error', error: err.message }), {
+          status: 500,
+          headers: { 'Content-Type': 'application/json', ...getCorsHeaders(request) },
+        });
+      }
       return new Response(JSON.stringify({ status: 'ok' }), {
         headers: { 'Content-Type': 'application/json', ...getCorsHeaders(request) },
       });
