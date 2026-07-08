@@ -3235,7 +3235,32 @@ _drl_market_state = {
     "price": btc or 60000,
     "momentum": (chg or 0) / 100.0,
 }
-_m68_signal = get_trading_signal(_drl_market_state)
+# ── Load trained Q-learning agent, if available (NEW) ──
+# Previously get_trading_signal() was always called WITHOUT an agent,
+# meaning the trained-agent branch inside that function was permanently
+# unreachable — every cycle silently used the simple rule-based
+# fallback while being labeled "M68 DRL Signal", regardless of whether
+# train_drl_agent_script.py had ever been run. This loads a saved
+# Q-table if train_drl_agent_script.py has produced one; falls back to
+# the same rule-based behavior as before (agent=None) if the file
+# doesn't exist yet or fails to load for any reason — so this is safe
+# to deploy even before ever running the training script once.
+_drl_agent = None
+_drl_agent_loaded = False
+if DRL_AVAILABLE:
+    try:
+        _drl_model_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "models", "drl_agent.pkl")
+        if os.path.exists(_drl_model_path):
+            from trading.drl_agent import QLearningAgent
+            _drl_agent = QLearningAgent()
+            _drl_agent.load(_drl_model_path)
+            _drl_agent_loaded = True
+    except Exception as _drl_load_e:
+        print(f"[M68] Failed to load trained agent, using rule-based fallback: {_drl_load_e}", file=sys.stderr)
+        _drl_agent = None
+        _drl_agent_loaded = False
+
+_m68_signal = get_trading_signal(_drl_market_state, agent=_drl_agent)
 
 # M69: GNN Systemic Risk
 #
@@ -3784,6 +3809,7 @@ out = {
     "m65_affects_sfc_score": False,  # display-only — pattern info, not blended into sfc_pct/effective_sfc
     "m68_drl_signal": _m68_signal,
     "m68_available": DRL_AVAILABLE,
+    "m68_agent_loaded": _drl_agent_loaded,
     "m68_affects_sfc_score": False,  # display-only — uses real market state as input, but signal isn't blended into sfc_pct
     "m69_systemic_risk": round(_m69_overall, 4),
     "m69_btc_systemic_risk": round(_m69_btc, 4),
