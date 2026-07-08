@@ -2099,6 +2099,65 @@ function render(d) {
       .map(([key, c]) => ({ label: labels[key] || key, points: -(c.contribution || 0) * 100 }))
       .sort((a, b) => Math.abs(b.points) - Math.abs(a.points));
   })();
+
+  // ── Q10 on-chain contribution breakdown (NEW) ──
+  // Each of Q10's 4 composite scores (whale_pressure, onchain_value,
+  // buying_power, market_structure) is a straight weighted average of
+  // several sub-metric scores — formula confirmed from onchain_fetch.py:
+  //   group_score = Σ(sub_score_i * weight_i) / Σweight_i
+  // so each sub-metric's point contribution is simply
+  // (sub_score_i * weight_i / Σweight_i) — no offset or inversion needed
+  // here, unlike GLF (which has a "55 +" base) or MPI (which inverts).
+  // Group membership + weights below are copied directly from
+  // onchain_fetch.py's factor_groups/weights_map — if that file's
+  // groupings change, this must be updated to match, or the breakdown
+  // shown here will silently misrepresent what's actually driving each
+  // Q10 score.
+  const Q10_GROUPS = {
+    whale_pressure: {
+      metrics: ["exchange_netflow", "whale_ratio", "exchange_supply_ratio", "funding_rates", "exchange_inflow_total", "exchange_outflow_total"],
+      weights: [0.20, 0.20, 0.15, 0.10, 0.20, 0.15],
+      labels: { exchange_netflow: "NetFlow", whale_ratio: "WhaleRatio", exchange_supply_ratio: "SupplyRatio", funding_rates: "Funding", exchange_inflow_total: "Inflow", exchange_outflow_total: "Outflow" },
+    },
+    onchain_value: {
+      metrics: ["mvrv_ratio", "puell_multiple", "miners_position", "miner_netflow_total"],
+      weights: [0.30, 0.25, 0.25, 0.20],
+      labels: { mvrv_ratio: "MVRV", puell_multiple: "Puell", miners_position: "MinerPos", miner_netflow_total: "MinerFlow" },
+    },
+    buying_power: {
+      metrics: ["stablecoin_reserve", "taker_buy_sell", "stablecoin_exchange_inflow", "stablecoin_exchange_outflow", "stablecoin_exchange_netflow", "exchange_stablecoins_ratio", "coinbase_premium_gap"],
+      weights: [0.15, 0.10, 0.15, 0.15, 0.15, 0.15, 0.15],
+      labels: { stablecoin_reserve: "StableRes", taker_buy_sell: "Taker", stablecoin_exchange_inflow: "SC-In", stablecoin_exchange_outflow: "SC-Out", stablecoin_exchange_netflow: "SC-Net", exchange_stablecoins_ratio: "SC-Ratio", coinbase_premium_gap: "CBPremium" },
+    },
+    market_structure: {
+      metrics: ["open_interest", "long_liquidations_usd", "short_liquidations_usd", "fund_flow_ratio", "korea_premium_index"],
+      weights: [0.25, 0.25, 0.20, 0.15, 0.15],
+      labels: { open_interest: "OI", long_liquidations_usd: "LongLiq", short_liquidations_usd: "ShortLiq", fund_flow_ratio: "FundFlow", korea_premium_index: "KRPremium" },
+    },
+  };
+
+  function computeQ10Contributions(groupKey) {
+    const config = Q10_GROUPS[groupKey];
+    const details = d.q10_details;
+    if (!config || !details) return [];
+    const totalW = config.weights.reduce((a, b) => a + b, 0);
+    const out = [];
+    for (let i = 0; i < config.metrics.length; i++) {
+      const metricName = config.metrics[i];
+      const metricDetail = details[metricName];
+      if (!metricDetail || metricDetail.status !== 'ok') continue; // skip unavailable sub-metrics, don't fabricate a contribution for missing data
+      const score = metricDetail.score; // already 0-100 scale
+      const weight = config.weights[i];
+      out.push({
+        label: config.labels[metricName] || metricName,
+        // Points contribution on the SAME 0-100 scale as the group score
+        // itself (centered relative to neutral=50, so a sub-metric at
+        // exactly 50 contributes 0 points regardless of its weight).
+        points: (score - 50) * weight / totalW,
+      });
+    }
+    return out.sort((a, b) => Math.abs(b.points) - Math.abs(a.points));
+  }
   const liqLabel = d.liq_pressure === 'LONG_SQUEEZE' ? 'Long Squeeze' : d.liq_pressure === 'SHORT_SQUEEZE' ? 'Short Squeeze' : 'Balanced';
   const liqColor = d.liq_pressure === 'LONG_SQUEEZE' ? 'var(--red)' : d.liq_pressure === 'SHORT_SQUEEZE' ? 'var(--green)' : 'var(--amber)';
 
@@ -2640,9 +2699,10 @@ function render(d) {
             <div class="stat-val" style="color:${(d.q10_whale_pressure||50)>=65?'var(--green)':(d.q10_whale_pressure||50)>=40?'var(--amber)':'var(--red)'}">${fmtNum(d.q10_whale_pressure,1)}</div>
             <div class="stat-note">${(d.q10_whale_pressure||50)>=65?'Supply leaving exchanges':(d.q10_whale_pressure||50)>=40?'Neutral inflow/outflow':'Whales depositing to sell'}</div>
             <div class="prog-track mt-4"><div class="prog-fill ${(d.q10_whale_pressure||50)>=65?'pf-green':(d.q10_whale_pressure||50)>=40?'pf-amber':'pf-red'}" style="width:${(d.q10_whale_pressure||50)}%"></div></div>
-            <div style="font-size:8px;color:var(--text-3);margin-top:4px;line-height:1.4">
-              ${d.q10_details?.exchange_netflow?.status==='ok'?`Netflow: ${d.q10_details.exchange_netflow.value>0?'+':''}${fmtNum(d.q10_details.exchange_netflow.value,1)} BTC · `:''}
-              ${d.q10_details?.whale_ratio?.status==='ok'?`Whale: ${(d.q10_details.whale_ratio.value*100).toFixed(0)}%`:''}
+            <div style="font-size:8px;color:var(--text-3);margin-top:4px;line-height:1.6">
+              ${(() => { const c = computeQ10Contributions('whale_pressure'); return c.length > 0
+                ? c.map(x => `<span style="color:${x.points>0?'var(--green)':x.points<0?'var(--red)':'var(--text-3)'}">${x.label} ${x.points>=0?'+':''}${x.points.toFixed(1)}</span>`).join(' &nbsp;·&nbsp; ')
+                : 'No sub-metric data available'; })()}
             </div>
           </div>
           <div class="stat-box">
@@ -2650,9 +2710,10 @@ function render(d) {
             <div class="stat-val" style="color:${(d.q10_onchain_value||50)>=70?'var(--green)':(d.q10_onchain_value||50)>=40?'var(--amber)':'var(--red)'}">${fmtNum(d.q10_onchain_value,1)}</div>
             <div class="stat-note">${(d.q10_onchain_value||50)>=70?'Undervalued zone':(d.q10_onchain_value||50)>=40?'Fair value':'Overvalued zone'}</div>
             <div class="prog-track mt-4"><div class="prog-fill ${(d.q10_onchain_value||50)>=70?'pf-green':(d.q10_onchain_value||50)>=40?'pf-amber':'pf-red'}" style="width:${(d.q10_onchain_value||50)}%"></div></div>
-            <div style="font-size:8px;color:var(--text-3);margin-top:4px;line-height:1.4">
-              ${d.q10_details?.mvrv_ratio?.status==='ok'?`MVRV: ${fmtNum(d.q10_details.mvrv_ratio.value,2)} · `:''}
-              ${d.q10_details?.puell_multiple?.status==='ok'?`Puell: ${fmtNum(d.q10_details.puell_multiple.value,2)}`:''}
+            <div style="font-size:8px;color:var(--text-3);margin-top:4px;line-height:1.6">
+              ${(() => { const c = computeQ10Contributions('onchain_value'); return c.length > 0
+                ? c.map(x => `<span style="color:${x.points>0?'var(--green)':x.points<0?'var(--red)':'var(--text-3)'}">${x.label} ${x.points>=0?'+':''}${x.points.toFixed(1)}</span>`).join(' &nbsp;·&nbsp; ')
+                : 'No sub-metric data available'; })()}
             </div>
           </div>
           <div class="stat-box">
@@ -2660,9 +2721,10 @@ function render(d) {
             <div class="stat-val" style="color:${(d.q10_buying_power||50)>=65?'var(--green)':(d.q10_buying_power||50)>=40?'var(--amber)':'var(--red)'}">${fmtNum(d.q10_buying_power,1)}</div>
             <div class="stat-note">${(d.q10_buying_power||50)>=65?'Strong buying power ready':(d.q10_buying_power||50)>=40?'Neutral':'Weak buying pressure'}</div>
             <div class="prog-track mt-4"><div class="prog-fill ${(d.q10_buying_power||50)>=65?'pf-green':(d.q10_buying_power||50)>=40?'pf-amber':'pf-red'}" style="width:${(d.q10_buying_power||50)}%"></div></div>
-            <div style="font-size:8px;color:var(--text-3);margin-top:4px;line-height:1.4">
-              ${d.q10_details?.stablecoin_reserve?.status==='ok'?`Stable: $${(d.q10_details.stablecoin_reserve.value/1e9).toFixed(1)}B · `:''}
-              ${d.q10_details?.taker_buy_sell?.status==='ok'?`Taker B/S: ${fmtNum(d.q10_details.taker_buy_sell.value,2)}`:''}
+            <div style="font-size:8px;color:var(--text-3);margin-top:4px;line-height:1.6">
+              ${(() => { const c = computeQ10Contributions('buying_power'); return c.length > 0
+                ? c.map(x => `<span style="color:${x.points>0?'var(--green)':x.points<0?'var(--red)':'var(--text-3)'}">${x.label} ${x.points>=0?'+':''}${x.points.toFixed(1)}</span>`).join(' &nbsp;·&nbsp; ')
+                : 'No sub-metric data available'; })()}
             </div>
           </div>
         </div>
@@ -2693,9 +2755,10 @@ function render(d) {
             <div class="stat-val" style="color:${d.q10_market_structure!=null&&d.q10_market_structure>=60?'var(--green)':d.q10_market_structure!=null&&d.q10_market_structure>=40?'var(--amber)':'var(--red)'}">${d.q10_market_structure!=null?fmtNum(d.q10_market_structure,1):'—'}</div>
             <div class="stat-note">${d.q10_market_structure>=60?'Healthy leverage':d.q10_market_structure>=40?'Moderate':'Elevated risk'}</div>
             <div class="prog-track mt-4"><div class="prog-fill ${d.q10_market_structure>=60?'pf-green':d.q10_market_structure>=40?'pf-amber':'pf-red'}" style="width:${d.q10_market_structure||50}%"></div></div>
-            <div style="font-size:8px;color:var(--text-3);margin-top:4px;line-height:1.4">
-              ${d.q10_details?.open_interest?.status==='ok'?`OI: $${(d.q10_details.open_interest.value/1e9).toFixed(1)}B · `:''}
-              ${d.q10_details?.fund_flow_ratio?.status==='ok'?`FF: ${fmtNum(d.q10_details.fund_flow_ratio.value,2)}`:''}
+            <div style="font-size:8px;color:var(--text-3);margin-top:4px;line-height:1.6">
+              ${(() => { const c = computeQ10Contributions('market_structure'); return c.length > 0
+                ? c.map(x => `<span style="color:${x.points>0?'var(--green)':x.points<0?'var(--red)':'var(--text-3)'}">${x.label} ${x.points>=0?'+':''}${x.points.toFixed(1)}</span>`).join(' &nbsp;·&nbsp; ')
+                : 'No sub-metric data available'; })()}
             </div>
           </div>
           <div class="stat-box">
@@ -2956,6 +3019,23 @@ function render(d) {
         <div class="stat-3 mb-12" style="font-size:8px;color:var(--text-3);line-height:1.4">
           <span>🔄 LM (Liquidity Momentum): ${d.lm_label||'—'} · ${d.lm_score!=null?fmtNum(d.lm_score,2):'—'}pts · ${d.lm_n_points||0} data points</span>
           <span>🎯 DFS (Feature Selector): ${d.dfs_regime||'—'} · ${d.dfs_n_groups||0} groups · ${d.dfs_n_features||0} features</span>
+          <div style="font-size:8px;color:var(--text-3);margin-top:4px;line-height:1.6">
+            ${(() => {
+              const w = d.dfs_group_weights;
+              if (!w || typeof w !== 'object') return '';
+              const labels = { global_liquidity: 'GlobalLiq', stablecoin: 'Stablecoin', onchain: 'OnChain', derivatives: 'Derivatives', technical: 'Technical', macro: 'Macro' };
+              // These are direct regime-conditional IMPORTANCE weights (not
+              // a "contribution to a score" like GLF/SLI/MPI/Q10 — DFS's
+              // own get_group_weights() already normalizes them to sum to
+              // 1.0), so this just displays the existing values as % of
+              // total feature-selection weight in the CURRENT regime,
+              // sorted by size — no additional math needed.
+              return Object.entries(w)
+                .sort((a, b) => b[1] - a[1])
+                .map(([key, weight]) => `${labels[key] || key} ${(weight*100).toFixed(0)}%`)
+                .join(' &nbsp;·&nbsp; ');
+            })()}
+          </div>
           <span>⚖ DW (Dynamic Weight): ${d.dw_regime||'—'} · Ft=${d.dw_weights?.Ft!=null?(d.dw_weights.Ft*100).toFixed(0):'—'}% Lt=${d.dw_weights?.Lt!=null?(d.dw_weights.Lt*100).toFixed(0):'—'}% · adj=${d.dw_sfc_adjustment!=null?fmtNum(d.dw_sfc_adjustment,1):'—'}pp</span>
         </div>
       </div>
