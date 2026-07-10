@@ -1,20 +1,7 @@
 {
-  "capital": 49181.75,
+  "capital": 50032.63,
   "peak_capital": 50047.96,
-  "positions": [
-    {
-      "type": "LONG",
-      "entry_price": 62751.88,
-      "size": 837.1,
-      "entry_date": "2026-07-09T16:24:24.097914+00:00",
-      "reason": "SFC 9% \u00b7 Conf 36%",
-      "sfc_at_entry": 8.8,
-      "confidence_at_entry": 36.0,
-      "slippage_entry": 0.42,
-      "spread_cost_entry": 0.42,
-      "time_slippage_pct": 0.026
-    }
-  ],
+  "positions": [],
   "trades": [
     {
       "id": 1,
@@ -141,6 +128,18 @@
       "slippage": 0.42,
       "time_slippage_pct": 0.026,
       "reason": "SFC 9% \u00b7 Conf 36%"
+    },
+    {
+      "id": 12,
+      "type": "CLOSE",
+      "direction": "LONG",
+      "date": "2026-07-10T01:50:30.628844+00:00",
+      "price": 63816.23,
+      "size": 837.1,
+      "pnl": 13.78,
+      "pnl_pct": 1.7,
+      "slippage_exit": 0.42,
+      "reason": "Cascade Risk 52%"
     }
   ],
   "equity_history": [
@@ -7024,6 +7023,13 @@
       "equity": 50027.22,
       "capital": 49181.75,
       "unrealized": 8.37
+    },
+    {
+      "ts": "2026-07-10T01:50:30.628856+00:00",
+      "btc": 63816.23,
+      "equity": 50032.63,
+      "capital": 50032.63,
+      "unrealized": 0
     }
   ],
   "daily_snapshots": {
@@ -7084,15 +7090,15 @@
     },
     "2026-07-10": {
       "date": "2026-07-10",
-      "equity": 50027.22,
-      "return_pct": 0.05,
-      "sharpe": -1.77,
-      "win_rate": 0.4,
+      "equity": 50032.63,
+      "return_pct": 0.07,
+      "sharpe": -1.99,
+      "win_rate": 0.5,
       "max_dd_pct": 0.07,
-      "total_trades": 11,
-      "open_positions": 1,
-      "status": "IN_MARKET"
+      "total_trades": 12,
+      "open_positions": 0,
+      "status": "CASH"
     }
   },
-  "updated_at": "2026-07-10T01:44:31.565312+00:00"
+  "updated_at": "2026-07-10T01:50:30.634027+00:00"
 }
