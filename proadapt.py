@@ -100,7 +100,16 @@ def _adaptive_weight(rmse_q, rmse_h):
     w_qlstm = (1/rmse_q) / (1/rmse_q + 1/rmse_h)
 
     Falls back to 0.5 when both are infinite (no data).
+
+    FIX 2026.07.11: Add MIN_RMSE_FLOOR=0.5 so tiny errors (<0.5 SFC pts)
+    don't produce meaningless 50/50 splits in calm markets. When both
+    RMSEs are below floor, the weight trends toward hybrid (GARCH-aware)
+    as the more complete predictor.
     """
+    MIN_RMSE_FLOOR = 0.5  # SFC points
+    rmse_q = max(rmse_q, MIN_RMSE_FLOOR)
+    rmse_h = max(rmse_h, MIN_RMSE_FLOOR)
+    
     if rmse_q == float('inf') and rmse_h == float('inf'):
         return 0.5
     if rmse_q == float('inf'):
