@@ -943,20 +943,34 @@ def score_factors_from_market(btc, btc_24h, dom, dvol, fng, pc_oi, m2_yoy, dxy, 
     return factors
 
 def calculate_sfc_ensemble(factors):
-    """Calculate 6-method ensemble from factors with Lt/St weights (33%/67%)."""
+    """Calculate 6-method ensemble from factors with Lt/St weights (33%/67%).
+
+    FIX v2026.07.11 — Scale mismatch bug:
+    All 6 methods had thresholds designed for norm in [-3, +3], but
+    `norm = factors/6` puts actual values in [-0.5, +0.5]. This meant:
+      - M1 KLR: max 0.30 (designed for 1.0)
+      - M2 Logit: anchors unreachable (z_score scaled by /6)
+      - M3 Bayes: norm[k] < -0.5 NEVER true → dead code
+      - M4 EWC: max 0.17 (designed for 1.0)
+      - M5 QReg: anchors unreachable (same /6 in z_score)
+      - M6 Regime: extreme/severe counts always 0
+    Fix restores original design range: z_score from raw factors [-15,+15],
+    norm[-0.5,+0.5] thresholds scaled by /6, M4 uses raw factors.
+    """
     # Apply Lt/St weights from correlation analysis (Lt|r|=0.057, St|r|=0.114)
     # Weights adjusted to preserve total scale (sum=5, same as equal weighting)
     _FACTOR_WT = {"Lt": 0.66, "St": 1.34, "Rt": 1.0, "Ft": 1.0, "Sc": 1.0}
     norm = {k: v/6 for k, v in factors.items()}
-    z_score = sum(norm[k] * _FACTOR_WT[k] for k in factors)
+    # FIX: use raw factors (not norm/6) for z_score — original [-15, +15] range
+    z_score = sum(factors[k] * _FACTOR_WT[k] for k in factors)
     
-    # M1: KLR
+    # M1: KLR — thresholds rescaled from [-2, -1, 0] → [÷6] for norm[-0.5, +0.5]
     ns_r = {"Lt":0.35, "St":0.50, "Rt":0.40, "Ft":0.25, "Sc":0.80}
     w = {k:1/v for k,v in ns_r.items()}
-    sig = sum((1.0 if norm[k]<-2 else 0.7 if norm[k]<-1 else 0.3 if norm[k]<0 else 0) * w[k] for k in factors)
+    sig = sum((1.0 if norm[k]<-0.333 else 0.7 if norm[k]<-0.167 else 0.3 if norm[k]<0 else 0) * w[k] for k in factors)
     p_klr = max(0.0, min(1.0, sig / sum(w.values())))  # clamp to [0,1]
     
-    # M2: Logit
+    # M2: Logit — z_score now [-15, +15], anchors match original design
     zc = [-1.0, -2.0, -3.0, -4.0, -8.0]
     pc = [0.08, 0.20, 0.55, 0.75, 0.95]
     yc = [math.log(p/(1-p)) for p in pc]
@@ -968,21 +982,21 @@ def calculate_sfc_ensemble(factors):
     z_l = b0 + b1*z_score
     p_logit = 1/(1+math.exp(-z_l))
     
-    # M3: Bayesian
+    # M3: Bayesian — threshold lowered from -0.5 (unreachable) to -0.3
     prior = 0.08  # raised from 0.04 — BTC historically crashes 8-15% of years
     odds = prior/(1-prior)
     bayes_mult = [2.5, 2.0, 2.0, 3.0, 1.5]
     for i, k in enumerate(factors):
-        if norm[k] < -0.5:
+        if norm[k] < -0.3:
             odds *= bayes_mult[i]
     p_bayes = odds/(1+odds)
     
-    # M4: ECB Composite
+    # M4: ECB Composite — use raw factors (not norm) to match /3.0 denominator
     w_ad = {"Lt":0.25, "St":0.20, "Rt":0.20, "Ft":0.30, "Sc":0.05}
-    ewc = sum(w_ad[k] * abs(norm[k]) for k in factors)
+    ewc = sum(w_ad[k] * abs(factors[k]) for k in factors)
     p_ewc = ewc/3.0
     
-    # M5: Quantile Regression
+    # M5: Quantile Regression — z_score now [-15, +15], anchors match design
     qr_anchors = [(-8.0, 0.95), (-5.0, 0.75), (-3.0, 0.50), (-1.5, 0.25), (-0.5, 0.10), (0.5, 0.04), (2.0, 0.01)]
     def quantile_stress(z):
         anchors = sorted(qr_anchors, key=lambda x: x[0])
@@ -997,19 +1011,19 @@ def calculate_sfc_ensemble(factors):
         return 0.04
     p_quantile = quantile_stress(z_score)
     
-    # M6: Composite Regime Score
+    # M6: Composite Regime Score — all thresholds ÷6 for norm[-0.5, +0.5]
     vals = list(norm.values())
     n = len(vals)
-    extreme_count = sum(1 for v in vals if v < -1.0)
-    severe_count = sum(1 for v in vals if v < -2.0)
+    extreme_count = sum(1 for v in vals if v < -0.167)
+    severe_count = sum(1 for v in vals if v < -0.333)
     p_extremity = (extreme_count * 0.15 + severe_count * 0.20)
     mean_v = sum(vals) / n
     variance = sum((v - mean_v)**2 for v in vals) / n
-    coherence_bonus = 0.10 * (1.0 - variance) if mean_v < -0.5 and variance < 1.0 else 0.0
+    coherence_bonus = 0.10 * (1.0 - variance) if mean_v < -0.083 and variance < 0.12 else 0.0
     ft_val = norm.get("Ft", 0)
     lt_val = norm.get("Lt", 0)
-    tail_contribution = (0.15 if ft_val < -1.5 else 0.0) + (0.10 if lt_val < -1.5 else 0.0)
-    p_baseline = max(0.0, min((-mean_v) * 0.12, 0.50))
+    tail_contribution = (0.15 if ft_val < -0.25 else 0.0) + (0.10 if lt_val < -0.25 else 0.0)
+    p_baseline = max(0.0, min((-mean_v) * 0.72, 0.50))
     p_regime = min(p_baseline + p_extremity + coherence_bonus + tail_contribution, 0.99)
     p_regime = max(p_regime, 0.01)
     
