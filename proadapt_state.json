@@ -1,15 +1,6 @@
 {
   "observations": [
     {
-      "qlstm_pred": 0.00016557209193706512,
-      "garch_pred": 0.0,
-      "hybrid_pred": 0.00016557209193706512,
-      "actual": 0.0,
-      "qlstm_error": -0.00016557209193706512,
-      "hybrid_error": -0.00016557209193706512,
-      "timestamp": 1783830950.318592
-    },
-    {
       "qlstm_pred": 0.0001490653119981289,
       "garch_pred": 0.0,
       "hybrid_pred": 0.0001490653119981289,
@@ -179,16 +170,25 @@
       "qlstm_error": -1.2943168403580785e-05,
       "hybrid_error": -1.2943168403580785e-05,
       "timestamp": 1783840191.5561469
+    },
+    {
+      "qlstm_pred": 1.1639666045084596e-05,
+      "garch_pred": 0.0,
+      "hybrid_pred": 1.1639666045084596e-05,
+      "actual": 0.0,
+      "qlstm_error": -1.1639666045084596e-05,
+      "hybrid_error": -1.1639666045084596e-05,
+      "timestamp": 1783840670.7901616
     }
   ],
   "window_size": 20,
   "rmse_window": 10,
   "fine_tune_threshold": 2.0,
-  "qlstm_mae": 2.3295118822716176e-05,
-  "hybrid_mae": 2.3295118822716176e-05,
+  "qlstm_mae": 2.0440030843019484e-05,
+  "hybrid_mae": 2.0440030843019484e-05,
   "fine_tune_requested": false,
-  "last_updated": 1783840191.5562973,
+  "last_updated": 1783840670.790294,
   "version": 1,
-  "qlstm_rmse": 2.4812506218320855e-05,
-  "hybrid_rmse": 2.4812506218320855e-05
+  "qlstm_rmse": 2.162592541118452e-05,
+  "hybrid_rmse": 2.162592541118452e-05
 }
