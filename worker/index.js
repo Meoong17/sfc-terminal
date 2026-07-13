@@ -12,7 +12,7 @@
 //   wrangler secret put BACKUP_URL
 // and paste your VPS URL (e.g. http://YOUR_VPS_IP:8765) when prompted.
 
-const TUNNEL_DEFAULT = 'https://coat-pays-injuries-irrigation.trycloudflare.com';
+const TUNNEL_DEFAULT = 'https://notify-directories-blanket-antibody.trycloudflare.com';
 
 async function fetchAny(env, path, accept) {
   // Try tunnel first, then VPS direct IP (from secret env, if configured)
