@@ -1,186 +1,169 @@
 #!/usr/bin/env python3
-"""Scrape Farside BTC ETF data and update .etf_cache.json"""
+"""Fetch Farside BTC ETF flow data, merge with existing cache, and update."""
 
-import cloudscraper
 import json
 import re
 import time
-import os
+from datetime import datetime
 from bs4 import BeautifulSoup
-from datetime import datetime, timezone
+import requests
+from collections import OrderedDict
 
-CACHE_PATH = '/home/ubuntu/sfc/.etf_cache.json'
-URL = 'https://farside.co.uk/btc/'
-
-ETF_NAMES = ['IBIT', 'FBTC', 'BITB', 'ARKB', 'BTCO', 'EZBC', 'BRRR', 'HODL', 'BTCW', 'MSBT', 'GBTC', 'BTC']
+HEADERS = {
+    'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+}
 
 MONTH_MAP = {
     'Jan': '01', 'Feb': '02', 'Mar': '03', 'Apr': '04', 'May': '05', 'Jun': '06',
     'Jul': '07', 'Aug': '08', 'Sep': '09', 'Oct': '10', 'Nov': '11', 'Dec': '12'
 }
 
+def parse_date(dd_mon_yyyy):
+    """Convert '11 Jan 2024' to '2024-01-11'."""
+    parts = dd_mon_yyyy.strip().split()
+    if len(parts) != 3:
+        return None
+    day, mon, year = parts
+    month = MONTH_MAP.get(mon)
+    if not month:
+        return None
+    return f"{year}-{month}-{day.zfill(2)}"
 
 def parse_value(val_str):
-    """Parse a cell value - handles parentheses for negative, dashes for no data."""
-    val_str = val_str.replace(',', '').replace('$', '').strip()
-    if val_str in ('', 'N/A', '-', 'n/a'):
+    """Parse a cell value: '-' -> 0.0, '(440.3)' -> -440.3, '51,086' -> 51086.0."""
+    val_str = val_str.strip().replace(',', '')
+    if val_str == '-' or val_str == '':
         return 0.0
     if val_str.startswith('(') and val_str.endswith(')'):
         return -float(val_str[1:-1])
     return float(val_str)
 
-
-def scrape_data():
-    """Scrape ETF table and cumulative data from Farside."""
-    scraper = cloudscraper.create_scraper()
-    resp = scraper.get(URL, timeout=30)
-    soup = BeautifulSoup(resp.text, 'html.parser')
-
-    # Find the ETF table
-    table = soup.find('table', class_='etf')
-    if not table:
-        raise RuntimeError("Could not find ETF table on page")
-
-    rows = table.find_all('tr')
-
-    new_flows = []
+def fetch_flows():
+    """Fetch ETF flow data from Farside all-data page. Returns (flows_list, cumulative_total_millions)."""
+    r = requests.get('https://farside.co.uk/bitcoin-etf-flow-all-data/', timeout=30, headers=HEADERS)
+    r.raise_for_status()
+    
+    soup = BeautifulSoup(r.text, 'html.parser')
+    tables = soup.find_all('table')
+    
+    # Find the table with our headers
+    target_table = None
+    for table in tables:
+        thead = table.find('thead')
+        if thead:
+            headers = [th.get_text(strip=True) for th in thead.find_all('th')]
+            if headers[:3] == ['Date', 'IBIT', 'FBTC']:
+                target_table = table
+                break
+    
+    if not target_table:
+        raise ValueError("Could not find the ETF flow data table")
+    
+    tbody = target_table.find('tbody') or target_table
+    rows = tbody.find_all('tr')
+    
+    flows = []
+    
     for row in rows:
-        cells = [td.get_text(strip=True) for td in row.find_all(['td', 'th'])]
-        if not cells:
+        cells = row.find_all('td')
+        if len(cells) != 14:  # Date + 12 ETFs + Total
             continue
-
-        date_text = cells[0]
-
-        # Skip non-data rows
-        if date_text in ('', 'Fee', 'Average', 'Maximum', 'Minimum', 'Total'):
+        
+        date_raw = cells[0].get_text(strip=True)
+        
+        # Skip non-date rows
+        if date_raw == 'Total' or date_raw == 'Average' or date_raw == 'Maximum' or date_raw == 'Minimum':
             continue
-
-        # Check if first cell is a date
-        date_match = re.match(r'(\d{1,2})\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{4})', date_text)
-        if not date_match:
+        
+        date_parsed = parse_date(date_raw)
+        if not date_parsed:
             continue
-
-        day, month_str, year = date_match.groups()
-        month = MONTH_MAP[month_str]
-        date_formatted = f"{year}-{month}-{int(day):02d}"
-
-        # Parse ETF values
-        etf_values = {}
-        has_any_data = False
-        for idx, etf_name in enumerate(ETF_NAMES):
-            val_str = cells[idx + 1] if len(cells) > idx + 1 else '0'
-            val = parse_value(val_str)
-            etf_values[etf_name] = val
-            if val_str not in ('-', '0', '0.0', '', 'N/A'):
-                has_any_data = True
-
-        # Parse total
-        total_str = cells[13] if len(cells) > 13 else '0'
-        total_val = parse_value(total_str)
-        total_usd = int(total_val * 1_000_000)
-
-        # If the row has all dashes (no data yet), keep total_usd = 0
-        # but store the entry anyway with 0s for all ETFs
-        if not has_any_data and total_val == 0:
-            for etf_name in ETF_NAMES:
-                etf_values[etf_name] = 0.0
-
-        new_flows.append({
-            "date": date_formatted,
+        
+        # ETF columns in order: Date, IBIT, FBTC, BITB, ARKB, BTCO, EZBC, BRRR, HODL, BTCW, MSBT, GBTC, BTC, Total
+        etf_names = ['IBIT', 'FBTC', 'BITB', 'ARKB', 'BTCO', 'EZBC', 'BRRR', 'HODL', 'BTCW', 'MSBT', 'GBTC', 'BTC']
+        
+        etfs = {}
+        for i, name in enumerate(etf_names):
+            etfs[name] = round(parse_value(cells[i+1].get_text(strip=True)), 4)
+        
+        total_val = parse_value(cells[-1].get_text(strip=True))
+        total_usd = int(round(total_val * 1_000_000))
+        
+        flows.append({
+            "date": date_parsed,
             "total_btc": None,
             "total_usd": total_usd,
-            "etfs": etf_values
+            "etfs": etfs
         })
-
-    # Extract cumulative USD from chart dataPoints
-    cum_usd = None
-    cum_btc = None
-
-    for s in soup.find_all('script'):
-        content = s.string or ''
-        if 'dataPoints' in content:
-            match = re.search(r'const\s+dataPoints\s*=\s*(\[.*?\]);', content, re.DOTALL)
-            if match:
-                vals = re.findall(r'([+-]?\d+\.?\d*)', match.group(1))
-                if vals:
-                    last = float(vals[-1])
-                    cum_usd = int(last * 1_000_000)
-
-    # Extract today's date from footer
-    last_update = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S')
-    today_match = re.search(r"Today['\u2019]*s*\s*date\s*is\s*(\d{1,2})\s+(\w+)\s+(\d{4})", resp.text)
-    if today_match:
-        day = int(today_match.group(1))
-        month_str = today_match.group(2)
-        year = today_match.group(3)
-        month_num = MONTH_MAP.get(month_str[:3], '01')
-        # Use footer date but our current time for the timestamp
-        # Actually just use current time - that's fine
-
-    return new_flows, cum_usd, cum_btc, last_update
-
-
-def merge_flows(existing_flows, new_flows):
-    """Merge new flows into existing flows, deduplicating by date (new wins)."""
-    flow_map = {}
-    for flow in existing_flows:
-        flow_map[flow['date']] = flow
-    for flow in new_flows:
-        flow_map[flow['date']] = flow
     
-    # Sort by date
-    merged = sorted(flow_map.values(), key=lambda x: x['date'])
-    return merged
+    # Get cumulative total from the Total row
+    cumulative_total_millions = 0.0
+    for row in rows:
+        cells = row.find_all('td')
+        if len(cells) == 14 and cells[0].get_text(strip=True) == 'Total':
+            cumulative_total_millions = parse_value(cells[-1].get_text(strip=True))
+            break
+    
+    return flows, cumulative_total_millions
 
 
 def main():
+    # Fetch new data
+    print("Fetching ETF flow data from Farside...")
+    new_flows, cumulative_total_millions = fetch_flows()
+    print(f"Fetched {len(new_flows)} flow records")
+    print(f"Date range: {new_flows[0]['date']} to {new_flows[-1]['date']}")
+    print(f"Cumulative total (millions USD): {cumulative_total_millions}")
+    
     # Read existing cache
-    existing_data = {}
-    if os.path.exists(CACHE_PATH):
-        with open(CACHE_PATH, 'r') as f:
-            existing_data = json.load(f)
-
-    existing_flows = existing_data.get('flows', [])
-
-    # Scrape new data
-    print("Scraping Farside BTC ETF data...")
-    new_flows, cum_usd, cum_btc, last_update = scrape_data()
-    print(f"  Scraped {len(new_flows)} flow rows")
-
-    # Merge flows
-    merged_flows = merge_flows(existing_flows, new_flows)
-    print(f"  Merged: {len(existing_flows)} existing + {len(new_flows)} new = {len(merged_flows)} total")
-
-    # Update cumulative values (only if we got new ones from the page)
-    if cum_usd is not None:
-        print(f"  Cumulative USD: ${cum_usd:,}")
-    else:
-        cum_usd = existing_data.get('cumulative_usd')
-
-    if cum_btc is None:
-        cum_btc = existing_data.get('cumulative_btc')
-
-    # Build new cache data
-    cache_data = {
-        "flows": merged_flows,
-        "cumulative_btc": cum_btc,
-        "cumulative_usd": cum_usd,
-        "last_update": last_update,
-        "cached_at": time.time()
-    }
-
-    # Write
-    with open(CACHE_PATH, 'w') as f:
-        json.dump(cache_data, f, indent=2)
-    print(f"\nWritten to {CACHE_PATH}")
-    print(f"  Last update: {last_update}")
-    print(f"  Total flows: {len(merged_flows)}")
-
-    # Verify by reading back
-    with open(CACHE_PATH, 'r') as f:
+    cache_path = '/home/ubuntu/sfc/.etf_cache.json'
+    try:
+        with open(cache_path, 'r') as f:
+            existing = json.load(f)
+        print(f"Existing cache has {len(existing.get('flows', []))} flow records")
+    except (FileNotFoundError, json.JSONDecodeError):
+        print("No valid existing cache found, starting fresh")
+        existing = {"flows": [], "cumulative_btc": None, "cumulative_usd": None}
+    
+    # Merge flows: existing by date, then overwrite/append with new
+    existing_by_date = {f['date']: f for f in existing.get('flows', [])}
+    
+    for flow in new_flows:
+        existing_by_date[flow['date']] = flow
+    
+    # Sort by date
+    merged_flows = sorted(existing_by_date.values(), key=lambda f: f['date'])
+    
+    # Compute cumulative_usd from the total row data if available
+    cumulative_usd = int(round(cumulative_total_millions * 1_000_000))
+    
+    # If we don't have a cumulative_btc from the page, compute from existing
+    cumulative_btc = existing.get('cumulative_btc')
+    
+    now = time.time()
+    dt_now = datetime.utcfromtimestamp(now).strftime('%Y-%m-%dT%H:%M:%S')
+    
+    cache_data = OrderedDict([
+        ("flows", merged_flows),
+        ("cumulative_btc", cumulative_btc),
+        ("cumulative_usd", cumulative_usd),
+        ("last_update", dt_now),
+        ("cached_at", now)
+    ])
+    
+    # Write cache
+    with open(cache_path, 'w') as f:
+        json.dump(cache_data, f, indent=2, ensure_ascii=False)
+    
+    print(f"Cache written with {len(merged_flows)} total flow records")
+    print(f"Cumulative USD: ${cumulative_usd:,}")
+    print(f"Last update: {dt_now}")
+    
+    # Verify
+    with open(cache_path, 'r') as f:
         verified = json.load(f)
-    print(f"  Verified: {len(verified['flows'])} flows, cumulative_usd={verified['cumulative_usd']}")
-
+    assert len(verified['flows']) == len(merged_flows), "Flow count mismatch!"
+    print(f"VERIFIED: Cache reads back valid JSON with {len(verified['flows'])} flows.")
 
 if __name__ == '__main__':
     main()
