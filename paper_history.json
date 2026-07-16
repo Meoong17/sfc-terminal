@@ -120,34 +120,38 @@
       "total_trades": 14,
       "open_positions": 0,
       "status": "CASH"
+    },
+    {
+      "date": "2026-07-16",
+      "equity": 50032.87,
+      "return_pct": 0.07,
+      "sharpe": 0.36,
+      "win_rate": 0.5714,
+      "max_dd_pct": 0.07,
+      "total_trades": 15,
+      "open_positions": 1,
+      "status": "IN_MARKET"
     }
   ],
   "current": {
     "initial_capital": 50000.0,
-    "capital": 50032.95,
-    "equity": 50032.95,
+    "capital": 49870.22,
+    "equity": 50032.87,
     "peak_equity": 50047.96,
     "total_return": 0.0007,
     "total_return_pct": 0.07,
-    "sharpe": 0.36,
+    "sharpe": 0.32,
     "win_rate": 0.5714,
     "win_rate_pct": 57.1,
     "max_dd": 0.0007,
     "max_dd_pct": 0.07,
-    "total_trades": 14,
+    "total_trades": 15,
     "closed_trades": 7,
-    "open_positions": 0,
-    "unrealized_pnl": 0,
-    "status": "CASH"
+    "open_positions": 1,
+    "unrealized_pnl": 0.0,
+    "status": "IN_MARKET"
   },
   "equity_curve": [
-    {
-      "ts": "2026-07-13T12:31:44.351886+00:00",
-      "btc": 62825.52,
-      "equity": 50032.95,
-      "capital": 50032.95,
-      "unrealized": 0
-    },
     {
       "ts": "2026-07-13T12:38:14.687723+00:00",
       "btc": 62628.27,
@@ -3640,6 +3644,13 @@
       "equity": 50032.95,
       "capital": 50032.95,
       "unrealized": 0
+    },
+    {
+      "ts": "2026-07-16T00:07:21.440702+00:00",
+      "btc": 64841.75,
+      "equity": 50032.87,
+      "capital": 49870.22,
+      "unrealized": 0.0
     }
   ]
 }
