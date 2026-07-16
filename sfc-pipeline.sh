@@ -46,7 +46,7 @@ collect_with_retry() {
 collect_with_retry
 
 log "Running paper trader..."
-$PYTHON paper_trader.py 2>>sfc-pipeline.log || log "⚠ Paper trader skipped"
+$PYTHON trading/paper_trader.py 2>>sfc-pipeline.log || log "⚠ Paper trader skipped"
 
 # ── Make git ignore index.html ──
 git update-index --skip-worktree index.html 2>/dev/null || true

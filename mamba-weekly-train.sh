@@ -15,7 +15,7 @@ log "=== Weekly Mamba Training Started ==="
 
 # 1. Fetch latest historical BTC data
 log "Step 1/2: Fetching historical BTC data..."
-if python3 fetch_historical_btc.py >> "$LOG_FILE" 2>&1; then
+if python3 data_sources/fetch_historical_btc.py >> "$LOG_FILE" 2>&1; then
     log "✅ Historical BTC data fetched"
 else
     log "⚠️  BTC fetch failed — continuing with cached data"
@@ -42,7 +42,7 @@ log "Step 2/2: Training Mamba SSM..."
 # still protected by it.
 set +e
 PYTHONPATH="${REPO_DIR}/sfc2/venv/lib/python3.12/site-packages:${PYTHONPATH:-}" \
-  timeout 600 python3 train_mamba.py >> "$LOG_FILE" 2>&1
+  timeout 600 python3 models/train_mamba.py >> "$LOG_FILE" 2>&1
 TRAIN_EXIT=$?
 set -e
 if [ $TRAIN_EXIT -eq 0 ]; then

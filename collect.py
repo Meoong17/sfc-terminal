@@ -9,11 +9,11 @@ import json, os, sys, subprocess, math, requests, time
 import numpy as np
 from datetime import datetime, timezone
 from dotenv import load_dotenv
-from onchain_fetch import fetch_all_onchain
+from data_sources.onchain_fetch import fetch_all_onchain
 
 # ── Probabilistic Output + Circuit Breaker (M1.docx Priority) ──
 try:
-    from probabilistic_output import ProbabilisticHead
+    from models.probabilistic_output import ProbabilisticHead
     _PROB_HEAD = ProbabilisticHead()
     PROBABILISTIC_AVAILABLE = True
 except Exception:
@@ -21,7 +21,7 @@ except Exception:
     PROBABILISTIC_AVAILABLE = False
 
 try:
-    from circuit_breaker import CircuitBreaker
+    from analysis.circuit_breaker import CircuitBreaker
     _CIRCUIT_BREAKER = CircuitBreaker()
     CB_AVAILABLE = True
 except Exception:
@@ -62,7 +62,7 @@ def _get_adv_ensemble():
             return None
     if _ADV_ENSEMBLE_MODULE is None or _ADV_ENSEMBLE_MODULE is False:
         try:
-            import ensemble_meta as m
+            from models import ensemble_meta as m
             _ADV_ENSEMBLE_MODULE = m
         except Exception:
             _ADV_ENSEMBLE_MODULE = False
@@ -77,7 +77,7 @@ def _get_adv_hmm():
             return None
     if _ADV_HMM_MODULE is None or _ADV_HMM_MODULE is False:
         try:
-            import hmm_regime as m
+            from models import hmm_regime as m
             _ADV_HMM_MODULE = m
         except Exception:
             _ADV_HMM_MODULE = False
@@ -107,7 +107,7 @@ def _get_adv_online():
             return None
     if _ADV_ONLINE_MODULE is None or _ADV_ONLINE_MODULE is False:
         try:
-            import online_learning as m
+            from models import online_learning as m
             _ADV_ONLINE_MODULE = m
         except Exception:
             _ADV_ONLINE_MODULE = False
@@ -131,7 +131,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 
 # Import stablecoin liquidity methods (M76-M80)
 try:
-    from stablecoin_liquidity import compute_all_stablecoin_metrics
+    from data_sources.stablecoin_liquidity import compute_all_stablecoin_metrics
     STABLECOIN_AVAILABLE = True
 except ImportError as e:
     STABLECOIN_AVAILABLE = False
@@ -140,7 +140,7 @@ except ImportError as e:
 
 # Import ETF flow module (M81-M82)
 try:
-    from etf_flow import compute_etf_metrics
+    from data_sources.etf_flow import compute_etf_metrics
     ETF_AVAILABLE = True
 except ImportError as e:
     ETF_AVAILABLE = False
@@ -149,7 +149,7 @@ except ImportError as e:
 
 # Import fiscal liquidity module (M83-M84)
 try:
-    from fiscal_liquidity import compute_fiscal_liquidity_metrics
+    from data_sources.fiscal_liquidity import compute_fiscal_liquidity_metrics
     FISCAL_AVAILABLE = True
 except ImportError as e:
     FISCAL_AVAILABLE = False
@@ -158,7 +158,7 @@ except ImportError as e:
 
 # Import repo market stress module (M86 — SOFR-EFFR spread)
 try:
-    from repo_market_stress import compute_repo_stress
+    from data_sources.repo_market_stress import compute_repo_stress
     REPO_STRESS_AVAILABLE = True
 except ImportError as e:
     REPO_STRESS_AVAILABLE = False
@@ -169,7 +169,7 @@ except ImportError as e:
 # US/Japan/Europe/UK sovereign bond signal, replaces the earlier idea of
 # separate M88/M89/M90 methods per country — see module docstring)
 try:
-    from global_sovereign_liquidity import compute_global_sovereign_liquidity
+    from data_sources.global_sovereign_liquidity import compute_global_sovereign_liquidity
     GSLS_AVAILABLE = True
 except ImportError as e:
     GSLS_AVAILABLE = False
@@ -181,7 +181,7 @@ _m86_score = 0.5
 
 # ── NEW: Global Liquidity Engine (GLF — consolidated liquidity factor) ──
 try:
-    from global_liquidity_engine import compute_global_liquidity_factor, get_glf_for_factors, get_glf_weight_by_regime
+    from data_sources.global_liquidity_engine import compute_global_liquidity_factor, get_glf_for_factors, get_glf_weight_by_regime
     GLOBAL_LIQUIDITY_AVAILABLE = True
 except ImportError as e:
     GLOBAL_LIQUIDITY_AVAILABLE = False
@@ -192,7 +192,7 @@ except ImportError as e:
 
 # ── NEW: Stablecoin Intelligence (enhanced composite index) ──
 try:
-    from stablecoin_intelligence import compute_stablecoin_liquidity_index
+    from data_sources.stablecoin_intelligence import compute_stablecoin_liquidity_index
     STABLECOIN_INTEL_AVAILABLE = True
 except ImportError as e:
     STABLECOIN_INTEL_AVAILABLE = False
@@ -216,7 +216,7 @@ except ImportError as e:
 
 # ── NEW: Market Positioning Index (MPI) ──
 try:
-    from market_positioning_index import compute_market_positioning_index
+    from data_sources.market_positioning_index import compute_market_positioning_index
     MPI_AVAILABLE = True
 except ImportError as e:
     MPI_AVAILABLE = False
@@ -225,7 +225,7 @@ except ImportError as e:
 
 # ── NEW: Liquidity Momentum (LM) ──
 try:
-    from liquidity_momentum import compute_liquidity_momentum
+    from analysis.liquidity_momentum import compute_liquidity_momentum
     LM_AVAILABLE = True
 except ImportError as e:
     LM_AVAILABLE = False
@@ -244,7 +244,7 @@ except ImportError as e:
 
 # Import causal inference
 try:
-    from causal_inference import CausalFilter
+    from analysis.causal_inference import CausalFilter
     CAUSAL_AVAILABLE = True
 except ImportError:
     CAUSAL_AVAILABLE = False
@@ -341,7 +341,7 @@ except ImportError:
 
 sys.path.insert(0, os.path.dirname(__file__))
 try:
-    from methods_institutional import compute_all_institutional
+    from data_sources.methods_institutional import compute_all_institutional
     INSTITUTIONAL_AVAILABLE = True
 except ImportError as e:
     print(f"[SFC] Institutional methods not available: {e}", file=sys.stderr)
@@ -349,7 +349,7 @@ except ImportError as e:
     INSTITUTIONAL_AVAILABLE = False
 
 try:
-    from ml_ensemble import (
+    from models.ml_ensemble import (
         predict_with_ml, add_observation, evaluate_accuracy, retrain_on_errors,
         record_price_snapshot, resolve_pending_labels,
     )
@@ -413,7 +413,7 @@ def _run_qlstm_inference():
         venv_path = os.path.join(sfc_dir, ".venv", "lib", "python3.12", "site-packages")
         if os.path.isdir(venv_path) and venv_path not in sys.path:
             sys.path.insert(0, venv_path)
-        from qlstm_enhanced import run_enhanced_inference
+        from models.qlstm_enhanced import run_enhanced_inference
         
         result = run_enhanced_inference(force=True)
         
@@ -2490,7 +2490,7 @@ try:
             print(f"[DFS] Mamba filter error: {_dfs_mamba_e}", file=sys.stderr)
 
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-    from mamba_encoder import get_mamba_prediction as _mamba_infer
+    from models.mamba_encoder import get_mamba_prediction as _mamba_infer
     mamba_result = _mamba_infer(_mamba_data, force=False)
     if mamba_result.get('available'):
         mamba_pred = mamba_result['combined']
@@ -3000,7 +3000,7 @@ liq_long_vol = None
 liq_short_vol = None
 
 try:
-    from liquidation_client import get_liquidation_data
+    from data_sources.liquidation_client import get_liquidation_data
     liq_data = get_liquidation_data()
     if liq_data and liq_data.get("source") == "okx":
         # Real OKX liquidation data
@@ -3293,7 +3293,7 @@ _m68_signal = get_trading_signal(_drl_market_state, agent=_drl_agent)
 # all-simulated baseline rather than requiring all five to succeed.
 _m69_is_simulated = False
 try:
-    from market_data_fetcher import fetch_all_cross_asset_data
+    from data_sources.market_data_fetcher import fetch_all_cross_asset_data
     _m69_btc_return = (chg or 0) / 100.0
     _m69_btc_vol = (dvol or 45.0) / 100.0
     _m69_btc_momentum = ((rsi_14m or 50) - 50) / 100.0  # RSI deviation from neutral as momentum proxy
@@ -3346,7 +3346,7 @@ _m71_lime_features = _xai_result.get("m71_lime_features", [])
 # ════════════════════════════════════════════════════════════
 # Confidence calibration & reliability (M2 analysis)
 try:
-    from confidence_calibration import recalibrate as _calib_recalibrate, get_calibration_info as _calib_info
+    from analysis.confidence_calibration import recalibrate as _calib_recalibrate, get_calibration_info as _calib_info
     _CALIB_AVAILABLE = True
     _CALIBRATED_CONF = _calib_recalibrate(float(composite_confidence or 0.5))
 except Exception:
@@ -3401,7 +3401,7 @@ if PROBABILISTIC_AVAILABLE and _PROB_HEAD is not None:
 # ════════════════════════════════════════════════════════════
 _DQ_RESULT = {"dq_available": False}
 try:
-    from data_quality import DataQualityPipeline
+    from analysis.data_quality import DataQualityPipeline
     _DQ = DataQualityPipeline()
     _DQ_CLEANED, _DQ_FLAGS = _DQ.process(_PROB_METHOD_SCORES)
     _DQ_RESULT = {
@@ -3422,7 +3422,7 @@ except Exception as _dq_e:
 # ════════════════════════════════════════════════════════════
 _DRIFT_RESULT = {"drift_available": False}
 try:
-    from drift_detection import DriftDetector
+    from analysis.drift_detection import DriftDetector
     _DRIFT = DriftDetector()
     _DRIFT_RESULT_RAW = _DRIFT.check(_PROB_METHOD_SCORES)
     _DRIFT_RESULT = {
