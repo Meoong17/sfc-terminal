@@ -1,20 +1,7 @@
 {
-  "capital": 49870.22,
+  "capital": 50032.42,
   "peak_capital": 50047.96,
-  "positions": [
-    {
-      "type": "LONG",
-      "entry_price": 64841.75,
-      "size": 162.65,
-      "entry_date": "2026-07-16T00:07:21.440678+00:00",
-      "reason": "SFC 22% \u00b7 Conf 35%",
-      "sfc_at_entry": 21.5,
-      "confidence_at_entry": 35.0,
-      "slippage_entry": 0.08,
-      "spread_cost_entry": 0.08,
-      "time_slippage_pct": 0.025
-    }
-  ],
+  "positions": [],
   "trades": [
     {
       "id": 1,
@@ -187,16 +174,21 @@
       "slippage": 0.08,
       "time_slippage_pct": 0.025,
       "reason": "SFC 22% \u00b7 Conf 35%"
+    },
+    {
+      "id": 16,
+      "type": "CLOSE",
+      "direction": "LONG",
+      "date": "2026-07-16T00:22:23.324572+00:00",
+      "price": 64696.61,
+      "size": 162.65,
+      "pnl": -0.45,
+      "pnl_pct": -0.22,
+      "slippage_exit": 0.08,
+      "reason": "No edge"
     }
   ],
   "equity_history": [
-    {
-      "ts": "2026-07-06T13:41:23.685749+00:00",
-      "btc": 61589.3,
-      "equity": 50022.76,
-      "capital": 50022.76,
-      "unrealized": 0
-    },
     {
       "ts": "2026-07-06T13:47:24.715521+00:00",
       "btc": 61726.34,
@@ -14189,6 +14181,13 @@
       "equity": 50032.86,
       "capital": 49870.22,
       "unrealized": -0.01
+    },
+    {
+      "ts": "2026-07-16T00:22:23.324588+00:00",
+      "btc": 64696.61,
+      "equity": 50032.42,
+      "capital": 50032.42,
+      "unrealized": 0
     }
   ],
   "daily_snapshots": {
@@ -14315,15 +14314,15 @@
     },
     "2026-07-16": {
       "date": "2026-07-16",
-      "equity": 50032.86,
-      "return_pct": 0.07,
+      "equity": 50032.42,
+      "return_pct": 0.06,
       "sharpe": 0.32,
-      "win_rate": 0.5714,
+      "win_rate": 0.5,
       "max_dd_pct": 0.07,
-      "total_trades": 15,
-      "open_positions": 1,
-      "status": "IN_MARKET"
+      "total_trades": 16,
+      "open_positions": 0,
+      "status": "CASH"
     }
   },
-  "updated_at": "2026-07-16T00:15:09.095155+00:00"
+  "updated_at": "2026-07-16T00:22:23.332410+00:00"
 }
