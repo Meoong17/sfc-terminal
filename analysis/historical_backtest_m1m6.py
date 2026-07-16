@@ -247,7 +247,7 @@ def fetch_fng_historical_dict():
             data = json.loads(resp.read())
         result = {}
         for entry in data.get("data", []):
-            date_str = datetime.utcfromtimestamp(int(entry["timestamp"])).strftime("%Y-%m-%d")
+            date_str = datetime.fromtimestamp(int(entry["timestamp"]), datetime.UTC).strftime("%Y-%m-%d")
             result[date_str] = int(entry["value"])
         print(f"[Backtest] FNG: {len(result)} observations fetched", file=sys.stderr)
         return result
