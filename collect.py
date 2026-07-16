@@ -1961,6 +1961,32 @@ except Exception as e:
     print(f"[SFC] On-chain fetch failed: {e}", file=sys.stderr)
     whale_pressure = onchain_value = buying_power = market_structure = None
 
+# ── REFLEXIVITY DIVERGENCE (EXPERIMENTAL — Option A: display-only) ──
+# Simplified discrete-derivative version of the Soros-style reflexivity
+# feedback loop (price vs fundamental vs leverage). Deliberately kept
+# SEPARATE from factors/sfc_pct for now — this is a new, unvalidated
+# signal (see analysis/reflexivity_divergence.py's module docstring for
+# the full design rationale and honest caveats about the arbitrary scale
+# constants). Exposed as its own field so it can be observed and
+# compared against live data before any decision to fold it into the
+# core ensemble — same cautious rollout pattern used for M86/M90 before
+# they were trusted enough to affect factors directly.
+_reflexivity_score, _reflexivity_details = 50.0, {"status": "unavailable"}
+try:
+    from analysis.reflexivity_divergence import compute_reflexivity_divergence
+    _q10_details_for_reflexivity = onchain_scores.get("details", {}) if onchain_scores else {}
+    _mvrv_val = _q10_details_for_reflexivity.get("mvrv_ratio", {}).get("value")
+    _oi_val = _q10_details_for_reflexivity.get("open_interest", {}).get("value")
+    if btc is not None and _mvrv_val is not None and _oi_val is not None:
+        _reflexivity_score, _reflexivity_details = compute_reflexivity_divergence(
+            price=btc, mvrv=_mvrv_val, leverage=_oi_val
+        )
+        print(f"[Reflexivity] score={_reflexivity_score} regime={_reflexivity_details.get('regime','?')}", file=sys.stderr)
+    else:
+        print("[Reflexivity] Skipped this cycle — missing price/mvrv/open_interest", file=sys.stderr)
+except Exception as e:
+    print(f"[Reflexivity] Error: {e}", file=sys.stderr)
+
 # ── STABLECOIN LIQUIDITY METRICS (M76-M80 / Layer 2 Crypto Liquidity) ──
 print("[SFC] Computing M76-M80 stablecoin liquidity metrics...", file=sys.stderr)
 _sc_results, sc_details, sc_active, sc_avg = {}, {}, 0, None
@@ -3884,6 +3910,9 @@ out = {
     "cb_tripped": _CIRCUIT_BREAKER.get_stats().get("tripped", False) if CB_AVAILABLE and _CIRCUIT_BREAKER else False,
     "cb_failures": _CIRCUIT_BREAKER.get_stats().get("consecutive_failures", 0) if CB_AVAILABLE and _CIRCUIT_BREAKER else 0,
     "cb_total_failures": _CIRCUIT_BREAKER.get_stats().get("total_failures", 0) if CB_AVAILABLE and _CIRCUIT_BREAKER else 0,
+    # Reflexivity Divergence (experimental, display-only — see analysis/reflexivity_divergence.py)
+    "reflexivity_divergence_score": _reflexivity_score,
+    "reflexivity_divergence_detail": _reflexivity_details,
 }
 
 # ── Circuit Breaker: validate output before writing ──
