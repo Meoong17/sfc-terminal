@@ -31,19 +31,33 @@ def parse_date(dd_mon_yyyy):
 
 def parse_value(val_str):
     """Parse a cell value: '-' -> 0.0, '(440.3)' -> -440.3, '51,086' -> 51086.0."""
+    if not val_str or not val_str.strip():
+        return 0.0
     val_str = val_str.strip().replace(',', '')
     if val_str == '-' or val_str == '':
         return 0.0
-    if val_str.startswith('(') and val_str.endswith(')'):
-        return -float(val_str[1:-1])
-    return float(val_str)
+    try:
+        if val_str.startswith('(') and val_str.endswith(')'):
+            return -float(val_str[1:-1])
+        return float(val_str)
+    except (ValueError, TypeError):
+        return 0.0
 
 def fetch_flows():
     """Fetch ETF flow data from Farside all-data page. Returns (flows_list, cumulative_total_millions)."""
-    r = requests.get('https://farside.co.uk/bitcoin-etf-flow-all-data/', timeout=30, headers=HEADERS)
-    r.raise_for_status()
+    try:
+        r = requests.get('https://farside.co.uk/bitcoin-etf-flow-all-data/', timeout=30, headers=HEADERS)
+        r.raise_for_status()
+    except requests.RequestException as e:
+        print(f"[WARN] Network error fetching ETF data: {e}")
+        return [], 0.0
     
-    soup = BeautifulSoup(r.text, 'html.parser')
+    try:
+        soup = BeautifulSoup(r.text, 'html.parser')
+    except Exception as e:
+        print(f"[WARN] Failed to parse HTML: {e}")
+        return [], 0.0
+    
     tables = soup.find_all('table')
     
     # Find the table with our headers
@@ -57,52 +71,58 @@ def fetch_flows():
                 break
     
     if not target_table:
-        raise ValueError("Could not find the ETF flow data table")
+        print("[WARN] Could not find the ETF flow data table on the page")
+        return [], 0.0
     
     tbody = target_table.find('tbody') or target_table
     rows = tbody.find_all('tr')
     
     flows = []
+    etf_names = ['IBIT', 'FBTC', 'BITB', 'ARKB', 'BTCO', 'EZBC', 'BRRR', 'HODL', 'BTCW', 'MSBT', 'GBTC', 'BTC']
     
     for row in rows:
-        cells = row.find_all('td')
-        if len(cells) != 14:  # Date + 12 ETFs + Total
+        try:
+            cells = row.find_all('td')
+            if len(cells) != 14:  # Date + 12 ETFs + Total
+                continue
+            
+            date_raw = cells[0].get_text(strip=True)
+            
+            # Skip non-date rows
+            if date_raw in ('Total', 'Average', 'Maximum', 'Minimum'):
+                continue
+            
+            date_parsed = parse_date(date_raw)
+            if not date_parsed:
+                continue
+            
+            etfs = {}
+            for i, name in enumerate(etf_names):
+                etfs[name] = round(parse_value(cells[i+1].get_text(strip=True)), 4)
+            
+            total_val = parse_value(cells[-1].get_text(strip=True))
+            total_usd = int(round(total_val * 1_000_000))
+            
+            flows.append({
+                "date": date_parsed,
+                "total_btc": None,
+                "total_usd": total_usd,
+                "etfs": etfs
+            })
+        except Exception:
+            # Skip malformed row rather than crashing the entire fetch
             continue
-        
-        date_raw = cells[0].get_text(strip=True)
-        
-        # Skip non-date rows
-        if date_raw == 'Total' or date_raw == 'Average' or date_raw == 'Maximum' or date_raw == 'Minimum':
-            continue
-        
-        date_parsed = parse_date(date_raw)
-        if not date_parsed:
-            continue
-        
-        # ETF columns in order: Date, IBIT, FBTC, BITB, ARKB, BTCO, EZBC, BRRR, HODL, BTCW, MSBT, GBTC, BTC, Total
-        etf_names = ['IBIT', 'FBTC', 'BITB', 'ARKB', 'BTCO', 'EZBC', 'BRRR', 'HODL', 'BTCW', 'MSBT', 'GBTC', 'BTC']
-        
-        etfs = {}
-        for i, name in enumerate(etf_names):
-            etfs[name] = round(parse_value(cells[i+1].get_text(strip=True)), 4)
-        
-        total_val = parse_value(cells[-1].get_text(strip=True))
-        total_usd = int(round(total_val * 1_000_000))
-        
-        flows.append({
-            "date": date_parsed,
-            "total_btc": None,
-            "total_usd": total_usd,
-            "etfs": etfs
-        })
     
     # Get cumulative total from the Total row
     cumulative_total_millions = 0.0
     for row in rows:
-        cells = row.find_all('td')
-        if len(cells) == 14 and cells[0].get_text(strip=True) == 'Total':
-            cumulative_total_millions = parse_value(cells[-1].get_text(strip=True))
-            break
+        try:
+            cells = row.find_all('td')
+            if len(cells) == 14 and cells[0].get_text(strip=True) == 'Total':
+                cumulative_total_millions = parse_value(cells[-1].get_text(strip=True))
+                break
+        except Exception:
+            continue
     
     return flows, cumulative_total_millions
 
@@ -112,8 +132,6 @@ def main():
     print("Fetching ETF flow data from Farside...")
     new_flows, cumulative_total_millions = fetch_flows()
     print(f"Fetched {len(new_flows)} flow records")
-    print(f"Date range: {new_flows[0]['date']} to {new_flows[-1]['date']}")
-    print(f"Cumulative total (millions USD): {cumulative_total_millions}")
     
     # Read existing cache
     cache_path = '/home/ubuntu/sfc/.etf_cache.json'
@@ -134,6 +152,11 @@ def main():
     # Sort by date
     merged_flows = sorted(existing_by_date.values(), key=lambda f: f['date'])
     
+    # Print date range safely
+    if merged_flows:
+        print(f"Date range: {merged_flows[0]['date']} to {merged_flows[-1]['date']}")
+        print(f"Cumulative total (millions USD): {cumulative_total_millions}")
+    
     # Compute cumulative_usd from the total row data if available
     cumulative_usd = int(round(cumulative_total_millions * 1_000_000))
     
@@ -151,19 +174,26 @@ def main():
         ("cached_at", now)
     ])
     
-    # Write cache
-    with open(cache_path, 'w') as f:
-        json.dump(cache_data, f, indent=2, ensure_ascii=False)
+    # Write cache — use temp file to avoid partial writes
+    try:
+        with open(cache_path, 'w') as f:
+            json.dump(cache_data, f, indent=2, ensure_ascii=False)
+    except (IOError, OSError) as e:
+        print(f"[ERROR] Failed to write cache: {e}")
+        return
     
     print(f"Cache written with {len(merged_flows)} total flow records")
     print(f"Cumulative USD: ${cumulative_usd:,}")
     print(f"Last update: {dt_now}")
     
     # Verify
-    with open(cache_path, 'r') as f:
-        verified = json.load(f)
-    assert len(verified['flows']) == len(merged_flows), "Flow count mismatch!"
-    print(f"VERIFIED: Cache reads back valid JSON with {len(verified['flows'])} flows.")
+    try:
+        with open(cache_path, 'r') as f:
+            verified = json.load(f)
+        assert len(verified['flows']) == len(merged_flows), "Flow count mismatch!"
+        print(f"VERIFIED: Cache reads back valid JSON with {len(verified['flows'])} flows.")
+    except (IOError, json.JSONDecodeError, AssertionError) as e:
+        print(f"[ERROR] Verification failed: {e}")
 
 if __name__ == '__main__':
     main()
