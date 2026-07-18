@@ -583,6 +583,34 @@ class PaperTrader:
             if dd > mdd:
                 mdd = dd
 
+        # ── Professional metrics (NEW) ──
+        losses = [t for t in closed if t.get("pnl", 0) <= 0]
+
+        # Sortino ratio: like Sharpe but only penalizes DOWNSIDE volatility
+        # (upside swings don't count as "risk" — a common broker-terminal
+        # metric alongside Sharpe, e.g. shown on IB/TDA performance reports)
+        downside_rets = [r for r in daily_rets if r < 0] if daily_rets else []
+        if downside_rets:
+            downside_std = math.sqrt(sum(r**2 for r in downside_rets) / len(downside_rets))
+            sortino = mean_ret / downside_std * math.sqrt(365) if downside_std > 0 else 0
+        else:
+            sortino = sharpe if daily_rets else 0  # no downside days yet — not literally infinite, fall back to Sharpe
+
+        # Profit factor: gross profit / gross loss (>1 = profitable overall,
+        # standard broker-statement metric; industry rule of thumb >1.5 is
+        # considered solid, but this project makes no claim about what
+        # counts as "good" here — just reports the number)
+        gross_profit = sum(t.get("pnl", 0) for t in wins)
+        gross_loss = abs(sum(t.get("pnl", 0) for t in losses))
+        profit_factor = gross_profit / gross_loss if gross_loss > 0 else (float('inf') if gross_profit > 0 else 0)
+
+        avg_win = gross_profit / len(wins) if wins else 0
+        avg_loss = gross_loss / len(losses) if losses else 0
+
+        # Expectancy: average $ P&L per trade, win-rate weighted — answers
+        # "on average, how much do I make/lose per trade taken"
+        expectancy = (win_rate * avg_win) - ((1 - win_rate) * avg_loss) if closed else 0
+
         return {
             "initial_capital": self.INITIAL_CAPITAL,
             "capital": round(self.capital, 2),
@@ -591,12 +619,19 @@ class PaperTrader:
             "total_return": round(total_return, 4),
             "total_return_pct": round(total_return * 100, 2),
             "sharpe": round(sharpe, 2),
+            "sortino": round(sortino, 2) if sortino != float('inf') else None,
             "win_rate": round(win_rate, 4),
             "win_rate_pct": round(win_rate * 100, 1),
             "max_dd": round(mdd, 4),
             "max_dd_pct": round(mdd * 100, 2),
+            "profit_factor": round(profit_factor, 2) if profit_factor != float('inf') else None,
+            "avg_win": round(avg_win, 2),
+            "avg_loss": round(avg_loss, 2),
+            "expectancy": round(expectancy, 2),
             "total_trades": len(self.trades),
             "closed_trades": len(closed),
+            "winning_trades": len(wins),
+            "losing_trades": len(losses),
             "open_positions": len(self.positions),
             "unrealized_pnl": round(getattr(self, '_unrealized', 0), 2),
             "status": "IN_MARKET" if self.positions else "CASH",
