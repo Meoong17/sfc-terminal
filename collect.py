@@ -3494,6 +3494,52 @@ regime_zone_divergence_note = (
     f"threshold. Both can be independently correct; this isn't a data error."
 ) if regime_zone_divergence else None
 
+# ── COMPOSITE WEIGHT OPTIMIZER (EXPERIMENTAL — Option A: comparison only) ──
+# Tracks GLF/SLI/MPI's internal component values over time and computes
+# a CORRELATION-ADJUSTED alternative to their manually-assigned weights —
+# components correlated with others in the same composite get LESS
+# relative weight (not more, unlike naive PCA), independent components
+# get relatively MORE. Deliberately kept separate from the LIVE weights
+# used in the actual GLF/SLI/MPI calculations — this only reports a
+# RECOMMENDATION for comparison, following the same cautious rollout
+# pattern as reflexivity_divergence.py. See analysis/composite_weight_optimizer.py's
+# module docstring for full rationale.
+_weight_recommendations = {}
+try:
+    from analysis.composite_weight_optimizer import update_composite_history, compute_independence_weights
+
+    if _glf_details and _glf_details.get("components"):
+        _glf_comp = _glf_details["components"]
+        _glf_zvals = {k: v.get("z_score") for k, v in _glf_comp.items() if v.get("z_score") is not None}
+        _glf_weights = {k: v.get("weight") for k, v in _glf_comp.items() if v.get("weight") is not None}
+        if _glf_zvals:
+            update_composite_history("GLF", _glf_zvals)
+        if _glf_weights:
+            _rec, _det = compute_independence_weights("GLF", _glf_weights)
+            _weight_recommendations["GLF"] = {"recommended_weights": _rec, "detail": _det}
+
+    if _sli_details and _sli_details.get("components"):
+        _sli_comp = _sli_details["components"]
+        _sli_svals = {k: v.get("score") for k, v in _sli_comp.items() if v.get("score") is not None}
+        _sli_weights = {k: v.get("weight") for k, v in _sli_comp.items() if v.get("weight") is not None}
+        if _sli_svals:
+            update_composite_history("SLI", _sli_svals)
+        if _sli_weights:
+            _rec, _det = compute_independence_weights("SLI", _sli_weights)
+            _weight_recommendations["SLI"] = {"recommended_weights": _rec, "detail": _det}
+
+    if _mpi_details and _mpi_details.get("components"):
+        _mpi_comp = _mpi_details["components"]
+        _mpi_svals = {k: v.get("score") for k, v in _mpi_comp.items() if v.get("score") is not None}
+        _mpi_weights = {k: v.get("weight") for k, v in _mpi_comp.items() if v.get("weight") is not None}
+        if _mpi_svals:
+            update_composite_history("MPI", _mpi_svals)
+        if _mpi_weights:
+            _rec, _det = compute_independence_weights("MPI", _mpi_weights)
+            _weight_recommendations["MPI"] = {"recommended_weights": _rec, "detail": _det}
+except Exception as _weight_opt_e:
+    print(f"[WeightOptimizer] Error: {_weight_opt_e}", file=sys.stderr)
+
 # Build output
 out = {
     "ts": datetime.now(timezone.utc).isoformat(),
@@ -3740,6 +3786,10 @@ out = {
     "q10_market_structure": market_structure,
     "q10_available": whale_pressure is not None and onchain_value is not None and buying_power is not None,
     "q10_details": onchain_scores.get("details", {}) if whale_pressure is not None else {},
+    # Reflexivity Divergence (experimental, display-only — see analysis/reflexivity_divergence.py)
+    "reflexivity_divergence_score": _reflexivity_score,
+    "reflexivity_divergence_detail": _reflexivity_details,
+    "weight_optimizer_recommendations": _weight_recommendations,
     # ── Advanced Feature Engineering (Peningkatan 1) ──
     # REMOVED: afe_rsi_7 (RSI-7 dihapus dari feature_engineering)
     "afe_macd_signal": float(round(_adv_features.get("macd_signal", 0), 4)) if _adv_features else None,
@@ -3910,9 +3960,6 @@ out = {
     "cb_tripped": _CIRCUIT_BREAKER.get_stats().get("tripped", False) if CB_AVAILABLE and _CIRCUIT_BREAKER else False,
     "cb_failures": _CIRCUIT_BREAKER.get_stats().get("consecutive_failures", 0) if CB_AVAILABLE and _CIRCUIT_BREAKER else 0,
     "cb_total_failures": _CIRCUIT_BREAKER.get_stats().get("total_failures", 0) if CB_AVAILABLE and _CIRCUIT_BREAKER else 0,
-    # Reflexivity Divergence (experimental, display-only — see analysis/reflexivity_divergence.py)
-    "reflexivity_divergence_score": _reflexivity_score,
-    "reflexivity_divergence_detail": _reflexivity_details,
 }
 
 # ── Circuit Breaker: validate output before writing ──
