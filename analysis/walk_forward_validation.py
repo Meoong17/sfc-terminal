@@ -38,6 +38,14 @@ with genuine OUT-OF-SAMPLE forward returns):
        window with ZERO stress-labeled observations), so a single point
        estimate could easily be noise rather than signal.
 
+QUANTILE ANALYSIS:
+    In addition to the fixed-threshold bucket test, the script also
+    performs a threshold-free quantile (decile) analysis. Dividing
+    observations into 10 equal groups by sfc_pct rank avoids the
+    calibration debate about whether 25/45 are the right cutoffs,
+    and instead answers the pure scientific question: "as sfc_pct
+    increases, does forward return monotonically decrease?"
+
 HONEST LIMITATIONS (inherited from historical_backtest_m1m6.py, not
 new to this script):
     - Uses the SIMPLIFIED factor set (price + DXY + M2 + FNG) since DVOL/
@@ -90,7 +98,8 @@ FORWARD_HORIZONS_DAYS = [7, 30]  # matches this project's own signal-generation
 # uses for trading decisions have genuine forward-looking meaning."
 BUCKET_EDGES = [(0, 25, "CALM"), (25, 45, "ELEVATED"), (45, 101, "STRESS")]
 
-N_BOOTSTRAP = 2000  # resamples for confidence interval estimation
+N_BOOTSTRAP = 2000   # resamples for confidence interval estimation
+N_QUANTILES = 10     # deciles for threshold-free quantile analysis
 
 
 def compute_sfc_time_series():
@@ -188,25 +197,133 @@ def bootstrap_mean_ci(values, n_bootstrap=N_BOOTSTRAP, ci=0.90):
     return point_estimate, means[lo_idx], means[hi_idx]
 
 
-def run_validation():
-    print("=" * 60)
-    print("WALK-FORWARD VALIDATION — SFC Core Ensemble")
-    print("=" * 60)
+def _text_bar(val, min_val, max_val, width=20):
+    """Return a simple text bar proportional to val's position in [min_val, max_val]."""
+    span = max_val - min_val
+    if span < 1e-9:
+        return "=" * (width // 2) + "|" + " " * (width - width // 2 - 1)
+    fraction = (val - min_val) / span
+    filled = max(0, min(width - 1, int(round(fraction * (width - 1)))))
+    return "=" * filled + "|" + " " * (width - filled - 1)
 
-    print("\nComputing historical sfc_pct time series (this can take a while)...")
-    series = compute_sfc_time_series()
-    if not series:
-        return
-    print(f"Computed {len(series)} daily observations")
 
-    series = add_forward_returns(series)
+def quantile_analysis(series):
+    """Threshold-free quantile analysis.
 
-    with open(OUTPUT_FILE, "w") as f:
-        json.dump(series, f)
-    print(f"Saved full time series to {OUTPUT_FILE}")
+    Divides the full series into N_QUANTILES equal-sized groups by
+    sfc_pct rank, then computes mean forward return + 90% CI per
+    group. This separates the question of predictive validity
+    (does higher sfc_pct genuinely predict worse returns) from the
+    separate question of threshold calibration (is 25/45 the right
+    cutoff). The fixed-threshold bucket analysis is useful for
+    checking the project's existing trading rules; this quantile
+    analysis is useful for answering the pure scientific question.
+    """
+    sorted_series = sorted(series, key=lambda x: x["sfc_pct"])
+    n = len(sorted_series)
+    bin_size = n // N_QUANTILES
+    remainder = n % N_QUANTILES
 
     print("\n" + "=" * 60)
+    print("QUANTILE ANALYSIS — Threshold-Free Predictive Validity")
+    print("=" * 60)
+    print(f"(Sorted by sfc_pct, divided into {N_QUANTILES} equal groups of ~{bin_size} obs)")
+
+    for horizon in FORWARD_HORIZONS_DAYS:
+        print(f"\n--- {horizon}-day forward return by sfc_pct decile ---")
+        print(f"  {'Decile':<8} {'sfc_pct range':<18} {'n':<6} {'mean fwd%':>10}  {'CI 90%':<22}  {'Bar':<22}")
+        print(f"  {'-'*8} {'-'*18} {'-'*6} {'-'*10}  {'-'*22}  {'-'*22}")
+
+        decile_means = []
+        start = 0
+        for q in range(N_QUANTILES):
+            size = bin_size + (1 if q < remainder else 0)
+            chunk = sorted_series[start:start + size]
+            start += size
+            if not chunk:
+                continue
+
+            lo_pct = chunk[0]["sfc_pct"]
+            hi_pct = chunk[-1]["sfc_pct"]
+
+            fwd_vals = [
+                p.get(f"fwd_return_{horizon}d") for p in chunk
+                if p.get(f"fwd_return_{horizon}d") is not None
+            ]
+            if len(fwd_vals) < 2:
+                print(f"  Q{q+1:<7} [{lo_pct:5.1f} — {hi_pct:5.1f}]  {len(fwd_vals):<6} {'insufficient':>10}")
+                decile_means.append(None)
+                continue
+
+            mean_est, ci_lo, ci_hi = bootstrap_mean_ci(fwd_vals)
+            decile_means.append(mean_est)
+            bar = _text_bar(mean_est, min(-5, min(fwd_vals)), max(5, max(fwd_vals)))
+
+            print(f"  Q{q+1:<7} [{lo_pct:5.1f} — {hi_pct:5.1f}]  {len(fwd_vals):<6} {mean_est:>+8.2f}%  "
+                  f"[{ci_lo:+.2f}, {ci_hi:+.2f}]  |{bar}|")
+
+        # Monotonicity check
+        valid = [(i, m) for i, m in enumerate(decile_means) if m is not None]
+        if len(valid) >= 3:
+            monotonic_pairs = sum(
+                1 for j in range(1, len(valid))
+                if valid[j][1] < valid[j-1][1]
+            )
+            total_pairs = len(valid) - 1
+            pct_monotonic = monotonic_pairs / total_pairs * 100
+
+            # Simple Kendall-like correlation: concordant vs discordant pairs
+            ranks = list(range(len(valid)))
+            means = [m for _, m in valid]
+            n_p = len(ranks)
+            concordant = 0
+            discordant = 0
+            for i in range(n_p):
+                for j in range(i + 1, n_p):
+                    if (ranks[j] > ranks[i] and means[j] < means[i]) or \
+                       (ranks[j] < ranks[i] and means[j] > means[i]):
+                        concordant += 1
+                    elif ranks[j] != ranks[i] and means[j] != means[i]:
+                        discordant += 1
+            total_pairs_cd = concordant + discordant
+            kendall_tau = (concordant - discordant) / total_pairs_cd if total_pairs_cd > 0 else 0.0
+
+            print(f"\n  Monotonicity (higher decile -> lower return):")
+            print(f"    Adjacent pairs following direction: {monotonic_pairs}/{total_pairs} ({pct_monotonic:.0f}%)")
+            print(f"    Kendall-like rank correlation (decile rank vs mean return): {kendall_tau:+.3f} "
+                  f"({'NEGATIVE -> CONFIRMS hypothesis' if kendall_tau < 0 else 'POSITIVE -> contradicts hypothesis'})")
+
+    # Compare top vs bottom decile
+    print(f"\n  {'='*56}")
+    print(f"  TOP DECILE (highest sfc_pct) vs BOTTOM DECILE (lowest sfc_pct)")
+    print(f"  {'='*56}")
+    for horizon in FORWARD_HORIZONS_DAYS:
+        fwd_key = f"fwd_return_{horizon}d"
+        bot_chunk = sorted_series[:bin_size]
+        bot_vals = [p[fwd_key] for p in bot_chunk if p.get(fwd_key) is not None]
+        top_chunk = sorted_series[-bin_size:]
+        top_vals = [p[fwd_key] for p in top_chunk if p.get(fwd_key) is not None]
+
+        if len(bot_vals) >= 2 and len(top_vals) >= 2:
+            b_mean = sum(bot_vals) / len(bot_vals)
+            t_mean = sum(top_vals) / len(top_vals)
+            _, b_lo, b_hi = bootstrap_mean_ci(bot_vals)
+            _, t_lo, t_hi = bootstrap_mean_ci(top_vals)
+            overlap = not (t_hi < b_lo or b_hi < t_lo)
+            print(f"  {horizon:>2}d: Bottom decile {b_mean:+.2f}% [{b_lo:+.2f}, {b_hi:+.2f}]")
+            print(f"       Top decile    {t_mean:+.2f}% [{t_lo:+.2f}, {t_hi:+.2f}]")
+            gap = t_mean - b_mean
+            flag = "NO OVERLAP" if not overlap else "OVERLAP"
+            if overlap and abs(t_hi - b_lo) < 0.5:
+                flag += " (borderline)"
+            print(f"       Gap: {gap:+.2f}pp — CI {flag}")
+
+
+def bucket_analysis(series):
+    """Fixed-threshold bucket analysis using paper_trader.py's BUY/SELL/HOLD thresholds."""
+    print("\n" + "=" * 60)
     print("FORWARD RETURN BY SIGNAL BUCKET (with 90% bootstrap CI)")
+    print("(Using paper_trader.py thresholds: CALM<25, ELEVATED 25-45, STRESS>=45)")
     print("=" * 60)
 
     for horizon in FORWARD_HORIZONS_DAYS:
@@ -233,46 +350,82 @@ def run_validation():
         if len(calm_vals) >= 2 and len(stress_vals) >= 2:
             calm_mean = sum(calm_vals) / len(calm_vals)
             stress_mean = sum(stress_vals) / len(stress_vals)
-            print(f"\n  CALM vs STRESS gap: {stress_mean - calm_mean:+.2f}pp "
-                  f"({'stress days had WORSE forward returns, as hypothesized' if stress_mean < calm_mean else 'stress days did NOT show worse forward returns — worth investigating why'})")
+            gap = stress_mean - calm_mean
+            print(f"\n  CALM vs STRESS gap: {gap:+.2f}pp "
+                  f"({'stress days had WORSE forward returns, as hypothesized' if gap < 0 else 'stress days did NOT show worse forward returns — worth investigating why'})")
+
+    quantile_analysis(series)
+
+
+def run_validation():
+    print("=" * 60)
+    print("WALK-FORWARD VALIDATION — SFC Core Ensemble")
+    print("=" * 60)
+
+    print("\nComputing historical sfc_pct time series (this can take a while)...")
+    series = compute_sfc_time_series()
+    if not series:
+        return
+    print(f"Computed {len(series)} daily observations")
+
+    series = add_forward_returns(series)
+
+    with open(OUTPUT_FILE, "w") as f:
+        json.dump(series, f)
+    print(f"Saved full time series to {OUTPUT_FILE}")
+
+    bucket_analysis(series)
 
 
 if __name__ == "__main__":
-    import sys as _sys
-    if "--skip-self-tests" not in _sys.argv:
+    run_quantile_only = "--quantile-only" in sys.argv
+
+    if not run_quantile_only:
         print("=== Self-test: bootstrap_mean_ci() and bucket_label() ===\n")
 
-    # bucket_label boundary tests
-    assert bucket_label(10) == "CALM"
-    assert bucket_label(24.99) == "CALM"
-    assert bucket_label(25) == "ELEVATED"
-    assert bucket_label(44.99) == "ELEVATED"
-    assert bucket_label(45) == "STRESS"
-    assert bucket_label(90) == "STRESS"
-    print("✅ PASS: bucket_label() boundaries correct\n")
+        # bucket_label boundary tests
+        assert bucket_label(10) == "CALM"
+        assert bucket_label(24.99) == "CALM"
+        assert bucket_label(25) == "ELEVATED"
+        assert bucket_label(44.99) == "ELEVATED"
+        assert bucket_label(45) == "STRESS"
+        assert bucket_label(90) == "STRESS"
+        print("✅ PASS: bucket_label() boundaries correct\n")
 
-    # bootstrap_mean_ci sanity test — known distribution
-    random.seed(42)
-    test_vals = [random.gauss(-2.0, 5.0) for _ in range(200)]  # true mean approx -2.0
-    point_est, ci_lo, ci_hi = bootstrap_mean_ci(test_vals, n_bootstrap=1000)
-    print(f"Point estimate: {point_est:.2f} (should be close to true mean -2.0)")
-    print(f"90% CI: [{ci_lo:.2f}, {ci_hi:.2f}]")
-    assert -3.5 < point_est < -0.5, f"FAIL: point estimate {point_est} not close to true mean"
-    assert ci_lo < point_est < ci_hi, "FAIL: point estimate should fall within its own CI"
-    print("✅ PASS: bootstrap CI correctly brackets a known distribution's mean\n")
+        # bootstrap_mean_ci sanity test — known distribution
+        random.seed(42)
+        test_vals = [random.gauss(-2.0, 5.0) for _ in range(200)]  # true mean approx -2.0
+        point_est, ci_lo, ci_hi = bootstrap_mean_ci(test_vals, n_bootstrap=1000)
+        print(f"Point estimate: {point_est:.2f} (should be close to true mean -2.0)")
+        print(f"90% CI: [{ci_lo:.2f}, {ci_hi:.2f}]")
+        assert -3.5 < point_est < -0.5, f"FAIL: point estimate {point_est} not close to true mean"
+        assert ci_lo < point_est < ci_hi, "FAIL: point estimate should fall within its own CI"
+        print("✅ PASS: bootstrap CI correctly brackets a known distribution's mean\n")
 
-    # add_forward_returns test
-    fake_series = [{"date": f"2024-01-{i+1:02d}", "price": 100 + i} for i in range(10)]
-    fake_series = add_forward_returns(fake_series, horizons=[3])
-    assert fake_series[0]["fwd_return_3d"] is not None
-    assert fake_series[-1]["fwd_return_3d"] is None  # not enough future data
-    assert fake_series[-2]["fwd_return_3d"] is None
-    assert fake_series[-3]["fwd_return_3d"] is None
-    assert fake_series[-4]["fwd_return_3d"] is not None
-    expected_return = (103 - 100) / 100 * 100  # day 0 price=100, day 3 price=103
-    assert abs(fake_series[0]["fwd_return_3d"] - expected_return) < 0.01
-    print("✅ PASS: add_forward_returns() correctly computes forward return and excludes tail with no future data\n")
+        # add_forward_returns test
+        fake_series = [{"date": f"2024-01-{i+1:02d}", "price": 100 + i} for i in range(10)]
+        fake_series = add_forward_returns(fake_series, horizons=[3])
+        assert fake_series[0]["fwd_return_3d"] is not None
+        assert fake_series[-1]["fwd_return_3d"] is None  # not enough future data
+        assert fake_series[-2]["fwd_return_3d"] is None
+        assert fake_series[-3]["fwd_return_3d"] is None
+        assert fake_series[-4]["fwd_return_3d"] is not None
+        expected_return = (103 - 100) / 100 * 100  # day 0 price=100, day 3 price=103
+        assert abs(fake_series[0]["fwd_return_3d"] - expected_return) < 0.01
+        print("✅ PASS: add_forward_returns() correctly computes forward return and excludes tail with no future data\n")
 
-    print("ALL SELF-TESTS PASSED")
+        print("ALL SELF-TESTS PASSED")
 
-    run_validation()
+        run_validation()
+
+    else:
+        # --quantile-only: skip self-tests, skip bucket analysis, load cached data
+        if os.path.exists(OUTPUT_FILE):
+            print(f"Loading cached time series from {OUTPUT_FILE} ...")
+            with open(OUTPUT_FILE) as f:
+                series = json.load(f)
+            print(f"Loaded {len(series)} observations")
+            quantile_analysis(series)
+        else:
+            print(f"No cached data found at {OUTPUT_FILE}. Run without --quantile-only first.")
+            sys.exit(1)
