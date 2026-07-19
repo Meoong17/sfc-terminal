@@ -54,7 +54,7 @@ import os
 import sys
 import time
 import urllib.request
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import math
 
@@ -247,7 +247,12 @@ def fetch_fng_historical_dict():
             data = json.loads(resp.read())
         result = {}
         for entry in data.get("data", []):
-            date_str = datetime.fromtimestamp(int(entry["timestamp"]), datetime.UTC).strftime("%Y-%m-%d")
+            # datetime.utcfromtimestamp() is deprecated since Python 3.12
+            # (its own DeprecationWarning recommends datetime.fromtimestamp()
+            # with an explicit UTC timezone instead — easy to misread that
+            # warning as "datetime.UTC itself is the problem" when it's
+            # actually the fix). Using the modern, non-deprecated form here.
+            date_str = datetime.fromtimestamp(int(entry["timestamp"]), tz=timezone.utc).strftime("%Y-%m-%d")
             result[date_str] = int(entry["value"])
         print(f"[Backtest] FNG: {len(result)} observations fetched", file=sys.stderr)
         return result
