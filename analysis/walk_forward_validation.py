@@ -61,7 +61,7 @@ import math
 import os
 import random
 import sys
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -100,6 +100,11 @@ BUCKET_EDGES = [(0, 25, "CALM"), (25, 45, "ELEVATED"), (45, 101, "STRESS")]
 
 N_BOOTSTRAP = 2000   # resamples for confidence interval estimation
 N_QUANTILES = 10     # deciles for threshold-free quantile analysis
+
+SUMMARY_CACHE_FILE = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    ".walk_forward_summary.json",
+)
 
 
 def compute_sfc_time_series():
@@ -195,6 +200,69 @@ def bootstrap_mean_ci(values, n_bootstrap=N_BOOTSTRAP, ci=0.90):
     hi_idx = int((1 + ci) / 2 * n_bootstrap) - 1
     point_estimate = sum(values) / n
     return point_estimate, means[lo_idx], means[hi_idx]
+
+
+def bootstrap_diff_ci(group_a, group_b, n_bootstrap=N_BOOTSTRAP, ci=0.90):
+    """Bootstrap the DIFFERENCE between two group means directly.
+
+    This is more statistically powerful than comparing two separate CIs
+    — two CIs can overlap slightly while the DIFFERENCE itself still
+    excludes zero at the same confidence level, since overlap-checking
+    is a conservative proxy for a true difference test, not equivalent
+    to one. If this CI excludes zero, that's a more direct, defensible
+    significance claim than 'the two separate CIs don't overlap'.
+    """
+    if len(group_a) < 2 or len(group_b) < 2:
+        return None, None, None
+    n_a, n_b = len(group_a), len(group_b)
+    diffs = []
+    for _ in range(n_bootstrap):
+        sample_a = [group_a[random.randrange(n_a)] for _ in range(n_a)]
+        sample_b = [group_b[random.randrange(n_b)] for _ in range(n_b)]
+        diffs.append(sum(sample_b) / n_b - sum(sample_a) / n_a)
+    diffs.sort()
+    lo_idx = int((1 - ci) / 2 * n_bootstrap)
+    hi_idx = int((1 + ci) / 2 * n_bootstrap) - 1
+    point_estimate = sum(group_b) / n_b - sum(group_a) / n_a
+    return point_estimate, diffs[lo_idx], diffs[hi_idx]
+
+
+def write_summary_cache(series):
+    """Write a SMALL summary that collect.py can cheaply read every live
+    cycle, exposing key walk-forward validation stats as dashboard fields
+    — without collect.py needing to re-fetch 11 years of FRED history or
+    re-run bootstrap resampling on every 5-minute cycle. Re-run this
+    script manually/periodically (e.g. monthly) to refresh this cache."""
+    summary = {
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "n_periods": len(series),
+    }
+    for horizon in FORWARD_HORIZONS_DAYS:
+        buckets = {label: [] for _, _, label in BUCKET_EDGES}
+        for point in series:
+            fwd = point.get(f"fwd_return_{horizon}d")
+            if fwd is None:
+                continue
+            buckets[bucket_label(point["sfc_pct"])].append(fwd)
+        calm_vals = buckets["CALM"]
+        stress_vals = buckets["STRESS"]
+        diff_est, diff_lo, diff_hi = bootstrap_diff_ci(calm_vals, stress_vals)
+        summary[f"gap_{horizon}d"] = round(diff_est, 2) if diff_est is not None else None
+        summary[f"gap_{horizon}d_ci_lo"] = round(diff_lo, 2) if diff_lo is not None else None
+        summary[f"gap_{horizon}d_ci_hi"] = round(diff_hi, 2) if diff_hi is not None else None
+        summary[f"gap_{horizon}d_significant"] = (diff_hi < 0) if diff_hi is not None else None
+        summary[f"n_calm_{horizon}d"] = len(calm_vals)
+        summary[f"n_stress_{horizon}d"] = len(stress_vals)
+    total_with_signal = sum(
+        1 for p in series
+        if p.get(f"fwd_return_{FORWARD_HORIZONS_DAYS[0]}d") is not None
+    )
+    n_stress_total = sum(1 for p in series if bucket_label(p["sfc_pct"]) == "STRESS")
+    summary["n_stress_pct"] = round(n_stress_total / len(series) * 100, 1) if series else None
+    with open(SUMMARY_CACHE_FILE, "w") as f:
+        json.dump(summary, f, indent=2)
+    print(f"[WalkForward] Summary cache written to {SUMMARY_CACHE_FILE}")
+    return summary
 
 
 def _text_bar(val, min_val, max_val, width=20):
@@ -348,11 +416,11 @@ def bucket_analysis(series):
         calm_vals = buckets["CALM"]
         stress_vals = buckets["STRESS"]
         if len(calm_vals) >= 2 and len(stress_vals) >= 2:
-            calm_mean = sum(calm_vals) / len(calm_vals)
-            stress_mean = sum(stress_vals) / len(stress_vals)
-            gap = stress_mean - calm_mean
-            print(f"\n  CALM vs STRESS gap: {gap:+.2f}pp "
-                  f"({'stress days had WORSE forward returns, as hypothesized' if gap < 0 else 'stress days did NOT show worse forward returns — worth investigating why'})")
+            diff_est, diff_lo, diff_hi = bootstrap_diff_ci(calm_vals, stress_vals)
+            significant = diff_hi < 0 if diff_hi is not None else False
+            print(f"\n  CALM vs STRESS gap (direct bootstrap of the difference): {diff_est:+.2f}pp "
+                  f"[90% CI: {diff_lo:+.2f}pp to {diff_hi:+.2f}pp] "
+                  f"{'— SIGNIFICANT (CI excludes zero)' if significant else '— not significant at 90% (CI includes zero)'}")
 
     quantile_analysis(series)
 
@@ -375,6 +443,10 @@ def run_validation():
     print(f"Saved full time series to {OUTPUT_FILE}")
 
     bucket_analysis(series)
+
+    summary = write_summary_cache(series)
+    print(f"\n  Cache: gap_7d={summary.get('gap_7d')}pp, gap_30d={summary.get('gap_30d')}pp, "
+          f"n_stress={summary.get('n_stress_pct')}%")
 
 
 if __name__ == "__main__":

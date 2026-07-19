@@ -3494,6 +3494,8 @@ regime_zone_divergence_note = (
     f"threshold. Both can be independently correct; this isn't a data error."
 ) if regime_zone_divergence else None
 
+# Build output
+
 # ── COMPOSITE WEIGHT OPTIMIZER (EXPERIMENTAL — Option A: comparison only) ──
 # Tracks GLF/SLI/MPI's internal component values over time and computes
 # a CORRELATION-ADJUSTED alternative to their manually-assigned weights —
@@ -3540,7 +3542,25 @@ try:
 except Exception as _weight_opt_e:
     print(f"[WeightOptimizer] Error: {_weight_opt_e}", file=sys.stderr)
 
-# Build output
+
+# ── WALK-FORWARD VALIDATION SUMMARY (read-only cache) ──
+# analysis/walk_forward_validation.py fetches ~11 years of FRED history
+# and runs bootstrap resampling — far too expensive to redo every live
+# 5-minute cycle. That script writes a small summary cache
+# (.walk_forward_summary.json) when run manually/periodically; this
+# just reads it. Fails safe (all None / wfv_available=False) if the
+# validation script hasn't been run yet, or its cache is missing/stale.
+_wfv_summary = {}
+_wfv_available = False
+try:
+    _wfv_cache_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".walk_forward_summary.json")
+    if os.path.exists(_wfv_cache_path):
+        with open(_wfv_cache_path) as _f:
+            _wfv_summary = json.load(_f)
+        _wfv_available = True
+except Exception as _wfv_e:
+    print(f"[WalkForward] Could not read summary cache: {_wfv_e}", file=sys.stderr)
+
 out = {
     "ts": datetime.now(timezone.utc).isoformat(),
     "btc": btc,
@@ -3852,7 +3872,7 @@ out = {
     "adv_reddit_sentiment": round(adv_alt.get('reddit_sentiment', 0), 3) if adv_alt else None,
     "adv_reddit_label": adv_alt.get('reddit_label', 'NONE') if adv_alt else 'NONE',
     "adv_cg_dd_ath": round(adv_alt.get('cg_ath_dd', 0), 3) if adv_alt else None,
-    # Backtest metrics — walk-forward validated (historical bootstrap, 90% CI, decile analysis confirms high sfc_pct precedes worse returns)
+    # Backtest metrics — ESTIMATED, not walk-forward validated (raw pre-cal ECE≈0.422)
     "bt_sharpe": bt_sharpe,
     "bt_sharpe_low": bt_sharpe_low,
     "bt_sharpe_high": bt_sharpe_high,
@@ -3864,7 +3884,23 @@ out = {
     "bt_periods": bt_periods,
     "bt_stability": bt_stability,
     "bt_calibration_note": bt_calibration_note,
-    "bt_label": "WALK-FORWARD VALIDATED (bootstrap CI, decile analysis — high sfc_pct precedes worse returns at 7d/30d)",
+    "bt_label": "ESTIMATED (heuristic formula, not walk-forward validated)",
+    # Walk-forward validation (genuine, FRED-history-based — separate
+    # system from the bt_* heuristic estimates above; see
+    # analysis/walk_forward_validation.py)
+    "wfv_available": _wfv_available,
+    "wfv_n_periods": _wfv_summary.get("n_periods"),
+    "wfv_generated_at": _wfv_summary.get("generated_at"),
+    "wfv_gap_7d": _wfv_summary.get("gap_7d"),
+    "wfv_gap_7d_ci_lo": _wfv_summary.get("gap_7d_ci_lo"),
+    "wfv_gap_7d_ci_hi": _wfv_summary.get("gap_7d_ci_hi"),
+    "wfv_gap_7d_significant": _wfv_summary.get("gap_7d_significant"),
+    "wfv_gap_30d": _wfv_summary.get("gap_30d"),
+    "wfv_gap_30d_ci_lo": _wfv_summary.get("gap_30d_ci_lo"),
+    "wfv_gap_30d_ci_hi": _wfv_summary.get("gap_30d_ci_hi"),
+    "wfv_gap_30d_significant": _wfv_summary.get("gap_30d_significant"),
+    "wfv_n_stress_pct": _wfv_summary.get("n_stress_pct"),
+    "wfv_label": "WALK-FORWARD VALIDATED (bootstrap CI on CALM-vs-STRESS forward-return gap, FRED price history since 2014)" if _wfv_available else "NOT YET RUN",
     # — Kelly Criterion Position Sizing (Gap 2 dari Reality Check) —
     "kelly_p_win": round(composite_confidence, 3),
     "kelly_b_payoff": 2.0,  # default risk/reward ratio
