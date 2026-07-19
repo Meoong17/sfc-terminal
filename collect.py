@@ -2041,6 +2041,29 @@ if ETF_AVAILABLE:
     except Exception as e:
         print(f"[ETF] Error: {e}", file=sys.stderr)
 
+# ── BEHAVIORAL DIVERGENCE DETECTOR (EXPERIMENTAL — Option A: display-only) ──
+# Detects mismatch between price action (btc_24h) and the DIRECTION of
+# institutional/whale flow signals ALREADY computed above (M81 ETF flow,
+# Q10 whale pressure, SLI stablecoin liquidity) — purely a different LENS
+# on existing signals, not a new data source. Deliberately kept separate
+# from factors/sfc_pct: re-combining these same signals into the core
+# ensemble a second time would double-count them, the exact mistake
+# already found and fixed for netflow/M81-M82 elsewhere in this project.
+# See analysis/behavioral_divergence.py's module docstring for full
+# rationale and honest caveats about the unvalidated 0.15 threshold.
+_divergence_score, _divergence_details = 0.0, {"status": "unavailable"}
+try:
+    from analysis.behavioral_divergence import compute_behavioral_divergence
+    _m81_is_available = _etf_details.get("status") == "ok"
+    _divergence_score, _divergence_details = compute_behavioral_divergence(
+        m81_etf_flow=_etf_m81_score, m81_available=_m81_is_available,
+        q10_whale_pressure=whale_pressure, sli_score=_sli_score,
+        btc_24h=chg,
+    )
+    print(f"[Divergence] score={_divergence_score} regime={_divergence_details.get('regime','?')}", file=sys.stderr)
+except Exception as e:
+    print(f"[Divergence] Error: {e}", file=sys.stderr)
+
 # ── FISCAL LIQUIDITY (M83-M84) ──
 _m83_score = 0.5
 _m84_score = 0.5
@@ -3809,6 +3832,8 @@ out = {
     # Reflexivity Divergence (experimental, display-only — see analysis/reflexivity_divergence.py)
     "reflexivity_divergence_score": _reflexivity_score,
     "reflexivity_divergence_detail": _reflexivity_details,
+    "behavioral_divergence_score": _divergence_score,
+    "behavioral_divergence_detail": _divergence_details,
     "weight_optimizer_recommendations": _weight_recommendations,
     # ── Advanced Feature Engineering (Peningkatan 1) ──
     # REMOVED: afe_rsi_7 (RSI-7 dihapus dari feature_engineering)
