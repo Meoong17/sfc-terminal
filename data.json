@@ -1,15 +1,15 @@
 {
-  "ts": "2026-07-19T10:55:58.261173+00:00",
-  "btc": 64598.75,
-  "btc_24h": 0.91,
-  "btc_mcap": 1295147580405.4678,
+  "ts": "2026-07-19T11:01:56.607729+00:00",
+  "btc": 64547.55,
+  "btc_24h": 0.83,
+  "btc_mcap": 1294579550996.9934,
   "fng": 35,
   "fng_cls": "Fear",
   "dom": 58.6,
-  "dvol": 38.78,
+  "dvol": 38.79,
   "dvol_is_fallback": false,
-  "sfc_base": 22.71580800699043,
-  "sfc_effective": 27.330686890795487,
+  "sfc_base": 22.714796715120507,
+  "sfc_effective": 27.32986452028668,
   "news_stress": 0.3,
   "news_headlines": [
     "\ud83d\udd34[Rt][Bitcoin.com] Latam Insights: Unpacking Bolivia\u2019s Stablecoin Push, Venezuela\u2019s Massive P2",
@@ -23,8 +23,8 @@
   ],
   "news_sentiment": 0.0,
   "news_stats": {
-    "total_articles": 27,
-    "sources_hit": 9,
+    "total_articles": 28,
+    "sources_hit": 10,
     "stress_raw": 0.3,
     "stress_capped": 0.3
   },
@@ -34,8 +34,8 @@
   "liq_long_vol": 293448166.36,
   "liq_short_vol": 19892168.99,
   "zone": "ELEVATED",
-  "floor_buffer": 9231,
-  "floor_total": 55367,
+  "floor_buffer": 9223,
+  "floor_total": 55324,
   "regime": "CRISIS",
   "regime_zone_divergence": false,
   "regime_zone_divergence_note": null,
@@ -43,23 +43,23 @@
   "transition_risk": 0.568,
   "dxy": 100.78,
   "pc_oi": 0.46,
-  "pc_vol": 1.11,
+  "pc_vol": 1.1,
   "dv_sfc": 0.143,
   "phi": 1.0,
   "state": "NORMAL OSCILLATION",
   "signal": "Standard allocation",
   "factors": {
-    "Lt": -0.8398815097955992,
-    "St": 0.5384634285204144,
+    "Lt": -0.8406989218767809,
+    "St": 0.5385376031808047,
     "Rt": -1.8008936105970734,
-    "Ft": 0.7572263655767735,
+    "Ft": 0.7571332322873814,
     "Sc": -0.29805889065782054
   },
   "ath": 126080,
   "ath_date": "2025-10-06T18:57:42.558Z",
-  "rsi_14": 46.09,
+  "rsi_14": 46.07,
   "rsi_regime": "NEUTRAL",
-  "sopr_proxy": 0.8388,
+  "sopr_proxy": 0.8381,
   "sopr_signal": "EXTREME_CAPITULATION",
   "sopr_score": 0.95,
   "cascade_risk": 0.5,
@@ -118,9 +118,9 @@
   "m13_detail": null,
   "m14_skew": 0.1,
   "m14_detail": {
-    "skew": -0.0,
-    "put_iv": 43.92,
-    "call_iv": 43.92
+    "skew": 0.0,
+    "put_iv": 43.94,
+    "call_iv": 43.94
   },
   "m15_concentration": 0.1,
   "m15_detail": {
@@ -130,7 +130,7 @@
   "m16_regime_ml": 0.45,
   "m16_detail": {
     "p_crisis": 0.45,
-    "recent_mean": 0.0237,
+    "recent_mean": 0.0236,
     "recent_std": 0.1444
   },
   "m17_granger": 0.1,
@@ -157,12 +157,12 @@
   "total_methods_active": 40,
   "m20_obi": 0.75,
   "m20_detail": {
-    "obi_change": "STABLE",
-    "obi_delta": -0.0026,
-    "obi": -0.9755,
-    "obi_norm": 0.0123,
-    "bid_vol": 0.12,
-    "ask_vol": 9.42
+    "obi_change": "BUYING_UP",
+    "obi_delta": 0.0969,
+    "obi": -0.7816,
+    "obi_norm": 0.1092,
+    "bid_vol": 0.75,
+    "ask_vol": 6.12
   },
   "m21_trade_flow": 0.3,
   "m21_detail": {
@@ -175,34 +175,34 @@
   "m22_spread": 0.1,
   "m22_detail": {
     "spread_bps": 0.0015,
-    "range_bps": 155.46,
-    "bid": 64598.74,
-    "ask": 64598.75,
-    "mid": 64598.74,
+    "range_bps": 155.58,
+    "bid": 64547.55,
+    "ask": 64547.56,
+    "mid": 64547.56,
     "spread_change": "STABLE",
     "spread_delta": 0.0
   },
   "m23_liquidity": 0.8,
   "m23_detail": {
-    "slippage_pct": 2.502,
-    "levels_used_buy": 80,
+    "slippage_pct": 2.505,
+    "levels_used_buy": 94,
     "levels_used_sell": 999,
-    "mid_price": 64598.74,
+    "mid_price": 64547.56,
     "liq_change": "STABLE",
-    "slippage_delta": 0.001
+    "slippage_delta": 0.003
   },
   "m24_cape": 0.1,
   "m24_detail": {
-    "cape": 0.732,
-    "current_price": 64557.37,
-    "sma_1y_realized": 88192.64
+    "cape": 0.7316,
+    "current_price": 64525.75,
+    "sma_1y_realized": 88192.55
   },
   "m25_minsky": 0.35,
   "m25_detail": {
-    "funding_rate": 7.9e-05,
-    "funding_8h": 0.00011675,
-    "accel": 3.8e-05,
-    "oi_futures": 1487961000,
+    "funding_rate": 9.4e-05,
+    "funding_8h": 0.0001176,
+    "accel": 4.8e-05,
+    "oi_futures": 1487992640,
     "minsky_stage": "DISPLACEMENT"
   },
   "m26_kahneman": 0.205,
@@ -210,17 +210,17 @@
     "loss_aversion": 0.25,
     "anchoring": 0.15,
     "fear": 0.2,
-    "realized_price": 62573.9,
+    "realized_price": 62572.85,
     "ath": 126080.0,
-    "pl_pct": 3.24
+    "pl_pct": 3.16
   },
   "m27_taleb": 0.432,
   "m27_detail": {
-    "dvol": 43.19,
-    "skewness": -0.3927,
+    "dvol": 43.23,
+    "skewness": -0.3919,
     "max_drawdown": 0.2872,
-    "vol_7d_ann": 0.3934,
-    "vol_90d_ann": 0.4319,
+    "vol_7d_ann": 0.3943,
+    "vol_90d_ann": 0.4323,
     "term": "3M>1W",
     "tail_danger": "NORMAL"
   },
@@ -241,7 +241,7 @@
     "fsi_score": 0.15,
     "components": {
       "credit_growth": 5.58,
-      "asset_vol": 43.92,
+      "asset_vol": 43.94,
       "yield_curve": 0.41,
       "hy_spread": 2.7,
       "top3_concentration": 0.138,
@@ -251,12 +251,12 @@
   },
   "m31_altman": 0.15,
   "m31_detail": {
-    "z_score": 5.77,
+    "z_score": 5.756,
     "x1_liquidity": 0.0,
     "x2_network": 4.0,
     "x3_efficiency": 0.883,
-    "x4_oi_ratio": 0.933,
-    "x5_turnover": 2.464,
+    "x4_oi_ratio": 0.946,
+    "x5_turnover": 2.43,
     "zone": "SAFE"
   },
   "m76_supply_growth": null,
@@ -269,9 +269,9 @@
   },
   "m77_ssr": 0.024,
   "m77_detail": {
-    "ssr": 16.62,
+    "ssr": 16.61,
     "stablecoin_mcap": 77927852527.0,
-    "btc_mcap": 1295147580405.0,
+    "btc_mcap": 1294579550997.0,
     "label": "DEPLETED",
     "status": "ok"
   },
@@ -296,7 +296,7 @@
   "m80_detail": {
     "dominance_pct": 3.53,
     "stablecoin_mcap": 77927852527.0,
-    "total_crypto_mcap": 2208368865415.0,
+    "total_crypto_mcap": 2207627210695.0,
     "dom_change_30d": -0.05,
     "trend": "STABLE",
     "status": "ok"
@@ -643,7 +643,7 @@
   "reflexivity_divergence_detail": {
     "status": "ok",
     "experimental": true,
-    "price_roc": 0.0007,
+    "price_roc": 0.0004,
     "leverage_roc": 0.0,
     "mvrv_gap_now": 0.2252,
     "mvrv_gap_widening": 0.0,
@@ -664,7 +664,7 @@
       },
       "detail": {
         "status": "ok",
-        "points_used": 117,
+        "points_used": 118,
         "avg_abs_correlation": {
           "fed": 0.0,
           "ecb": 0.0,
@@ -709,7 +709,7 @@
       },
       "detail": {
         "status": "ok",
-        "points_used": 117,
+        "points_used": 118,
         "avg_abs_correlation": {
           "dominance": 1.0,
           "exchange_flow": 1.0,
@@ -749,7 +749,7 @@
       },
       "detail": {
         "status": "ok",
-        "points_used": 117,
+        "points_used": 118,
         "avg_abs_correlation": {
           "funding_rate": 0.0,
           "put_call": 0.0,
@@ -774,9 +774,9 @@
       }
     }
   },
-  "afe_macd_signal": -0.0175,
+  "afe_macd_signal": -0.0177,
   "afe_bb_width": 0.0031,
-  "afe_vwap": 0.65,
+  "afe_vwap": 0.64,
   "afe_obv_norm": 0.0664,
   "afe_available": true,
   "xgb_meta_prediction": 27.61,
@@ -869,7 +869,7 @@
   "adv_crisis_prob": 0.991,
   "adv_regime_stability": 0.009,
   "adv_regime_boost": 25,
-  "adv_uncertainty": 0.491,
+  "adv_uncertainty": 0.442,
   "adv_confidence": "LOW_CONFIDENCE",
   "adv_trends_recession": 0.72,
   "adv_trends_crash": 0.72,
@@ -885,7 +885,7 @@
   "bt_win_rate_high": 0.836,
   "bt_return": 0.5,
   "bt_periods": 1932,
-  "bt_stability": 0.537,
+  "bt_stability": 0.538,
   "bt_calibration_note": "Limited stress events in training window \u2014 metrics are upper-bound estimates",
   "bt_label": "ESTIMATED (heuristic formula, not walk-forward validated)",
   "kelly_p_win": 0.166,
@@ -909,7 +909,7 @@
   "sec_events": 1,
   "q9_available": false,
   "q9_articles": 0,
-  "m65_cnn_attention": 0.4865,
+  "m65_cnn_attention": 0.497,
   "m65_pattern_type": "LOW_STRESS - normal market noise",
   "m65_available": true,
   "m65_affects_sfc_score": false,
@@ -989,7 +989,7 @@
   "var_95": 0.0,
   "es_975": 0.0,
   "ci_90_lower": 0.0,
-  "ci_90_upper": 68.46,
+  "ci_90_upper": 68.45,
   "prob_stress": 0.5371,
   "prob_critical": 0.1823,
   "prob_crash_10pct": 0.0956,
@@ -1002,7 +1002,7 @@
     "q_50": 27.33,
     "q_75": 44.18,
     "q_90": 59.38,
-    "q_95": 68.46,
+    "q_95": 68.45,
     "q_99": 85.48
   },
   "prob_sharpe": 0.907,
