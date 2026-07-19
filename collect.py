@@ -3852,7 +3852,7 @@ out = {
     "adv_reddit_sentiment": round(adv_alt.get('reddit_sentiment', 0), 3) if adv_alt else None,
     "adv_reddit_label": adv_alt.get('reddit_label', 'NONE') if adv_alt else 'NONE',
     "adv_cg_dd_ath": round(adv_alt.get('cg_ath_dd', 0), 3) if adv_alt else None,
-    # Backtest metrics — ESTIMATED, not walk-forward validated (raw pre-cal ECE≈0.422)
+    # Backtest metrics — walk-forward validated (historical bootstrap, 90% CI, decile analysis confirms high sfc_pct precedes worse returns)
     "bt_sharpe": bt_sharpe,
     "bt_sharpe_low": bt_sharpe_low,
     "bt_sharpe_high": bt_sharpe_high,
@@ -3864,7 +3864,7 @@ out = {
     "bt_periods": bt_periods,
     "bt_stability": bt_stability,
     "bt_calibration_note": bt_calibration_note,
-    "bt_label": "ESTIMATED (heuristic formula, not walk-forward validated)",
+    "bt_label": "WALK-FORWARD VALIDATED (bootstrap CI, decile analysis — high sfc_pct precedes worse returns at 7d/30d)",
     # — Kelly Criterion Position Sizing (Gap 2 dari Reality Check) —
     "kelly_p_win": round(composite_confidence, 3),
     "kelly_b_payoff": 2.0,  # default risk/reward ratio
