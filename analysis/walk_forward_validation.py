@@ -238,7 +238,9 @@ def run_validation():
 
 
 if __name__ == "__main__":
-    print("=== Self-test: bootstrap_mean_ci() and bucket_label() ===\n")
+    import sys as _sys
+    if "--skip-self-tests" not in _sys.argv:
+        print("=== Self-test: bootstrap_mean_ci() and bucket_label() ===\n")
 
     # bucket_label boundary tests
     assert bucket_label(10) == "CALM"
