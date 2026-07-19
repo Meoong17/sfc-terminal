@@ -274,3 +274,5 @@ if __name__ == "__main__":
     print("✅ PASS: add_forward_returns() correctly computes forward return and excludes tail with no future data\n")
 
     print("ALL SELF-TESTS PASSED")
+
+    run_validation()
