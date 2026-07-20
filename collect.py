@@ -821,8 +821,11 @@ def _sopr_signal_score(value):
     else:
         return "EXTREME_DISTRIBUTION", 0.10
 
+SOPR_CACHE_FILE = os.path.join(os.path.dirname(__file__), '.sopr_cache.json')
+SOPR_CACHE_TTL = 3600  # 1 hour (free tier: 10 req/hour)
+
 def compute_sopr(closes_7d, closes_30d, btc_spot):
-    """Compute SOPR: try true on-chain from BGeometrics API first, fallback to price proxy.
+    """Compute SOPR: try true on-chain from BGeometrics API first (cached), fallback to price proxy.
 
     True SOPR (on-chain) = spent output value / creation value (UTXO-based).
     Proxy = btc_spot / (0.4*avg_7d + 0.6*avg_30d).
@@ -830,6 +833,18 @@ def compute_sopr(closes_7d, closes_30d, btc_spot):
     Returns:
         (sopr_value, signal, score)
     """
+    # Try cached true SOPR first
+    if os.path.exists(SOPR_CACHE_FILE):
+        try:
+            with open(SOPR_CACHE_FILE) as _f:
+                _cache = json.load(_f)
+            if time.time() - _cache.get("ts", 0) < SOPR_CACHE_TTL:
+                _val = _cache["sopr"]
+                _signal, _score = _sopr_signal_score(_val)
+                return _val, _signal, _score
+        except Exception:
+            pass
+
     # Try true on-chain SOPR from BGeometrics API
     api_key = os.getenv("SOPR_API_KEY", "")
     if api_key:
@@ -843,6 +858,12 @@ def compute_sopr(closes_7d, closes_30d, btc_spot):
                 if isinstance(data, list) and len(data) > 0:
                     latest = data[-1]
                     true_sopr = float(latest["sopr"])
+                    # Write cache
+                    try:
+                        with open(SOPR_CACHE_FILE, "w") as _f:
+                            json.dump({"sopr": true_sopr, "ts": time.time()}, _f)
+                    except Exception:
+                        pass
                     signal, score = _sopr_signal_score(true_sopr)
                     return true_sopr, signal, score
         except Exception:
