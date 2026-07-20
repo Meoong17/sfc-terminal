@@ -195,19 +195,36 @@ class HMMRegimeDetector:
             if self._scaler_mean is not None and self._scaler_std is not None:
                 features = (features - self._scaler_mean) / self._scaler_std
 
-            # Most likely hidden state
-            state = int(self.model.predict(features)[0])
+            # For single-point prediction, use emission log-likelihood + stationary
+            # prior rather than hmmlearn's predict_proba (which uses the learned
+            # startprob — often degenerate on long sequences, causing the model
+            # to be stuck in one state permanently).
+            log_likelihoods = self.model._compute_log_likelihood(features)[0]
+
+            # Stationary distribution from transition matrix as prior
+            try:
+                eigvals, eigvecs = np.linalg.eig(self.model.transmat_.T)
+                stationary = np.real(eigvecs[:, np.isclose(eigvals, 1.0)][:, 0])
+                stationary = stationary / stationary.sum()
+            except Exception:
+                stationary = np.ones(self.n_regimes) / self.n_regimes
+
+            # Posterior: log_posterior = log_prior + log_likelihood
+            log_posterior = np.log(stationary + 1e-15) + log_likelihoods
+            log_posterior -= log_posterior.max()  # numerical stability
+            posterior = np.exp(log_posterior)
+            posterior /= posterior.sum()
+
+            # Most likely state
+            state = int(np.argmax(posterior))
             regime_label = int(self._state_order[state])
             regime_name = REGIME_NAMES.get(regime_label, "NORMAL")
-
-            # Posterior probabilities over HMM states
-            hmm_probs = self.model.predict_proba(features)[0]
 
             # Reorder to regime-label order (0=BULL, 1=BEAR, 2=SIDEWAYS, 3=CRISIS)
             regime_probs = np.zeros(self.n_regimes, dtype=np.float64)
             for hmm_idx in range(self.n_regimes):
                 regime_label_idx = int(self._state_order[hmm_idx])
-                regime_probs[regime_label_idx] = float(hmm_probs[hmm_idx])
+                regime_probs[regime_label_idx] = float(posterior[hmm_idx])
 
             # Crisis probability = prob mass of CRISIS regime (label 3)
             crisis_prob = float(regime_probs[3])
