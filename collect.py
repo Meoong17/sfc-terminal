@@ -2438,8 +2438,8 @@ if _xgb_module:
     try:
         # Build method scores dict for XGBoost
         _xgb_method_scores = {}
-        for _name, _val in [("m1_klr",m1_klr),("m2_logit",m2_logit),("m3_bayes",m3_bayes),
-                            ("m4_ewc",m4_ewc),("m5_qreg",m5_qreg),("m6_regime",m6_regime),
+        for _name, _val in [("m1_klr",m1_klr*100),("m2_logit",m2_logit*100),("m3_bayes",m3_bayes*100),
+                            ("m4_ewc",m4_ewc*100),("m5_qreg",m5_qreg),("m6_regime_score",m6_regime),
                             ("m7_fisher",m7_s),("m8_yield",m8_s),("m9_liquidity",m9_s),
                             ("m10_garch",m10_s),("m11_var",m11_s),("m12_jump",m12_s),
                             ("m13_funding",m13_s),("m14_skew",m14_s),("m15_concentration",m15_s),
