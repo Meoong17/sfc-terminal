@@ -845,7 +845,29 @@ def compute_sopr(closes_7d, closes_30d, btc_spot):
         except Exception:
             pass
 
-    # Try true on-chain SOPR from BGeometrics API
+    # Try public endpoint first (no API key needed)
+    try:
+        r = requests.get(
+            "https://api.bitcoin-data.com/v1/sopr?days=1",
+            timeout=10,
+        )
+        if r.status_code == 200:
+            data = r.json()
+            if isinstance(data, list) and len(data) > 0:
+                latest = data[-1]
+                true_sopr = float(latest["sopr"])
+                # Write cache
+                try:
+                    with open(SOPR_CACHE_FILE, "w") as _f:
+                        json.dump({"sopr": true_sopr, "ts": time.time()}, _f)
+                except Exception:
+                    pass
+                signal, score = _sopr_signal_score(true_sopr)
+                return true_sopr, signal, score
+    except Exception:
+        pass
+
+    # Fallback: try with API key if public fails
     api_key = os.getenv("SOPR_API_KEY", "")
     if api_key:
         try:
