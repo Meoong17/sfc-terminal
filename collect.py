@@ -802,30 +802,61 @@ def compute_rsi(closes, period=14):
     rs = avg_gain / avg_loss
     return round(100 - (100 / (1 + rs)), 2)
 
-def compute_sopr_proxy(closes_7d, closes_30d, btc_spot):
+def _sopr_signal_score(value):
+    """Classify SOPR value into signal name and stress score (0-1)."""
+    if value is None:
+        return "UNKNOWN", 0.5
+    if value < 0.93:
+        return "EXTREME_CAPITULATION", 0.95
+    elif value < 0.97:
+        return "CAPITULATION", 0.80
+    elif value < 0.995:
+        return "MILD_DISTRESS", 0.65
+    elif value < 1.005:
+        return "BREAKEVEN", 0.50
+    elif value < 1.03:
+        return "MILD_PROFIT", 0.40
+    elif value < 1.08:
+        return "DISTRIBUTION", 0.25
+    else:
+        return "EXTREME_DISTRIBUTION", 0.10
+
+def compute_sopr(closes_7d, closes_30d, btc_spot):
+    """Compute SOPR: try true on-chain from BGeometrics API first, fallback to price proxy.
+
+    True SOPR (on-chain) = spent output value / creation value (UTXO-based).
+    Proxy = btc_spot / (0.4*avg_7d + 0.6*avg_30d).
+
+    Returns:
+        (sopr_value, signal, score)
+    """
+    # Try true on-chain SOPR from BGeometrics API
+    api_key = os.getenv("SOPR_API_KEY", "")
+    if api_key:
+        try:
+            r = requests.get(
+                f"https://api.bgeometrics.com/v1/sopr?token={api_key}&days=3",
+                timeout=10,
+            )
+            if r.status_code == 200:
+                data = r.json()
+                if isinstance(data, list) and len(data) > 0:
+                    latest = data[-1]
+                    true_sopr = float(latest["sopr"])
+                    signal, score = _sopr_signal_score(true_sopr)
+                    return true_sopr, signal, score
+        except Exception:
+            pass
+
+    # Fallback: price proxy
     if not closes_7d or not closes_30d or not btc_spot:
         return None, "UNKNOWN", 0.5
     avg_7d = sum(closes_7d) / len(closes_7d)
     avg_30d = sum(closes_30d) / len(closes_30d)
     weighted_cost = 0.40 * avg_7d + 0.60 * avg_30d
-    sopr_proxy = round(btc_spot / weighted_cost, 4) if weighted_cost > 0 else None
-    if sopr_proxy is None:
-        return None, "UNKNOWN", 0.5
-    if sopr_proxy < 0.93:
-        signal, score = "EXTREME_CAPITULATION", 0.95
-    elif sopr_proxy < 0.97:
-        signal, score = "CAPITULATION", 0.80
-    elif sopr_proxy < 0.995:
-        signal, score = "MILD_DISTRESS", 0.65
-    elif sopr_proxy < 1.005:
-        signal, score = "BREAKEVEN", 0.50
-    elif sopr_proxy < 1.03:
-        signal, score = "MILD_PROFIT", 0.40
-    elif sopr_proxy < 1.08:
-        signal, score = "DISTRIBUTION", 0.25
-    else:
-        signal, score = "EXTREME_DISTRIBUTION", 0.10
-    return sopr_proxy, signal, score
+    proxy = round(btc_spot / weighted_cost, 4) if weighted_cost > 0 else None
+    signal, score = _sopr_signal_score(proxy)
+    return proxy, signal, score
 
 # ============================================================
 # 2. SFC v2.1 CALCULATION (NO LLM - Rule Based)
@@ -3005,7 +3036,7 @@ except Exception as e:
     print(f"[Backtest] Error: {e}", file=sys.stderr)
 
 # Technical indicators
-sopr_proxy, sopr_signal, sopr_score = compute_sopr_proxy(closes_7m, closes_30m, btc)
+sopr_proxy, sopr_signal, sopr_score = compute_sopr(closes_7m, closes_30m, btc)
 
 # Composite confidence — dynamic components
 # RSI confidence: extremes = momentum/extreme = unpredictable = lower confidence
@@ -3188,7 +3219,7 @@ elif fng is not None and fng > 85:
     cc_penalty += 0.04
 
 # SOPR capitulation — on-chain stress
-if sopr_proxy is not None and sopr_proxy < 0.98:
+if sopr_proxy is not None and sopr_proxy < 0.97:
     cc_penalty += 0.05
 
 # ── M8 YIELD CURVE CONFIDENCE MODULATOR (refactored from stress signal) ──
@@ -3648,7 +3679,7 @@ out = {
         "method_agree": round(method_agreement, 3),
         "low_stress_boost": round(max(0, 1.0 - (effective_sfc/100)) * 0.08, 4),
         "rsi": round(rsi_conf, 3),
-        "sopr": round(-0.05 if sopr_proxy is not None and sopr_proxy < 0.98 else 0.0, 3),
+        "sopr": round(-0.05 if sopr_proxy is not None and sopr_proxy < 0.97 else 0.0, 3),
         "dvol": round(dvol_conf, 3),
         "squeeze_penalty": round(-0.06 if liq_pressure in ('LONG_SQUEEZE', 'SHORT_SQUEEZE') else 0.0, 3),
         "cascade_penalty": round(-(0.10 if cascade_risk > 0.5 else 0.05 if cascade_risk > 0.35 else 0.0), 3),
