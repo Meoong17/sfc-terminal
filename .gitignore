@@ -56,12 +56,10 @@ btc_ws.json
 historical_data.json
 ml_ensemble_model.pkl
 ml_ensemble_scaler.pkl
-
-# ─── Model weights (too large for git) ───
 models/*.pth
 models/*.pkl
 models/ewma_state.json
-models/hmm_regime.pkl
+!models/hmm_regime.pkl
 models/xgboost_meta.json
 *.npy
 
