@@ -2580,7 +2580,7 @@ try:
         "m2_yoy": m2_yoy, "dxy": dxy,
         "method_agreement": method_agreement,
         "composite_confidence": composite_confidence if "composite_confidence" in dir() else None,
-        "m1_klr": m1_klr, "m2_logit": m2_logit, "m4_ewc": m4_ewc, "m5_qreg": m5_qreg,
+        "m1_klr": m1_klr*100, "m2_logit": m2_logit*100, "m4_ewc": m4_ewc*100, "m5_qreg": m5_qreg,
         "m3_bayes": m3_bayes if "m3_bayes" in dir() else None,
         "factors": factors,
         "sopr_proxy": sopr_proxy if "sopr_proxy" in dir() else None,
