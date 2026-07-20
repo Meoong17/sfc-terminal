@@ -205,7 +205,14 @@ def compute_etf_metrics(btc_price=None):
     # ── M82: Cumulative Holdings Trend ──
     # Compare cumulative BTC holdings change over last 20 trading days
     # (about 1 month)
-    cum = cache.get("cumulative_btc", 0)
+    cum = cache.get("cumulative_btc")
+    if cum is None or cum == 0:
+        # Reconstruct from flow entries if cache summary is missing
+        cum = 0
+        for f in flows:
+            tb = _entry_total_btc(f)
+            if tb is not None:
+                cum += tb
 
     # If we have enough historical data, compute the trend
     if len(flows) >= 20:
