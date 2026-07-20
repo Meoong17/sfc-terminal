@@ -145,7 +145,35 @@ def compute_etf_metrics(btc_price=None):
 
     # ── M81: ETF Net Flow Score ──
     # Use last 5 trading days of net flows (in BTC)
-    recent_flows = [f for f in flows if f.get("total_btc") is not None][:5]
+    #
+    # FIX (found via live cache inspection, 2026-07): two compounding bugs
+    # were here previously:
+    #   1. `flows[:5]` assumed the cache was newest-first, but it's
+    #      actually stored chronologically ascending (oldest first) —
+    #      confirmed live: first entry was 2024-01-11, last was
+    #      2026-07-20. Taking flows[:5] silently grabbed 2024 data, not
+    #      recent data, every single cycle.
+    #   2. `total_btc` is never populated by the cache-writer (always
+    #      None) — confirmed in EVERY entry checked, including the most
+    #      recent. The per-ETF breakdown dict (`etfs`) IS populated
+    #      though, so total_btc is reconstructed as sum(etfs.values())
+    #      rather than silently discarding every entry as "no usable data."
+    def _entry_total_btc(f):
+        if f.get("total_btc") is not None:
+            return f["total_btc"]
+        etfs = f.get("etfs")
+        if isinstance(etfs, dict) and etfs:
+            return sum(v for v in etfs.values() if v is not None)
+        return None
+
+    sorted_flows = sorted(flows, key=lambda f: f.get("date", ""), reverse=True)
+    recent_flows = []
+    for f in sorted_flows:
+        tb = _entry_total_btc(f)
+        if tb is not None:
+            recent_flows.append({**f, "total_btc": tb})
+        if len(recent_flows) >= 5:
+            break
 
     if not recent_flows:
         return 0.5, 0.5, {"status": "no_recent_flows"}
@@ -181,13 +209,18 @@ def compute_etf_metrics(btc_price=None):
 
     # If we have enough historical data, compute the trend
     if len(flows) >= 20:
-        old_cum = sum(f.get("total_btc", 0) for f in flows[19:])  # cumulative at 20 days ago
-        # Actually we need cumulative data per day. Let's compute from deltas
+        # FIX: same root cause as M81 above — total_btc is never
+        # populated by the cache-writer, so this loop previously never
+        # added anything to cumulative_over_time (the `is not None`
+        # check always failed), meaning M82 was ALWAYS stuck at the
+        # neutral 0.50 fallback further below. Reuse the same
+        # reconstruct-from-etfs-breakdown helper defined above.
         cumulative_over_time = []
         running = 0
         for f in reversed(flows):
-            if f.get("total_btc") is not None:
-                running += f["total_btc"]
+            tb = _entry_total_btc(f)
+            if tb is not None:
+                running += tb
                 cumulative_over_time.append(running)
         cumulative_over_time.reverse()
 
