@@ -223,11 +223,15 @@ def get_news_stress_v2(cryptopanic_key=None, max_workers=8):
 SHOCK_MATRIX = {
     "emergency rate cut": 0.40, "fed emergency": 0.35, "liquidity facility": 0.30,
     "bailout": 0.25, "ceasefire": 0.20, "truce": 0.15, "spot etf approved": 0.20,
-    "nuclear": -0.50, "war declared": -0.45, "military strike": -0.35,
+    "nuclear war": -0.50, "nuclear strike": -0.45, "nuclear attack": -0.45, "war declared": -0.45, "military strike": -0.35,
     "margin call": -0.25, "exchange halt": -0.30, "bank run": -0.35,
-    "default": -0.25, "insolvency": -0.30, "circuit breaker": -0.25,
+    "insolvency": -0.30, "circuit breaker": -0.25,
     "flash crash": -0.20, "cascading liquidations": -0.30, "tether insolvency": -0.45,
     "binance hack": -0.35, "exchange insolvent": -0.40, "sec charges": -0.15,
+    # "default" removed — single-word match causes false positives
+    # (e.g. "default standard", "by default"). Replaced with specific variants:
+    "debt default": -0.25, "bond default": -0.25, "loan default": -0.25,
+    "credit default": -0.25, "defaulted on": -0.30,
 }
 
 def detect_black_swan_v2(articles):
