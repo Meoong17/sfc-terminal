@@ -88,6 +88,8 @@ class HMMRegimeDetector:
         self._is_fitted = False
         self._state_order: np.ndarray | None = None  # maps HMM state idx -> regime label
         self._feature_means: np.ndarray | None = None
+        self._scaler_mean: np.ndarray | None = None   # z-score mean (n_features,)
+        self._scaler_std: np.ndarray | None = None    # z-score std  (n_features,)
 
     # ── fit ──
 
@@ -118,16 +120,22 @@ class HMMRegimeDetector:
         # Handle NaN / Inf
         features = np.nan_to_num(features, nan=0.0, posinf=0.0, neginf=0.0)
 
-        # Train Gaussian HMM with full covariance
+        # Z-score standardize so all features have equal influence
+        self._scaler_mean = features.mean(axis=0)
+        self._scaler_std = features.std(axis=0)
+        self._scaler_std[self._scaler_std < 1e-8] = 1.0  # avoid div-by-zero
+        features_std = (features - self._scaler_mean) / self._scaler_std
+
+        # Train Gaussian HMM with diagonal covariance (more stable than full)
         self.model = hmm.GaussianHMM(
             n_components=self.n_regimes,
-            covariance_type="full",
+            covariance_type="diag",
             n_iter=1000,
             random_state=42,
             tol=1e-4,
             verbose=False,
         )
-        self.model.fit(features)
+        self.model.fit(features_std)
 
         # Label regimes by mean daily_return (first feature, column 0)
         means = self.model.means_  # (n_regimes, n_features)
@@ -182,6 +190,10 @@ class HMMRegimeDetector:
                 return {"regime": "NORMAL", "crisis_probability": 0.0}
 
             features = np.nan_to_num(features, nan=0.0, posinf=0.0, neginf=0.0)
+
+            # Apply same z-score standardization as during training
+            if self._scaler_mean is not None and self._scaler_std is not None:
+                features = (features - self._scaler_mean) / self._scaler_std
 
             # Most likely hidden state
             state = int(self.model.predict(features)[0])
@@ -371,6 +383,8 @@ class HMMRegimeDetector:
             "_state_order": self._state_order,
             "_feature_means": self._feature_means,
             "_is_fitted": self._is_fitted,
+            "_scaler_mean": self._scaler_mean,
+            "_scaler_std": self._scaler_std,
         }
         with open(save_path, "wb") as f:
             pickle.dump(state, f)
@@ -397,7 +411,9 @@ class HMMRegimeDetector:
         self.n_regimes = state["n_regimes"]
         self._state_order = state["_state_order"]
         self._feature_means = state["_feature_means"]
-        self._is_fitted = state["_is_fitted"]
+        self._is_fitted = state.get("_is_fitted", True)
+        self._scaler_mean = state.get("_scaler_mean")
+        self._scaler_std = state.get("_scaler_std")
 
         log.info(f"Model loaded from {load_path}")
         return self
