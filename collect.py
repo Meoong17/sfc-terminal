@@ -2796,7 +2796,7 @@ if _hmm_module:
         # input reduced the value of HMM regime detection as a check that's
         # actually independent of the ensemble's own current reading.
         _hmm_feat = np.array([[
-            (chg or 0) / 100.0,
+            (chg or 0),  # btc_24h is already % (e.g. 0.903), NOT divided by 100
             (dvol or 50) / 100.0,
             (m2_yoy if m2_yoy is not None else 5.0) / 15.0,
             (rsi_14m or 50) / 100.0,
