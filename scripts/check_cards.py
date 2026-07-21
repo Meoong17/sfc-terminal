@@ -47,7 +47,7 @@ if 'factors' in d and d['factors']:
         if sub not in d['factors']:
             issues.append(f'MISSING factor.{sub}')
 if 'confidence_components' in d and d['confidence_components']:
-    for sub in ['method_agree','rsi','sopr','dvol','cascade_penalty','fear_penalty']:
+    for sub in ['method_agree','rsi','sopr','dvol','macro_penalty','macro_confidence','execution_risk','squeeze_magnitude','cascade_penalty','fear_penalty']:
         if sub not in d['confidence_components']:
             issues.append(f'MISSING cc.{sub}')
 
