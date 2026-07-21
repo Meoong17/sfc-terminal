@@ -47,7 +47,7 @@ else:
 # ── 4. Mamba Encoder (State-Space Model) ──
 echo "" | tee -a "$LOG"
 echo "[4/5] Mamba retrain..." | tee -a "$LOG"
-/home/ubuntu/sfc2/venv/bin/python3 /home/ubuntu/sfc/models/train_mamba.py 2>&1 | tail -10 | tee -a "$LOG"
+/home/ubuntu/sfc/.venv/bin/python /home/ubuntu/sfc/models/train_mamba.py 2>&1 | tail -10 | tee -a "$LOG"
 
 # ── 5. DRL Agent (if available) ──
 echo "" | tee -a "$LOG"
