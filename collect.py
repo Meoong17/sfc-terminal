@@ -3223,88 +3223,104 @@ if DFS_AVAILABLE and _DFS_SELECTOR is not None:
         print(f"[DFS] Error: {_dfs_e}", file=sys.stderr)
         _dfs_profile = None
 
-# Composite confidence — multi-factor penalized model
-# Base: method agreement + market calmness
+# ── Composite confidence — two-layer model ──
+# Layer 1 (Macro/Arah): base confidence ± adjustments for signal reliability.
+#   Base: method agreement + market calmness (additive).
+#   Adjustments: RSI, SOPR, FNG, news, vol, transition, MPI, yield curve.
+# Layer 2 (Execution Risk): market safety for entry/exit (multiplicative).
+#   Factors: cascade_risk, squeeze pressure, funding imbalance.
+#   Formula: Confidence = Macro × (1 - ExecutionRisk)
+#
+# Pemisahan ini mencegah mencampur "keyakinan arah" dengan "risiko eksekusi"
+# — squeeze/cascade adalah kondisi derivatif sementara, bukan perubahan fundamental.
+# Nilai penalty dihitung SEKALI dan dipakai oleh computation + display.
+
+# ── Compute all penalty values once (single source of truth) ──
+# Macro adjustments (Layer 1) — affect signal reliability
+if rsi_14m is not None:
+    _pen_rsi = 0.08 if (rsi_14m < 25 or rsi_14m > 75) else 0.04 if (rsi_14m < 35 or rsi_14m > 65) else 0.0
+else:
+    _pen_rsi = 0.0
+
+_pen_sopr = 0.05 if sopr_proxy is not None and sopr_proxy < 0.97 else 0.0
+
+if fng is not None and fng < 15:
+    _pen_fng = 0.06
+elif fng is not None and fng > 85:
+    _pen_fng = 0.04
+else:
+    _pen_fng = 0.0
+
+_pen_news = 0.04 if news_sentiment < -0.5 else 0.02 if news_sentiment < -0.3 else 0.0
+
+_pen_dvol_safety = 0.05 if dvol is not None and dvol > 80 else 0.0
+
+_pen_transition = 0.05 if transition_risk > 0.5 else 0.0
+
+_pen_mpi = max(0, (_mpi_stress - 0.5) * 0.08) if _mpi_stress is not None else 0.0
+
+# Yield curve adjustments (macro)
+_pen_yield = 0.0
+_boost_yield = 0.0
+if m8_d is not None:
+    _slope = m8_d.get("slope")
+    _spread = m8_d.get("spread")
+    if _slope is not None:
+        if _slope < 0:
+            _pen_yield += 0.08
+        elif _slope < 0.5:
+            _pen_yield += 0.04
+        elif _slope > 2.0:
+            _boost_yield = 0.03
+    if _spread is not None:
+        _pen_yield += 0.06 if _spread > 400 else 0.03 if _spread > 300 else 0.0
+
+# Execution risk factors (Layer 2) — multiplicative, affect sizing/timing
+_squeeze_active = liq_pressure in ('LONG_SQUEEZE', 'SHORT_SQUEEZE')
+
+# Funding imbalance — from liquidation flow or funding rate
+_imb_funding = 0.0
+if liq_total_24h is not None and liq_long_vol is not None and liq_short_vol is not None:
+    _liq_tot = liq_long_vol + liq_short_vol
+    if _liq_tot > 0:
+        _imb_funding = abs(liq_long_vol - liq_short_vol) / _liq_tot
+elif m13_d and isinstance(m13_d, dict):
+    _fr = m13_d.get("funding_rate")
+    if _fr is not None:
+        _imb_funding = min(abs(_fr) * 10, 1.0)
+
+# Continuous execution risk factor: R = 0.4×cascade + 0.3×squeeze + 0.3×funding
+# Capped at 0.95 so confidence floor stays at 5%
+_execution_risk = min(
+    0.40 * cascade_risk +
+    0.30 * (1.0 if _squeeze_active else 0.0) +
+    0.30 * _imb_funding,
+    0.95
+)
+
+# ── Layer 1: Macro confidence (base + adjustments) ──
 cc_base = 0.30
-cc_base += method_agreement * 0.15   # methods agree → more reliable
-cc_base += max(0, 1.0 - (effective_sfc/100)) * 0.08  # low stress → more reliable
+cc_base += method_agreement * 0.15
+cc_base += max(0, 1.0 - (effective_sfc/100)) * 0.08
 
-# Penalties — reduce confidence when conditions contradict SFC signal
-cc_penalty = 0.0
+_macro_penalty = _pen_rsi + _pen_sopr + _pen_fng + _pen_news + \
+                 _pen_dvol_safety + _pen_transition + _pen_mpi + _pen_yield
 
-# MPI confidence penalty (needs cc_penalty defined first)
+macro_confidence = max(0.05, min(cc_base + _boost_yield - _macro_penalty, 0.95))
+
+# ── Final: Composite Confidence = Macro × (1 - ExecutionRisk) ──
+composite_confidence = max(0.05, min(macro_confidence * (1.0 - _execution_risk), 0.95))
+composite_confidence = round(composite_confidence, 3)
+
+# Debug prints (continue existing convention)
 if _mpi_stress is not None:
     _mpi_conf_penalty = (_mpi_stress - 0.5) * 0.08
-    cc_penalty += max(0, _mpi_conf_penalty)
     print(f"[MPI] CC penalty: {_mpi_conf_penalty:+.3f} (mpi_stress={_mpi_stress:.3f})", file=sys.stderr)
-
-# Cascade risk — high cascade = signal less reliable
-if cascade_risk > 0.5:
-    cc_penalty += 0.10
-elif cascade_risk > 0.35:
-    cc_penalty += 0.05
-
-# RSI extremes — extreme momentum = unpredictable
-if rsi_14m is not None:
-    if rsi_14m < 25:
-        cc_penalty += 0.08
-    elif rsi_14m < 35:
-        cc_penalty += 0.04
-    elif rsi_14m > 75:
-        cc_penalty += 0.08
-    elif rsi_14m > 65:
-        cc_penalty += 0.04
-
-# Liquidation squeeze — one-sided pressure = unreliable signal
-if liq_pressure in ('LONG_SQUEEZE', 'SHORT_SQUEEZE'):
-    cc_penalty += 0.06
-
-# Extreme fear/greed — emotional market = unpredictable
-if fng is not None and fng < 15:
-    cc_penalty += 0.06
-elif fng is not None and fng > 85:
-    cc_penalty += 0.04
-
-# SOPR capitulation — on-chain stress
-if sopr_proxy is not None and sopr_proxy < 0.97:
-    cc_penalty += 0.05
-
-# ── M8 YIELD CURVE CONFIDENCE MODULATOR (refactored from stress signal) ──
-# Inverted yield curve = macro uncertainty → reduce confidence
-# Steep curve = normal expansion → increase confidence
-# Wide credit spreads = credit stress → reduce confidence
 if m8_d is not None:
-    slope = m8_d.get("slope")
-    spread = m8_d.get("spread")
-    if slope is not None:
-        if slope < 0:
-            cc_penalty += 0.08  # inverted → high macro uncertainty
-        elif slope < 0.5:
-            cc_penalty += 0.04  # flattening → mild uncertainty
-        elif slope > 2.0:
-            cc_base += 0.03  # steep normal → slightly more confident
-    if spread is not None and spread > 400:
-        cc_penalty += 0.06  # credit market stress
-    elif spread is not None and spread > 300:
-        cc_penalty += 0.03
-    print(f"[M8] Yield curve confidence adj: slope={slope} spread={spread} penalty={cc_penalty:.2f}", file=sys.stderr)
-
-# Very negative news sentiment
-if news_sentiment < -0.5:
-    cc_penalty += 0.04
-elif news_sentiment < -0.3:
-    cc_penalty += 0.02
-
-# High volatility
-if dvol is not None and dvol > 80:
-    cc_penalty += 0.05
-
-# Regime transition — risk of regime flip
-if transition_risk > 0.5:
-    cc_penalty += 0.05
-
-composite_confidence = max(0.05, min(cc_base - cc_penalty, 0.95))
-composite_confidence = round(composite_confidence, 3)
+    print(f"[M8] Yield curve adj: penalty={_pen_yield:.2f} boost={_boost_yield:.2f}", file=sys.stderr)
+print(f"[CC] macro_base={cc_base:.3f} penalties={_macro_penalty:.3f} "
+      f"macro_conf={macro_confidence:.3f} exec_risk={_execution_risk:.3f} "
+      f"final={composite_confidence:.3f}", file=sys.stderr)
 
 # ── Transition Risk Guard: force CASH when regime flip risk exceeds threshold ──
 # When transition_risk > 60%, override kelly to 0 → model stays CASH
@@ -3728,7 +3744,13 @@ out = {
         "rsi": round(rsi_conf, 3),
         "sopr": round(-0.05 if sopr_proxy is not None and sopr_proxy < 0.97 else 0.0, 3),
         "dvol": round(dvol_conf, 3),
-        "squeeze_penalty": round(-0.06 if liq_pressure in ('LONG_SQUEEZE', 'SHORT_SQUEEZE') else 0.0, 3),
+        "macro_penalty": round(_macro_penalty, 3),
+        "macro_confidence": round(macro_confidence, 3),
+        "execution_risk": round(_execution_risk, 3),
+        "squeeze_active": _squeeze_active,
+        "cascade_risk_raw": round(cascade_risk, 3),
+        "funding_imbalance": round(_imb_funding, 3),
+        "squeeze_penalty": round(-0.06 if _squeeze_active else 0.0, 3),
         "cascade_penalty": round(-(0.10 if cascade_risk > 0.5 else 0.05 if cascade_risk > 0.35 else 0.0), 3),
         "fear_penalty": round(-(0.06 if fng is not None and fng < 15 else 0.0), 3),
         "news_penalty": round(-(0.04 if news_sentiment < -0.5 else 0.02 if news_sentiment < -0.3 else 0.0), 3),
