@@ -2674,13 +2674,17 @@ if ADVANCED_AVAILABLE is None or ADVANCED_AVAILABLE:
                 _regime_needs_refit = True
             
             if _regime_needs_refit:
-                # Build feature matrix from all current method scores for regime detection
+                # Build feature vector from actual method scores (m1-m5) — MUST match
+                # the features used for training (cols 0-4 of data_collection.json).
+                # Previously this used [sfc_stress, dvol, fng, btc_momentum, 0.5] which
+                # was a *completely different feature space* than what k-means was
+                # clustering on, making the classification meaningless.
                 feat_dict = {
-                    'sfc_stress': sfc_pct / 100.0 if sfc_pct else 0.5,
-                    'dvol': dvol / 100.0 if dvol else 0.5,
-                    'fng': fng / 100.0 if fng else 0.5,
-                    'btc_momentum': (chg / 10.0 + 1) / 2 if chg is not None else 0.5,
-                    'news_stress': 0.5,
+                    'm1_klr': m1_klr if m1_klr is not None else 0.5,
+                    'm2_logit': m2_logit if m2_logit is not None else 0.5,
+                    'm3_bayes': m3_bayes if m3_bayes is not None else 0.5,
+                    'm4_ewc': m4_ewc if m4_ewc is not None else 0.5,
+                    'm5_qreg': (m5_qreg / 100.0) if m5_qreg is not None else 0.5,
                 }
                 
                 # Use historical data for regime fitting
