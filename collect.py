@@ -3139,12 +3139,20 @@ try:
         liq_short_vol = short_v
 
         # Pressure: based on which side is dominating
+        # FIX (2026-07): liquidation_client.py's long_vol_usd/short_vol_usd/
+        # dominant were inverted from their names (see that file's own fix
+        # note). Now that dominant="long" genuinely means "long liquidations
+        # dominate" (longs forced to sell = selling pressure), this
+        # classification is flipped to match — previously "dominant=='long'"
+        # (which used to mean short-liqs-dominate) mapped to SHORT_SQUEEZE;
+        # now that dominant=='long' genuinely means long-liqs-dominate, it
+        # correctly maps to LONG_SQUEEZE instead.
         dominant = liq_data.get("dominant", "balanced")
         liq_ratio = liq_data.get("long_ratio", 0.5)
         if dominant == "long" and liq_ratio > 0.8:
-            liq_pressure = "SHORT_SQUEEZE"   # heavy short liquidations = buying pressure
-        elif dominant == "short" and liq_ratio < 0.2:
             liq_pressure = "LONG_SQUEEZE"    # heavy long liquidations = selling pressure
+        elif dominant == "short" and liq_ratio < 0.2:
+            liq_pressure = "SHORT_SQUEEZE"   # heavy short liquidations = buying pressure
         else:
             liq_pressure = "BALANCED"
 

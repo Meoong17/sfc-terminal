@@ -57,13 +57,25 @@ def fetch_okx_liquidations(symbol="BTC-USDT-SWAP", limit=100):
     """
     Fetch real liquidation orders from OKX (free, no API key).
     Returns: {
-        "long_vol_usd": float,   # Total short-side liquidated (shorts forced to buy)
-        "short_vol_usd": float,  # Total long-side liquidated (longs forced to sell)
+        "long_vol_usd": float,   # Total LONG-side liquidated (longs forced to sell)
+        "short_vol_usd": float,  # Total SHORT-side liquidated (shorts forced to buy)
         "order_count": int,
         "dominant": "long"|"short"|"balanced",
         "liq_intensity": float,  # 0-1 normalised
         "source": "okx"
     }
+
+    NOTE (fix, 2026-07): prior to this fix, long_vol_usd/short_vol_usd and
+    "dominant" were inverted from their names — long_vol_usd actually held
+    SHORT liquidations and vice versa, "dominant='long'" actually meant
+    "short liquidations dominate". collect.py's liq_pressure classification
+    had a compensating (equally confusing) flip that happened to cancel
+    this out for the FINAL "SHORT_SQUEEZE"/"LONG_SQUEEZE" label, but the
+    raw long_vol_usd/short_vol_usd numbers shown directly on the dashboard
+    (as "Long $XXXM / Short $XXXM") were genuinely displaying swapped
+    values. Both this function AND collect.py's classification logic were
+    fixed together — see collect.py's liq_pressure block for the matching
+    other half of this fix.
     """
     url = f"{OKX_BASE}/api/v5/public/liquidation-orders"
     params = {
@@ -82,20 +94,20 @@ def fetch_okx_liquidations(symbol="BTC-USDT-SWAP", limit=100):
             return None
 
         # Parse each liquidation event
-        long_vol = 0.0   # shorts liquidated (side=buy = short liq)
-        short_vol = 0.0  # longs liquidated (side=sell = long liq)
+        long_vol = 0.0   # longs liquidated (side=sell = long liq)
+        short_vol = 0.0  # shorts liquidated (side=buy = short liq)
         count = 0
 
         for event in orders:
             details = event.get("details", [])
             for d in details:
-                side = d.get("side", "")  # "buy" = short liq, "sell" = long liq
+                side = d.get("side", "")  # "sell" = long liq, "buy" = short liq
                 sz = float(d.get("sz", 0))
                 px = float(d.get("bkPx", 0))
                 vol_usd = sz * px
-                if side == "buy":    # shorts being liquidated (buying pressure)
+                if side == "sell":   # longs being liquidated (selling pressure)
                     long_vol += vol_usd
-                elif side == "sell": # longs being liquidated (selling pressure)
+                elif side == "buy":  # shorts being liquidated (buying pressure)
                     short_vol += vol_usd
                 count += 1
 
@@ -103,12 +115,12 @@ def fetch_okx_liquidations(symbol="BTC-USDT-SWAP", limit=100):
         if total == 0:
             return None
 
-        # Determine dominant side
+        # Determine dominant side (now correctly: long_vol = long-side liquidated)
         ratio = long_vol / total if total > 0 else 0.5
         if ratio > 0.65:
-            dominant = "long"       # short liquidations dominating
+            dominant = "long"       # long liquidations dominating (longs forced to sell)
         elif ratio < 0.35:
-            dominant = "short"      # long liquidations dominating
+            dominant = "short"      # short liquidations dominating (shorts forced to buy)
         else:
             dominant = "balanced"
 
