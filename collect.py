@@ -3762,11 +3762,11 @@ out = {
         "cascade_risk_raw": round(cascade_risk, 3),
         "funding_imbalance": round(_imb_funding, 3),
         "squeeze_magnitude": round(_squeeze_magnitude, 3),
-        "cascade_penalty": round(-(0.10 if cascade_risk > 0.5 else 0.05 if cascade_risk > 0.35 else 0.0), 3),
-        "fear_penalty": round(-(0.06 if fng is not None and fng < 15 else 0.0), 3),
-        "news_penalty": round(-(0.04 if news_sentiment < -0.5 else 0.02 if news_sentiment < -0.3 else 0.0), 3),
-        "vol_penalty": round(-0.05 if dvol is not None and dvol > 80 else 0.0, 3),
-        "transition_penalty": round(-0.05 if transition_risk > 0.5 else 0.0, 3)
+        "cascade_penalty": round(-(0.40 * cascade_risk), 3),  # continuous contribution to execution_risk, not stale step-function
+        "fear_penalty": round(-_pen_fng, 3),  # references real _pen_fng (covers fng<15 AND fng>85)
+        "news_penalty": round(-_pen_news, 3),
+        "vol_penalty": round(-_pen_dvol_safety, 3),
+        "transition_penalty": round(-_pen_transition, 3)
     },
     "m1_klr": round(m1_klr * 100, 1),
     "m2_logit": round(m2_logit * 100, 1),
