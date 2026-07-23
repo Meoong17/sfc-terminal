@@ -2620,7 +2620,8 @@ try:
         mamba_ok = True
         mamba_sfc = mamba_pred * 100
         mamba_diff = mamba_sfc - sfc_pct
-        mamba_adjustment = mamba_diff * 0.03  # 3% nudge (complementary to QLSTM's 5%)
+        mamba_adjustment = 0  # DISABLED: Mamba SSM output collapsed (all zeros due to numerical explosion in selective scan)
+        mamba_ok = False  # Mark inactive so dashboard shows DISABLED
         sfc_pct += mamba_adjustment
         zone = "CRITICAL" if sfc_pct/100 > 0.75 else "HIGH" if sfc_pct/100 > 0.5 else "ELEVATED" if sfc_pct/100 > 0.25 else "NORMAL"
         print(f"[SFC] Mamba: SFC={mamba_sfc:.1f}% conf={mamba_result['confidence']*100:.1f}% "

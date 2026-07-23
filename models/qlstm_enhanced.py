@@ -27,7 +27,7 @@ SFC_DIR = os.path.dirname(SCRIPT_DIR)  # /home/ubuntu
 
 # Paths
 QLSTM_MODEL_PATH = os.path.join(SCRIPT_DIR, "qlstm_model.pt")
-QLSTM_MODULE_PATH = os.path.join(SCRIPT_DIR, "qlstm_model.py")
+QLSTM_MODULE_PATH = os.path.join(os.path.dirname(__file__), "qlstm_model.py")
 DATA_PATH = os.path.join(SFC_DIR, "sfc", "data_collection.json")
 
 # Error tracking
