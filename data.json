@@ -1,15 +1,15 @@
 {
-  "ts": "2026-07-23T06:32:17.301486+00:00",
-  "btc": 65747.13,
-  "btc_24h": -0.198,
-  "btc_mcap": 1317918996399.4443,
+  "ts": "2026-07-23T06:38:16.517912+00:00",
+  "btc": 65743.0,
+  "btc_24h": -0.338,
+  "btc_mcap": 1317864542983.5857,
   "fng": 39,
   "fng_cls": "Fear",
   "dom": 58.9,
   "dvol": 38.57,
   "dvol_is_fallback": false,
-  "sfc_base": 11.962935140626294,
-  "sfc_effective": 10.512855228454255,
+  "sfc_base": 11.861663363395435,
+  "sfc_effective": 10.43434650503396,
   "news_stress": 1.1,
   "news_headlines": [
     "\ud83d\udd34[Rt][CoinDesk] Bitcoin wilts as oil and rates rise. Clarity Act odds tumble to 38%",
@@ -34,13 +34,13 @@
   "liq_long_vol": 172987392.9,
   "liq_short_vol": 268766030.73,
   "zone": "NORMAL",
-  "floor_buffer": 5153,
-  "floor_total": 60594,
+  "floor_buffer": 5113,
+  "floor_total": 60630,
   "regime": "NORMAL",
   "regime_zone_divergence": false,
   "regime_zone_divergence_note": null,
-  "regime_prob": 0.624,
-  "transition_risk": 0.376,
+  "regime_prob": 0.626,
+  "transition_risk": 0.374,
   "dxy": 101.12,
   "pc_oi": 0.44,
   "pc_vol": 0.45,
@@ -49,8 +49,8 @@
   "state": "NORMAL OSCILLATION",
   "signal": "Standard allocation",
   "factors": {
-    "Lt": -0.9506224147941489,
-    "St": 0.464794477330994,
+    "Lt": -0.9518329788320337,
+    "St": 0.4648675349309872,
     "Rt": -1.0671882486988178,
     "Ft": 0.8069117924078266,
     "Sc": -0.29820429350832
@@ -68,7 +68,7 @@
   "composite_confidence": 0.335,
   "confidence_components": {
     "method_agree": 0.442,
-    "low_stress_boost": 0.0716,
+    "low_stress_boost": 0.0717,
     "rsi": 0.03,
     "sopr": 0.0,
     "dvol": 0.05,
@@ -87,7 +87,7 @@
   "m1_klr": 16.9,
   "m2_logit": 2.6,
   "m3_bayes": 8.0,
-  "m4_ewc": 35.0,
+  "m4_ewc": 34.9,
   "m5_qreg": 2.3,
   "m6_regime_score": 15.0,
   "method_agreement": 0.442,
@@ -124,8 +124,8 @@
   "m14_skew": 0.1,
   "m14_detail": {
     "skew": 0.0,
-    "put_iv": 46.92,
-    "call_iv": 46.92
+    "put_iv": 46.91,
+    "call_iv": 46.91
   },
   "m15_concentration": 0.1,
   "m15_detail": {
@@ -156,18 +156,18 @@
   "new_methods_active": 6,
   "new_methods_avg": 0.232,
   "inst_methods_active": 12,
-  "inst_methods_avg": 0.187,
+  "inst_methods_avg": 0.17,
   "sc_methods_active": 5,
   "sc_methods_avg": 0.364,
   "total_methods_active": 43,
   "m20_obi": 0.25,
   "m20_detail": {
-    "obi_change": "BUY_SURGE",
-    "obi_delta": 0.1887,
-    "obi": -0.2413,
-    "obi_norm": 0.3794,
-    "bid_vol": 2.0,
-    "ask_vol": 3.27
+    "obi_change": "STABLE",
+    "obi_delta": 0.0409,
+    "obi": -0.1595,
+    "obi_norm": 0.4203,
+    "bid_vol": 2.49,
+    "ask_vol": 3.43
   },
   "m21_trade_flow": 0.3,
   "m21_detail": {
@@ -180,10 +180,10 @@
   "m22_spread": 0.1,
   "m22_detail": {
     "spread_bps": 0.0015,
-    "range_bps": 126.29,
-    "bid": 65747.13,
-    "ask": 65747.14,
-    "mid": 65747.13,
+    "range_bps": 126.3,
+    "bid": 65742.99,
+    "ask": 65743.0,
+    "mid": 65742.99,
     "spread_change": "STABLE",
     "spread_delta": 0.0
   },
@@ -192,40 +192,40 @@
     "slippage_pct": 5.0,
     "levels_used_buy": 999,
     "levels_used_sell": 999,
-    "mid_price": 65747.14,
-    "liq_change": "THINNING_FAST",
-    "slippage_delta": 2.5
+    "mid_price": 65742.99,
+    "liq_change": "STABLE",
+    "slippage_delta": 0.0
   },
   "m24_cape": 0.1,
   "m24_detail": {
-    "cape": 0.7499,
-    "current_price": 65700.11,
-    "sma_1y_realized": 87608.44
+    "cape": 0.7497,
+    "current_price": 65683.68,
+    "sma_1y_realized": 87608.39
   },
-  "m25_minsky": 0.35,
+  "m25_minsky": 0.15,
   "m25_detail": {
-    "funding_rate": 6.5e-05,
-    "funding_8h": 8.74e-06,
-    "accel": 5.1e-05,
-    "oi_futures": 1490035400,
-    "minsky_stage": "DISPLACEMENT"
+    "funding_rate": 0,
+    "funding_8h": 8.68e-06,
+    "accel": -1.4e-05,
+    "oi_futures": 1489997210,
+    "minsky_stage": "NORMAL"
   },
   "m26_kahneman": 0.205,
   "m26_detail": {
     "loss_aversion": 0.25,
     "anchoring": 0.15,
     "fear": 0.2,
-    "realized_price": 62883.85,
+    "realized_price": 62883.3,
     "ath": 126080.0,
     "pl_pct": 4.55
   },
   "m27_taleb": 0.502,
   "m27_detail": {
-    "dvol": 45.66,
-    "skewness": -0.3617,
+    "dvol": 45.64,
+    "skewness": -0.3612,
     "max_drawdown": 0.2859,
-    "vol_7d_ann": 0.2261,
-    "vol_90d_ann": 0.4566,
+    "vol_7d_ann": 0.2269,
+    "vol_90d_ann": 0.4564,
     "term": "3M>1W",
     "tail_danger": "ELEVATED"
   },
@@ -246,7 +246,7 @@
     "fsi_score": 0.15,
     "components": {
       "credit_growth": 5.58,
-      "asset_vol": 46.92,
+      "asset_vol": 46.91,
       "yield_curve": 0.37,
       "hy_spread": 2.7,
       "top3_concentration": 0.135,
@@ -256,12 +256,12 @@
   },
   "m31_altman": 0.15,
   "m31_detail": {
-    "z_score": 6.535,
+    "z_score": 6.53,
     "x1_liquidity": 0.0,
     "x2_network": 4.0,
     "x3_efficiency": 0.905,
-    "x4_oi_ratio": 0.544,
-    "x5_turnover": 4.156,
+    "x4_oi_ratio": 0.546,
+    "x5_turnover": 4.145,
     "zone": "SAFE"
   },
   "m76_supply_growth": null,
@@ -276,7 +276,7 @@
   "m77_detail": {
     "ssr": 7.15,
     "stablecoin_mcap": 184395556368.0,
-    "btc_mcap": 1317918996399.0,
+    "btc_mcap": 1317864542984.0,
     "label": "LIMITED",
     "status": "ok"
   },
@@ -301,7 +301,7 @@
   "m80_detail": {
     "dominance_pct": 8.24,
     "stablecoin_mcap": 184395556368.0,
-    "total_crypto_mcap": 2238952741436.0,
+    "total_crypto_mcap": 2239128845568.0,
     "dom_change_30d": -0.1,
     "trend": "STABLE",
     "status": "ok"
@@ -350,11 +350,9 @@
   "sli_usdt_growth": null,
   "sli_usdc_growth": -1.62,
   "sli_growth_divergence": null,
-  "micro_change_flags": {
-    "liq": "THINNING_FAST"
-  },
-  "micro_trend_score": 0.333,
-  "micro_deteriorating": true,
+  "micro_change_flags": {},
+  "micro_trend_score": null,
+  "micro_deteriorating": null,
   "m32_qlstm": null,
   "m32_active": false,
   "m32_adjustment_pp": 0,
@@ -369,7 +367,7 @@
   "m32_mamba_medium": 0.0,
   "m32_mamba_long": 0.0,
   "m32_mamba_confidence": 0.4618,
-  "m32_adjustment_pp_mamba": -0.37,
+  "m32_adjustment_pp_mamba": -0.3669,
   "m33_glo_score": 0.85,
   "m33_glo_detail": {
     "fed_yoy": 0.53,
@@ -511,9 +509,9 @@
   "dxy_btc_corr": null,
   "dxy_gate_regime": null,
   "xai_top_features": null,
-  "ml_ensemble_score": 0.238,
+  "ml_ensemble_score": 0.235,
   "ml_ensemble_confidence": 0.8,
-  "ml_ensemble_msg": "WeightedAvg=0.238",
+  "ml_ensemble_msg": "WeightedAvg=0.235",
   "ml_accuracy": 1.0,
   "ml_total_labeled": 1947,
   "ml_correct": 1947,
@@ -670,7 +668,7 @@
   "reflexivity_divergence_detail": {
     "status": "ok",
     "experimental": true,
-    "price_roc": 0.0016,
+    "price_roc": 0.0013,
     "leverage_roc": 0.0,
     "mvrv_gap_now": 0.2474,
     "mvrv_gap_widening": 0.0,
@@ -683,7 +681,7 @@
     "regime": "NO_DIVERGENCE",
     "flow_direction_score": 0.123,
     "price_direction": -1,
-    "btc_24h": -0.198,
+    "btc_24h": -0.338,
     "components_used": [
       "etf_flow",
       "whale_pressure",
@@ -744,34 +742,34 @@
     },
     "SLI": {
       "recommended_weights": {
-        "dominance": 0.0412,
-        "exchange_flow": 0.2265,
-        "growth_divergence": 0.151,
-        "reserve_ratio": 0.3019,
-        "ssr": 0.0619,
-        "supply_growth": 0.0904,
-        "velocity": 0.1271
+        "dominance": 0.0402,
+        "exchange_flow": 0.2285,
+        "growth_divergence": 0.1523,
+        "reserve_ratio": 0.3047,
+        "ssr": 0.0603,
+        "supply_growth": 0.0896,
+        "velocity": 0.1244
       },
       "detail": {
         "status": "ok",
         "points_used": 180,
         "avg_abs_correlation": {
-          "dominance": 0.727,
+          "dominance": 0.736,
           "exchange_flow": 0.0,
           "growth_divergence": 0.0,
           "reserve_ratio": 0.0,
-          "ssr": 0.727,
-          "supply_growth": 0.701,
-          "velocity": 0.158
+          "ssr": 0.736,
+          "supply_growth": 0.706,
+          "velocity": 0.184
         },
         "independence_score": {
-          "dominance": 0.273,
+          "dominance": 0.264,
           "exchange_flow": 1.0,
           "growth_divergence": 1.0,
           "reserve_ratio": 1.0,
-          "ssr": 0.273,
-          "supply_growth": 0.299,
-          "velocity": 0.842
+          "ssr": 0.264,
+          "supply_growth": 0.294,
+          "velocity": 0.816
         },
         "original_weights": {
           "dominance": 0.1,
@@ -786,11 +784,11 @@
     },
     "MPI": {
       "recommended_weights": {
-        "funding_rate": 0.2573,
-        "put_call": 0.2058,
-        "liquidation": 0.1913,
-        "basis": 0.1913,
-        "open_interest": 0.1544
+        "funding_rate": 0.2569,
+        "put_call": 0.2055,
+        "liquidation": 0.1917,
+        "basis": 0.1917,
+        "open_interest": 0.1542
       },
       "detail": {
         "status": "ok",
@@ -798,15 +796,15 @@
         "avg_abs_correlation": {
           "funding_rate": 0.0,
           "put_call": 0.0,
-          "liquidation": 0.071,
-          "basis": 0.071,
+          "liquidation": 0.067,
+          "basis": 0.067,
           "open_interest": 0.0
         },
         "independence_score": {
           "funding_rate": 1.0,
           "put_call": 1.0,
-          "liquidation": 0.929,
-          "basis": 0.929,
+          "liquidation": 0.933,
+          "basis": 0.933,
           "open_interest": 1.0
         },
         "original_weights": {
@@ -841,7 +839,7 @@
     "Sc": 0.35
   },
   "dw_factors": {
-    "Lt": 0.658,
+    "Lt": 0.659,
     "St": 0.423,
     "Rt": 0.678,
     "Ft": 0.366,
@@ -912,8 +910,8 @@
   "adv_crisis_prob": 0.01,
   "adv_regime_stability": 0.01,
   "adv_regime_boost": 0,
-  "adv_uncertainty": 0.333,
-  "adv_confidence": "LOW_CONFIDENCE",
+  "adv_uncertainty": 0.262,
+  "adv_confidence": "HIGH_CONFIDENCE_CALM",
   "adv_trends_recession": 0.69,
   "adv_trends_crash": 0.69,
   "adv_reddit_sentiment": 0.0,
@@ -951,7 +949,7 @@
   "kelly_quarter": 0.0006,
   "kelly_override_reason": null,
   "signal_type": "CALM",
-  "signal_strength": 0.21,
+  "signal_strength": 0.209,
   "calibrated_confidence": 0.335,
   "reliability": "LOW",
   "reliability_reason": "LOW agreement (<0.50) \u2014 no consensus",
@@ -965,7 +963,7 @@
   "sec_events": 1,
   "q9_available": false,
   "q9_articles": 0,
-  "m65_cnn_attention": 0.5185,
+  "m65_cnn_attention": 0.517,
   "m65_pattern_type": "MODERATE_STRESS - developing pattern",
   "m65_available": true,
   "m65_affects_sfc_score": false,
@@ -1040,29 +1038,29 @@
   "m71_lime_top_1_pct": 18.0,
   "m71_lime_top_3": "M1_KLR, M20_OBI, M25_Minsky",
   "prob_dist_available": true,
-  "predicted_mean": 10.51,
+  "predicted_mean": 10.43,
   "predicted_std": 10.84,
   "var_95": 0.0,
   "es_975": 0.0,
   "ci_90_lower": 0.0,
-  "ci_90_upper": 28.34,
-  "prob_stress": 0.0907,
+  "ci_90_upper": 28.27,
+  "prob_stress": 0.0895,
   "prob_critical": 0.0001,
   "prob_crash_10pct": 0.0,
-  "prob_calm": 0.6605,
+  "prob_calm": 0.6632,
   "prob_quantiles": {
     "q_01": 0.0,
     "q_05": 0.0,
     "q_10": 0.0,
-    "q_25": 3.21,
-    "q_50": 10.51,
-    "q_75": 17.82,
-    "q_90": 24.41,
-    "q_95": 28.34,
-    "q_99": 35.73
+    "q_25": 3.13,
+    "q_50": 10.43,
+    "q_75": 17.74,
+    "q_90": 24.33,
+    "q_95": 28.27,
+    "q_99": 35.65
   },
-  "prob_sharpe": 3.643,
-  "prob_sortino": 5.464,
+  "prob_sharpe": 3.65,
+  "prob_sortino": 5.475,
   "prob_uncertainty_breakdown": {
     "method_disagreement_sigma": 3.0,
     "confidence_sigma": 9.98,
