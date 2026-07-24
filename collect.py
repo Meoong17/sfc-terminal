@@ -478,9 +478,10 @@ if CMC_KEY:
 CG_API_KEY = "x_cg_demo_api_key=REMOVED_SECRET"
 
 # ── Model Version Tracking ─────────────────────────────────────────
-MODEL_VERSION = "3.0.0"
+MODEL_VERSION = "4.0.0"
 MODEL_CHANGELOG = {
     "3.0.0": "2026-07-24 — Baseline: model_version tracking introduced",
+    "4.0.0": "2026-07-25 — Lt de-duplicated: removed redundant M33 GLO + direct m2_yoy sigmoid, consolidated into single GLF ×5.927 (LT_EMPIRICAL_RESCALE).",
 }
 
 def get_cmc_price():
@@ -929,9 +930,7 @@ def score_factors_from_market(btc, btc_24h, dom, dvol, fng, pc_oi, m2_yoy, dxy, 
     onchain_market_structure: 0-100 score from derivatives data (Q10+)"""
     factors = {"Lt": 0.0, "St": 0.0, "Rt": 0.0, "Ft": 0.0, "Sc": 0.0}
     
-    # Lt (Liquidity) — based on M2, GLO, and BTC momentum
-    if m2_yoy is not None:
-        factors["Lt"] += _sigmoid_factor(m2_yoy, center=5.0, k=0.8)
+    # Lt (Liquidity) — based on GLO and BTC momentum
     if glo_score is not None:
         # GLO maps: 0=contractive(bearish) -> -3, 100=expansive(bullish) -> +3
         # Map GLO 0-100 to sigmoid center at 50
@@ -2379,19 +2378,21 @@ if GLOBAL_LIQUIDITY_AVAILABLE:
         print(f"[GLF] Error: {_glf_e}", file=sys.stderr)
         _glf_score, _glf_sfc_stress, _glf_details = 50.0, 0.5, {"error": str(_glf_e), "status": "fallback"}
 
-# Apply GLO to Lt factor (post-hoc adjustment)
-glo_val = m33_glo_detail.get("glo_score", 50)
-glo_adj = 6 / (1 + math.exp(-0.08 * (glo_val - 50))) - 3
-factors["Lt"] += glo_adj
-
-# Apply GLF to Lt factor (if available, supplements GLO)
+# Apply GLF to Lt factor (consolidated liquidity — replaces former M33 GLO
+# + direct m2_yoy sigmoid which were redundant, sharing the same underlying
+# Fed/ECB/BOJ/M2 data. Scaled up to compensate for the removed terms;
+# see analysis/lt_redundancy_experiment.py for the full walk-forward proof.)
 if _glf_sfc_stress is not None:
-    glf_factor_adj = get_glf_for_factors(_glf_sfc_stress)
+    # LT_EMPIRICAL_RESCALE = 5.927 (std_A/std_B dari eksperimen redundansi Lt)
+    # Eksperimen membuktikan Lt tunggal ×5.927 menyamai/ melampaui performa
+    # redundant 3-term stack. Live GLF range ±1.5 vs eksperimen ±1.0, tapi
+    # clamp akhir ±3.0 menjaga saturasi tetap sama.
+    glf_factor_adj = get_glf_for_factors(_glf_sfc_stress) * 5.927
     factors["Lt"] += glf_factor_adj
-    print(f"[GLF] Lt adjustment: {glf_factor_adj:+.3f} (glf_stress={_glf_sfc_stress:.3f}) Lt={factors['Lt']:.3f}", file=sys.stderr)
+    print(f"[GLF] Lt adjustment: {glf_factor_adj:+.3f} (×5.927 scaled, glf_stress={_glf_sfc_stress:.3f}) Lt={factors['Lt']:.3f}", file=sys.stderr)
 
 factors["Lt"] = max(-3.0, min(3.0, factors["Lt"]))
-print(f"[SFC] GLO Lt adjustment: {glo_adj:+.3f} (glo={glo_val:.1f}) Lt={factors['Lt']:.3f}", file=sys.stderr)
+print(f"[SFC] Lt after GLF+ETF+Fiscal+GSLS: {factors['Lt']:.3f}", file=sys.stderr)
 
 # ── MACRO LIQUIDITY (M72-M75 / Layer 1) ──
 print("[SFC] Computing M72-M75 macro liquidity metrics...", file=sys.stderr)
