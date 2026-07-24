@@ -265,3 +265,6 @@ if __name__ == "__main__":
     print("✅ PASS: confirms A over-weights the same underlying signal relative to B\n")
 
     print("ALL SELF-TESTS PASSED")
+
+    # === Full experiment with real FRED data ===
+    run_experiment()
