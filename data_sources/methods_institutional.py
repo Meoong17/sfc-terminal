@@ -36,6 +36,9 @@ def _save_micro_cache(state):
 
 BINANCE_BASE = "https://api.binance.com"
 
+# ── CoinGecko API key ────────────────────────────────────
+CG_API_PARAM = "x_cg_demo_api_key=REMOVED_SECRET"
+
 # ── Shared CoinGecko cache (M24-M27, M31 all need market data) ──
 _CG_CACHE = {}
 
@@ -46,11 +49,12 @@ def _cg_fetch_all():
 
     from concurrent.futures import ThreadPoolExecutor, as_completed
     
+    cg_key = CG_API_PARAM
     urls = [
-        ("coin_info", "https://api.coingecko.com/api/v3/coins/bitcoin?localization=false&tickers=false&community_data=false&developer_data=false"),
-        ("prices_365", "https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=365&interval=daily"),
-        ("prices_90", "https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=90&interval=daily"),
-        ("prices_200", "https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=200&interval=daily"),
+        ("coin_info", f"https://api.coingecko.com/api/v3/coins/bitcoin?localization=false&tickers=false&community_data=false&developer_data=false&{cg_key}"),
+        ("prices_365", f"https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=365&interval=daily&{cg_key}"),
+        ("prices_90", f"https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=90&interval=daily&{cg_key}"),
+        ("prices_200", f"https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=200&interval=daily&{cg_key}"),
     ]
     
     results = {}

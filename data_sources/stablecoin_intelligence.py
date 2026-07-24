@@ -35,6 +35,7 @@ CACHE_TTL = 21600  # 6 hours
 # ── Stablecoin IDs for per-coin tracking ──
 STABLECOIN_IDS = ["tether", "usd-coin", "dai", "first-digital-usd"]
 CG_BASE = "https://api.coingecko.com/api/v3"
+CG_API_PARAM = "x_cg_demo_api_key=REMOVED_SECRET"
 
 
 def _load_cache():
@@ -68,7 +69,7 @@ def _fetch_per_coin_data():
     result = {}
 
     def _fetch_one(coin_id):
-        data = _fetch_cg(f"{CG_BASE}/coins/{coin_id}/market_chart?vs_currency=usd&days=30")
+        data = _fetch_cg(f"{CG_BASE}/coins/{coin_id}/market_chart?vs_currency=usd&days=30&{CG_API_PARAM}")
         if data and "market_caps" in data and data["market_caps"]:
             mcaps = [m[1] for m in data["market_caps"]]
             if len(mcaps) >= 2:

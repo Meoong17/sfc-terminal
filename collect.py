@@ -474,6 +474,9 @@ CMC_KEY = os.getenv("CMC_API_KEY", "")
 if CMC_KEY:
     CMC_HEADERS = {"X-CMC_PRO_API_KEY": CMC_KEY, "Accept": "application/json"}
 
+# ── CoinGecko API key (demo tier) ──────────────────────────────────
+CG_API_KEY = "x_cg_demo_api_key=REMOVED_SECRET"
+
 def get_cmc_price():
     """Fetch BTC price, 24h change, market cap from CoinMarketCap (primary)"""
     if not CMC_KEY:
@@ -560,7 +563,7 @@ def get_btc():
         print(f"[SFC] BTC from CMC: ${cmc_btc:,.0f}", file=sys.stderr)
         return cmc_btc, cmc_chg, cmc_mcap
     try:
-        r = requests.get("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd&include_24hr_change=true&include_market_cap=true", timeout=10)
+        r = requests.get(f"https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd&include_24hr_change=true&include_market_cap=true&{CG_API_KEY}", timeout=10)
         d = r.json()["bitcoin"]
         print(f"[SFC] BTC from CoinGecko (fallback): ${d['usd']:,.0f}", file=sys.stderr)
         return d["usd"], d.get("usd_24h_change", 0), d.get("usd_market_cap", 0)
@@ -570,7 +573,7 @@ def get_btc():
 def get_ath():
     """Fetch dynamic ATH from CoinGecko — fallback to hardcoded 126272 and cache"""
     try:
-        r = requests.get("https://api.coingecko.com/api/v3/coins/bitcoin?localization=false&tickers=false&community_data=false&developer_data=false", timeout=10)
+        r = requests.get(f"https://api.coingecko.com/api/v3/coins/bitcoin?localization=false&tickers=false&community_data=false&developer_data=false&{CG_API_KEY}", timeout=10)
         d = r.json()
         ath = d.get("market_data", {}).get("ath", {}).get("usd")
         ath_date = d.get("market_data", {}).get("ath_date", {}).get("usd", "")
@@ -624,7 +627,7 @@ def get_dom():
         print(f"[SFC] Dominance from CMC: {cmc_dom:.1f}%", file=sys.stderr)
         return cmc_dom
     try:
-        r = requests.get("https://api.coingecko.com/api/v3/global", timeout=10)
+        r = requests.get(f"https://api.coingecko.com/api/v3/global?{CG_API_KEY}", timeout=10)
         d = r.json()["data"]["market_cap_percentage"]["btc"]
         print(f"[SFC] Dominance from CoinGecko (fallback): {d:.1f}%", file=sys.stderr)
         return d
@@ -766,7 +769,7 @@ def get_put_call_ratio():
 
 def get_btc_ohlcv_daily(days=30):
     try:
-        r = requests.get(f"https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days={days}&interval=daily", timeout=15)
+        r = requests.get(f"https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days={days}&interval=daily&{CG_API_KEY}", timeout=15)
         d = r.json()
         prices = d.get("prices", [])
         volumes = d.get("total_volumes", [])

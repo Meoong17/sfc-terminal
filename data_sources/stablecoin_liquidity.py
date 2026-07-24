@@ -36,6 +36,7 @@ def _save_cache(cache):
 # ── Stablecoin IDs for CoinGecko ──────────────────────────────────────
 STABLECOIN_IDS = ["tether", "usd-coin", "dai", "first-digital-usd"]
 CG_BASE = "https://api.coingecko.com/api/v3"
+CG_API_PARAM = "x_cg_demo_api_key=REMOVED_SECRET"
 
 def _fetch_cg_single(url):
     try:
@@ -48,7 +49,7 @@ def _fetch_cg_single(url):
         return None
 
 def _fetch_market_chart(coin_id, days=365):
-    url = f"{CG_BASE}/coins/{coin_id}/market_chart?vs_currency=usd&days={days}"
+    url = f"{CG_BASE}/coins/{coin_id}/market_chart?vs_currency=usd&days={days}&{CG_API_PARAM}"
     data = _fetch_cg_single(url)
     if data and "market_caps" in data and data["market_caps"]:
         return data["market_caps"]  # [[ts, mcap], ...]
