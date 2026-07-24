@@ -72,8 +72,8 @@ try:
         _sigmoid_factor, calculate_sfc_ensemble,
     )
     from walk_forward_validation import (
-        add_forward_returns, bucket_label, bootstrap_mean_ci, bootstrap_diff_ci,
-        BUCKET_EDGES, FORWARD_HORIZONS_DAYS,
+        add_forward_returns, bootstrap_diff_ci,
+        FORWARD_HORIZONS_DAYS,
     )
 except ImportError as e:
     print(f"[LtExperiment] Could not import required modules — make sure "
@@ -216,29 +216,39 @@ def run_experiment():
         json.dump({"version_a": series_a, "version_b": series_b}, f)
     print(f"Saved to {OUTPUT_FILE}")
 
+    QUANTILE_TAIL = 0.20  # top 20% vs bottom 20% of sfc_pct distribution
+
     for label, series in [("VERSION A (current, redundant)", series_a),
                           ("VERSION B (de-duplicated)", series_b)]:
         print("\n" + "=" * 60)
         print(label)
         print("=" * 60)
-        for horizon in FORWARD_HORIZONS_DAYS:
-            buckets = {lbl: [] for _, _, lbl in BUCKET_EDGES}
-            for point in series:
-                fwd = point.get(f"fwd_return_{horizon}d")
-                if fwd is None:
-                    continue
-                buckets[bucket_label(point["sfc_pct"])].append(fwd)
 
-            calm_vals = buckets["CALM"]
-            stress_vals = buckets["STRESS"]
-            if len(calm_vals) >= 2 and len(stress_vals) >= 2:
-                diff_est, diff_lo, diff_hi = bootstrap_diff_ci(calm_vals, stress_vals)
-                significant = diff_hi < 0 if diff_hi is not None else False
-                print(f"  {horizon}d gap: {diff_est:+.2f}pp [90% CI: {diff_lo:+.2f}, {diff_hi:+.2f}] "
-                      f"{'SIGNIFICANT' if significant else 'not significant'} "
-                      f"(n_calm={len(calm_vals)}, n_stress={len(stress_vals)})")
-            else:
-                print(f"  {horizon}d gap: insufficient data (n_calm={len(calm_vals)}, n_stress={len(stress_vals)})")
+        sorted_series = sorted(series, key=lambda x: x["sfc_pct"])
+        n = len(sorted_series)
+        tail_n = int(n * QUANTILE_TAIL)
+
+        bottom = sorted_series[:tail_n]
+        top = sorted_series[-tail_n:]
+
+        print(f"  Bottom {QUANTILE_TAIL*100:.0f}%: sfc_pct [{bottom[0]['sfc_pct']:.2f} — {bottom[-1]['sfc_pct']:.2f}] (n={len(bottom)})")
+        print(f"  Top    {QUANTILE_TAIL*100:.0f}%: sfc_pct [{top[0]['sfc_pct']:.2f} — {top[-1]['sfc_pct']:.2f}] (n={len(top)})")
+
+        for horizon in FORWARD_HORIZONS_DAYS:
+            bottom_fwd = [p.get(f"fwd_return_{horizon}d") for p in bottom
+                          if p.get(f"fwd_return_{horizon}d") is not None]
+            top_fwd = [p.get(f"fwd_return_{horizon}d") for p in top
+                       if p.get(f"fwd_return_{horizon}d") is not None]
+
+            if len(bottom_fwd) < 2 or len(top_fwd) < 2:
+                print(f"  {horizon}d gap: insufficient data (n_bottom={len(bottom_fwd)}, n_top={len(top_fwd)})")
+                continue
+
+            diff_est, diff_lo, diff_hi = bootstrap_diff_ci(bottom_fwd, top_fwd)
+            significant = diff_hi < 0 if diff_hi is not None else False
+            # diff = bottom - top; negative means lower sfc_pct → lower forward return (correct polarity)
+            print(f"  {horizon}d gap (low - high sfc): {diff_est:+.2f}pp [90% CI: {diff_lo:+.2f}, {diff_hi:+.2f}] "
+                  f"{'SIGNIFICANT' if significant else 'not significant'} ")
 
 
 if __name__ == "__main__":
