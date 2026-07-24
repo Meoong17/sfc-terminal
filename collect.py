@@ -477,6 +477,12 @@ if CMC_KEY:
 # ── CoinGecko API key (demo tier) ──────────────────────────────────
 CG_API_KEY = "x_cg_demo_api_key=REMOVED_SECRET"
 
+# ── Model Version Tracking ─────────────────────────────────────────
+MODEL_VERSION = "3.0.0"
+MODEL_CHANGELOG = {
+    "3.0.0": "2026-07-24 — Baseline: model_version tracking introduced",
+}
+
 def get_cmc_price():
     """Fetch BTC price, 24h change, market cap from CoinMarketCap (primary)"""
     if not CMC_KEY:
@@ -3704,6 +3710,7 @@ except Exception as _wfv_e:
 
 out = {
     "ts": datetime.now(timezone.utc).isoformat(),
+    "model_version": MODEL_VERSION,
     "btc": btc,
     "btc_24h": chg,
     "btc_mcap": mcap,
