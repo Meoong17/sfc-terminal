@@ -2136,6 +2136,7 @@ if ETF_AVAILABLE:
 _divergence_score, _divergence_details = 0.0, {"status": "unavailable"}
 try:
     from analysis.behavioral_divergence import compute_behavioral_divergence
+    from analysis.behavioral_divergence_tracker import record_divergence
     _m81_is_available = _etf_details.get("status") == "ok"
     _divergence_score, _divergence_details = compute_behavioral_divergence(
         m81_etf_flow=_etf_m81_score, m81_available=_m81_is_available,
@@ -2143,6 +2144,17 @@ try:
         btc_24h=chg,
     )
     print(f"[Divergence] score={_divergence_score} regime={_divergence_details.get('regime','?')}", file=sys.stderr)
+    # Track historical divergence signals for forward-return validation
+    try:
+        _track_result = record_divergence(
+            ts=datetime.now(timezone.utc).isoformat(),
+            score=_divergence_score,
+            detail=_divergence_details,
+            btc_price=btc,
+        )
+        print(f"[DivergenceTracker] recorded={_track_result['entries_recorded']} total={_track_result['total_entries']}", file=sys.stderr)
+    except Exception as te:
+        print(f"[DivergenceTracker] Error: {te}", file=sys.stderr)
 except Exception as e:
     print(f"[Divergence] Error: {e}", file=sys.stderr)
 
