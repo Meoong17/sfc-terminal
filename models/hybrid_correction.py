@@ -32,35 +32,42 @@ DATA_PATH = "/home/ubuntu/sfc/data_collection.json"
 # QIGWO weights (same as in training)
 QIGWO_WEIGHTS = np.array([0.19, 0.16, 0.12, 0.16, 0.24, 0.14])
 
-# Model hyperparams (must match training)
-# Actual input dim is max feature length after padding (data has varying lengths 27-31)
-INPUT_DIM = 31
-HIDDEN_DIM = 16
-SEQ_LEN = 8
-N_QUBITS = 4
-N_QLAYERS = 2
+# Model hyperparams — NOTE: input_dim, seq_len, hidden_dim are OVERRIDDEN
+# at load time from the checkpoint (the source of truth). The defaults below
+# are fallbacks only; the actual values come from the saved .pt file.
+DEFAULT_HIDDEN_DIM = 16
+DEFAULT_N_QUBITS = 4
+DEFAULT_N_QLAYERS = 2
 
 
 def load_model():
-    """Load the QLSTM model architecture with trained weights."""
+    """Load the QLSTM model architecture with trained weights.
+    Reads input_dim / seq_len / hidden_dim from the checkpoint itself
+    so the architecture always matches (fix: was hardcoded to INPUT_DIM=31
+    when checkpoint was saved with input_dim=30 → state_dict mismatch)."""
     # Import here so module can be imported without triggering pennylane init
     from qlstm_model import QLSTMVolatilityPredictor
 
     device = torch.device("cpu")
 
+    # Load checkpoint first — it IS the source of truth for dimensions
+    ckpt = torch.load(MODEL_PATH, map_location=device, weights_only=False)
+
     model = QLSTMVolatilityPredictor(
-        input_dim=INPUT_DIM,
-        hidden_dim=HIDDEN_DIM,
-        seq_len=SEQ_LEN,
+        input_dim=ckpt["input_dim"],
+        hidden_dim=ckpt.get("hidden_dim", DEFAULT_HIDDEN_DIM),
+        seq_len=ckpt["seq_len"],
     )
 
-    ckpt = torch.load(MODEL_PATH, map_location=device, weights_only=False)
     model.load_state_dict(ckpt["model_state_dict"])
     model.eval()
     model.to(device)
 
-    print(f"  [hybrid] Loaded QLSTM model | val_loss={ckpt.get('val_loss', '?'):.4f}")
-    return model, device
+    print(f"  [hybrid] Loaded QLSTM model | input_dim={ckpt['input_dim']}"
+          f" seq_len={ckpt['seq_len']}"
+          f" hidden_dim={ckpt.get('hidden_dim', DEFAULT_HIDDEN_DIM)}"
+          f" | val_loss={ckpt.get('val_loss', '?'):.4f}")
+    return model, device, ckpt["input_dim"], ckpt["seq_len"]
 
 
 def load_features():
@@ -110,14 +117,14 @@ def run_hybrid_correction():
     print("\n[hybrid] === QLSTM + GARCH Hybrid Correction ===\n")
 
     # ── Load model ──
-    model, device = load_model()
+    model, device, input_dim, seq_len = load_model()
 
     # ── Load features ──
     features_raw = load_features()  # original, non-normalized
     N = features_raw.shape[0]
 
-    if N < SEQ_LEN + 1:
-        raise ValueError(f"Not enough samples ({N}) for seq_len={SEQ_LEN}")
+    if N < seq_len + 1:
+        raise ValueError(f"Not enough samples ({N}) for seq_len={seq_len}")
 
     features_norm, mean, std = normalize_features(features_raw)
 
@@ -125,11 +132,11 @@ def run_hybrid_correction():
     qlstm_preds = []
     targets = []
 
-    print(f"  [hybrid] Computing {N - SEQ_LEN} historical predictions...")
+    print(f"  [hybrid] Computing {N - seq_len} historical predictions...")
     with torch.no_grad():
-        for i in range(SEQ_LEN, N):
+        for i in range(seq_len, N):
             # Window of normalized features
-            window = features_norm[i - SEQ_LEN : i]  # (seq_len, input_dim)
+            window = features_norm[i - seq_len : i]  # (seq_len, input_dim)
             inp = torch.tensor(window, dtype=torch.float32).unsqueeze(0)  # (1, seq_len, input_dim)
             inp = inp.to(device)
 
@@ -139,7 +146,7 @@ def run_hybrid_correction():
             qlstm_preds.append(pred)
             targets.append(tgt)
 
-    qlstm_preds = np.array(qlstm_preds)  # shape: (N - SEQ_LEN,)
+    qlstm_preds = np.array(qlstm_preds)  # shape: (N - seq_len,)
     targets = np.array(targets)
 
     # ── Residuals: actual - QLSTM_pred ──
@@ -160,8 +167,8 @@ def run_hybrid_correction():
 
     # ── Final prediction for next step ──
     # The "next" QLSTM prediction uses the LAST seq_len window
-    # (indices N-SEQ_LEN .. N-1), which predicts target at index N
-    last_window = features_norm[N - SEQ_LEN : N]  # (seq_len, input_dim)
+    # (indices N-seq_len .. N-1), which predicts target at index N
+    last_window = features_norm[N - seq_len : N]  # (seq_len, input_dim)
     inp_last = torch.tensor(last_window, dtype=torch.float32).unsqueeze(0).to(device)
     with torch.no_grad():
         next_qlstm_pred = model(inp_last).item()
