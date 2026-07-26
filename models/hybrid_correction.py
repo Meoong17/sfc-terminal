@@ -39,6 +39,12 @@ DEFAULT_HIDDEN_DIM = 16
 DEFAULT_N_QUBITS = 4
 DEFAULT_N_QLAYERS = 2
 
+# GARCH: how many historical QLSTM prediction residuals to compute.
+# GARCH(1,1) converges well with ~200 recent observations; using all
+# ~2000 samples takes ~22 min on CPU, exceeding the 5-min cron cycle.
+# 200 windows → ~130s, fitting within the 150s collect timeout.
+MAX_GARCH_WINDOWS = 200
+
 
 def load_model():
     """Load the QLSTM model architecture with trained weights.
@@ -128,13 +134,16 @@ def run_hybrid_correction():
 
     features_norm, mean, std = normalize_features(features_raw)
 
-    # ── Historical QLSTM predictions ──
+    # ── Historical QLSTM predictions (last MAX_GARCH_WINDOWS) ──
     qlstm_preds = []
     targets = []
 
-    print(f"  [hybrid] Computing {N - seq_len} historical predictions...")
+    start_idx = max(seq_len, N - MAX_GARCH_WINDOWS)
+    n_preds = N - start_idx
+    print(f"  [hybrid] Computing {n_preds} historical predictions (windows {start_idx}-{N-1}, "
+          f"limit={MAX_GARCH_WINDOWS})...")
     with torch.no_grad():
-        for i in range(seq_len, N):
+        for i in range(start_idx, N):
             # Window of normalized features
             window = features_norm[i - seq_len : i]  # (seq_len, input_dim)
             inp = torch.tensor(window, dtype=torch.float32).unsqueeze(0)  # (1, seq_len, input_dim)
