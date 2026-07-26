@@ -9,7 +9,7 @@ weighting that adapts over time.
 Usage:
     # Standalone training from git history
     cd /home/ubuntu/sfc
-    PYTHONPATH="/home/ubuntu/sfc2/venv/lib/python3.12/site-packages:$PYTHONPATH" python3 ensemble_meta.py
+    python3 ensemble_meta.py
 
     # As a library
     from ensemble_meta import predict_ensemble, train_from_git_history
@@ -20,11 +20,6 @@ import json, os, sys, subprocess, logging, traceback
 from datetime import datetime, timedelta
 import numpy as np
 from pathlib import Path
-
-# Ensure XGBoost is importable from the project venv
-XGBOOST_PATH = "/home/ubuntu/sfc2/venv/lib/python3.12/site-packages"
-if XGBOOST_PATH not in sys.path:
-    sys.path.insert(0, XGBOOST_PATH)
 
 try:
     import xgboost as xgb

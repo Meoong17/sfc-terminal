@@ -17,7 +17,16 @@ warnings.filterwarnings("ignore")
 # ──────────────────────────────────────────────
 # Paths
 # ──────────────────────────────────────────────
-MODEL_PATH = "/home/ubuntu/sfc2/qlstm_model.pt"
+# FIX (2026-07, per SFC_Path_Inventory.docx diagnosis): was hardcoded to
+# /home/ubuntu/sfc2/qlstm_model.pt — a STALE, different-architecture model
+# file (20,040 bytes, Jun 11) in an inactive old project directory, not
+# the one collect.py actually trains/uses (/home/ubuntu/sfc/qlstm_model.pt,
+# 19,784 bytes, Jul 16). This line was never actually being executed
+# before the sys.path fix in qlstm_enhanced.py (the import failed first),
+# so this bug was previously masked — fixing that import without also
+# fixing this would have introduced a NEW problem (loading the wrong
+# model). Both fixed together.
+MODEL_PATH = "/home/ubuntu/sfc/qlstm_model.pt"
 DATA_PATH = "/home/ubuntu/sfc/data_collection.json"
 
 # QIGWO weights (same as in training)

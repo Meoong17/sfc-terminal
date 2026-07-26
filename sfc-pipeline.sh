@@ -19,7 +19,7 @@ cd "$REPO_DIR" || { log "FATAL: Cannot cd to $REPO_DIR"; exit 1; }
 COLLECT_RESULT="skipped"
 GIT_RESULT="skipped"
 
-PYTHON="/home/ubuntu/sfc2/venv/bin/python3"
+PYTHON="python3"
 
 MAX_RETRIES=2; RETRY_DELAY=10; COLLECT_TIMEOUT=150
 

@@ -166,7 +166,14 @@ def run_enhanced_inference(force=False):
             
             # 4. GARCH residual correction
             try:
-                sys.path.insert(0, SCRIPT_DIR)
+                # FIX (2026-07, per SFC_Path_Inventory.docx diagnosis): was
+                # inserting SCRIPT_DIR (the grandparent /home/ubuntu/sfc)
+                # into sys.path, but hybrid_correction.py actually lives in
+                # THIS file's own directory (models/) — the import always
+                # failed silently, causing garch_residual/garch_volatility
+                # to fall back to 0.0 on every single cycle. Insert this
+                # file's own directory instead.
+                sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
                 from hybrid_correction import run_hybrid_correction
                 result = run_hybrid_correction()
                 garch_residual = result["garch_residual"]

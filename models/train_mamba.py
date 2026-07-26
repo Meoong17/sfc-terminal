@@ -8,7 +8,7 @@ trains Mamba model, saves best weights.
 
 Usage:
     cd /home/ubuntu/sfc
-    PYTHONPATH="/home/ubuntu/sfc2/venv/lib/python3.12/site-packages:$PYTHONPATH" python3 train_mamba.py
+    python3 train_mamba.py
 """
 
 import json, os, sys, time, subprocess, math
