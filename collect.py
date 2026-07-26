@@ -3721,6 +3721,23 @@ try:
 except Exception as _wfv_e:
     print(f"[WalkForward] Could not read summary cache: {_wfv_e}", file=sys.stderr)
 
+# ── PROBABILISTIC HEAD CALIBRATION TRACKER (logging only, checked periodically) ──
+# Appends this cycle's (effective_sfc, composite_confidence, regime,
+# method_scores) to a dedicated history log — separate from
+# data_collection.json (whose 2000-entry cap only retains ~7 days,
+# insufficient for a 30-day-forward calibration check). Analysis itself
+# is NOT run here — see analysis/probabilistic_head_tracker.py's
+# suggested weekly cron entry. Never allowed to affect the live
+# pipeline: wrapped in try/except, logging failure is non-fatal.
+try:
+    from analysis.probabilistic_head_tracker import log_cycle as _log_prob_head_cycle
+    _log_prob_head_cycle(
+        effective_sfc=effective_sfc, composite_confidence=composite_confidence,
+        regime=regime, method_scores=all_method_scores,
+    )
+except Exception as _pht_e:
+    print(f"[ProbHeadTracker] Wiring error (non-fatal): {_pht_e}", file=sys.stderr)
+
 out = {
     "ts": datetime.now(timezone.utc).isoformat(),
     "model_version": MODEL_VERSION,
