@@ -78,75 +78,23 @@ async function gzip(data) {
   return out;
 }
 
-// Cookie helpers
-function getCookie(request, name) {
-  const cookie = request.headers.get('Cookie') || '';
-  const match = cookie.match(new RegExp('(?:^|;\\s*)' + name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '=([^;]*)'));
-  return match ? decodeURIComponent(match[1]) : null;
-}
+// REMOVED (2026-07): cookie helpers (getCookie/setCookie/clearCookie) —
+// no longer needed now that identity comes from Cloudflare Access's
+// verified header instead of a self-issued session cookie.
 
-function setCookie(name, value, maxAgeDays = 30) {
-  return `${name}=${encodeURIComponent(value)}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${maxAgeDays * 86400}`;
-}
-
-function clearCookie(name) {
-  return `${name}=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0`;
-}
-
-// ── Signed session tokens ──────────────────────────────────────
-// Previously the session cookie was just the raw username — anyone could
-// set `sfc_session=<target_username>` manually (e.g. via curl or browser
-// devtools) and the server would treat them as that user, with no password
-// or verification involved at all. Login only checked that the username was
-// non-empty, never validated the cookie came from an actual login request.
-//
-// This signs the session value with HMAC-SHA256 using a secret only the
-// server knows (env.SESSION_SECRET), so a forged cookie without a valid
-// signature is rejected. This does NOT add password-based authentication
-// (usernames are still unauthenticated identity claims, consistent with the
-// "just a username" design) — it only ensures that whoever holds a session
-// cookie actually went through this server's /api/login at some point,
-// rather than being able to fabricate one for an arbitrary username.
-//
-// Required setup: `wrangler secret put SESSION_SECRET` (any long random
-// string). If unset, session signing is skipped with a console warning and
-// falls back to the old unsigned behavior — set it before going to
-// production, especially since this repo is public.
-
-async function hmacSign(secret, message) {
-  const key = await crypto.subtle.importKey(
-    'raw', new TextEncoder().encode(secret),
-    { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
-  );
-  const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(message));
-  return btoa(String.fromCharCode(...new Uint8Array(sig))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-}
-
-async function createSessionToken(env, username) {
-  const payload = `${username}.${Date.now()}`;
-  if (!env || !env.SESSION_SECRET) {
-    console.warn('SESSION_SECRET not set — issuing UNSIGNED session token. Set with `wrangler secret put SESSION_SECRET`.');
-    return payload; // unsigned fallback, same weak behavior as before
-  }
-  const sig = await hmacSign(env.SESSION_SECRET, payload);
-  return `${payload}.${sig}`;
-}
-
-async function verifySessionToken(env, token) {
-  if (!token) return null;
-  const parts = token.split('.');
-  if (!env || !env.SESSION_SECRET) {
-    // Unsigned fallback mode — accept old-style raw-username cookies too,
-    // so existing logged-in users aren't immediately logged out when
-    // SESSION_SECRET is first configured. Username is parts[0].
-    return parts[0] || null;
-  }
-  if (parts.length !== 3) return null; // must be username.timestamp.signature
-  const [username, ts, sig] = parts;
-  const expectedSig = await hmacSign(env.SESSION_SECRET, `${username}.${ts}`);
-  if (sig !== expectedSig) return null; // signature mismatch — forged or tampered
-  return username || null;
-}
+// ── Identity now comes from Cloudflare Access ──────────────────
+// REMOVED (2026-07): the app's own /api/login + signed-session-cookie
+// system. Access control now happens at the Cloudflare edge (Zero Trust
+// Access policy, configured in the Cloudflare dashboard) BEFORE a request
+// ever reaches this Worker — so there is no app-level login page anymore.
+// Cloudflare Access injects a verified 'Cf-Access-Authenticated-User-Email'
+// header on every request that passed its policy. getSessionUser() below
+// reads THAT header instead of a cookie this app used to issue itself —
+// this is a genuinely VERIFIED identity (Cloudflare confirmed the email via
+// OAuth/OTP), unlike the old system where a "username" was just an
+// unauthenticated string claim. Per-user state isolation (/user/:id/state)
+// still works — "id" is now the Access-verified email, not a self-claimed
+// username.
 
 export default {
   async fetch(request, env, ctx) {
@@ -158,6 +106,7 @@ export default {
     const ALLOWED_ORIGINS = [
       'https://meoong17.github.io',
       'https://sfc-terminal.meoong17.workers.dev',
+      'https://sfcterminal.xyz',
     ];
 
     // Dynamic CORS — only respond with ACAO when Origin matches allowlist
@@ -175,12 +124,12 @@ export default {
       return {};
     }
 
-    // Session check helper — returns normalized username or null.
-    // Verifies the HMAC signature (see verifySessionToken above) rather
-    // than trusting the cookie value directly.
+    // Identity now comes from Cloudflare Access — this header is only
+    // present/trustworthy because Cloudflare's edge already verified it
+    // before this Worker ever ran (Access policy blocks unverified
+    // requests upstream). No cookie, no app-level login needed.
     async function getSessionUser(request) {
-      const token = getCookie(request, 'sfc_session');
-      return verifySessionToken(env, token);
+      return request.headers.get('Cf-Access-Authenticated-User-Email') || null;
     }
 
     // Security headers for HTML pages (clickjacking, MIME sniffing, HSTS, referrer)
@@ -189,6 +138,32 @@ export default {
       'X-Content-Type-Options': 'nosniff',
       'Strict-Transport-Security': 'max-age=31536000; includeSubDomains; preload',
       'Referrer-Policy': 'no-referrer',
+      // ADDED (2026-07, security hardening pass): CSP restricts which
+      // external resources can load — built from the ACTUAL domains this
+      // dashboard uses (verified via grep against index.html, not guessed):
+      // cdn.jsdelivr.net (JS libs), fonts.googleapis.com/fonts.gstatic.com
+      // (Google Fonts). 'unsafe-inline' is needed for script-src/style-src
+      // since this dashboard embeds inline <script>/<style> blocks directly
+      // in index.html (a nonce-based CSP would be stronger but requires
+      // restructuring how the page is served — a bigger change than this
+      // pass covers). frame-ancestors 'none' blocks this site from being
+      // embedded in an iframe elsewhere (clickjacking protection,
+      // reinforcing X-Frame-Options above for browsers that prefer CSP).
+      'Content-Security-Policy': [
+        "default-src 'self'",
+        "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+        "font-src 'self' https://fonts.gstatic.com",
+        "img-src 'self' data:",
+        "connect-src 'self' https://sfc-terminal.meoong17.workers.dev https://sfcterminal.xyz",
+        "frame-ancestors 'none'",
+        "base-uri 'self'",
+        "form-action 'self'",
+      ].join('; '),
+      // Restricts browser features this dashboard has no legitimate need
+      // for — reduces attack surface even if a script injection ever
+      // succeeded despite CSP above.
+      'Permissions-Policy': 'geolocation=(), camera=(), microphone=(), payment=(), usb=()',
     };
 
     // CORS preflight
@@ -196,15 +171,15 @@ export default {
       return new Response(null, { headers: getCorsHeaders(request) });
     }
 
-    // ── SESSION AUTH GUARD ──────────────────────────────────
-    // Protected routes require sfc_session cookie
+    // ── ACCESS GUARD ─────────────────────────────────────────
+    // Protected routes require Cf-Access-Authenticated-User-Email header
+    // (set by Cloudflare Access at the edge — see getSessionUser above)
     // (checked inline inside each handler for consistency)
 
-    // Debug endpoint — echo cookies and session
+    // Debug endpoint — echo the Access identity header
     if (path === '/__cookie_check') {
-      const cookie = request.headers.get('Cookie') || '(none)';
-      const sessionUser = getCookie(request, 'sfc_session');
-      return new Response(JSON.stringify({ cookie, sessionUser, all: Object.fromEntries(request.headers) }), {
+      const accessUser = request.headers.get('Cf-Access-Authenticated-User-Email') || '(none)';
+      return new Response(JSON.stringify({ accessUser, all: Object.fromEntries(request.headers) }), {
         headers: { 'Content-Type': 'application/json', ...getCorsHeaders(request) },
       });
     }
@@ -389,128 +364,10 @@ export default {
     }
 
     // ── AUTH ENDPOINTS ──────────────────────────────────────
-
-    // POST /api/login — validate username, set session cookie, redirect
-    if (path === '/api/login' && method === 'POST') {
-      let body;
-      const contentType = request.headers.get('Content-Type') || '';
-      if (contentType.includes('application/json')) {
-        try { body = await request.json(); } catch (_) { body = {}; }
-      } else {
-        try {
-          const formData = await request.formData();
-          body = { username: formData.get('username') || '' };
-        } catch (_) { body = {}; }
-      }
-      const username = (body.username || '').trim();
-      if (!username || username.length < 1 || username.length > 32 || !/^[a-zA-Z0-9_-]+$/.test(username)) {
-        // For form posts, redirect back with error
-        if (contentType.includes('x-www-form-urlencoded')) {
-          return Response.redirect(url.origin + '/login?error=Invalid+username', 302);
-        }
-        return new Response(JSON.stringify({ error: 'Invalid username. Use letters, numbers, hyphens and underscores.' }), {
-          status: 400,
-          headers: { 'Content-Type': 'application/json', ...getCorsHeaders(request) },
-        });
-      }
-      const normalized = username.toLowerCase();
-      const sessionToken = await createSessionToken(env, normalized);
-      // Set cookie via 200 + JS redirect (more reliable on mobile browsers like Brave)
-      if (contentType.includes('x-www-form-urlencoded')) {
-        const safeUser = encodeURIComponent(username);
-        return new Response(
-          `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Redirecting...</title></head><body><script>window.location.href='/?user=${safeUser}'</script></body></html>`,
-          {
-            status: 200,
-            headers: {
-              'Content-Type': 'text/html; charset=utf-8',
-              'Set-Cookie': setCookie('sfc_session', sessionToken),
-              'Cache-Control': 'no-cache, no-store, must-revalidate',
-              ...securityHeaders,
-              ...getCorsHeaders(request),
-            },
-          }
-        );
-      }
-      return new Response(JSON.stringify({ status: 'ok', username }), {
-        status: 200,
-        headers: {
-          'Content-Type': 'application/json',
-          'Set-Cookie': setCookie('sfc_session', sessionToken),
-          ...getCorsHeaders(request),
-        },
-      });
-    }
-
-    // GET /logout — clear session cookie
-    if (path === '/logout') {
-      return new Response(null, {
-        status: 302,
-        headers: {
-          'Location': '/login',
-          'Set-Cookie': clearCookie('sfc_session'),
-          ...getCorsHeaders(request),
-        },
-      });
-    }
-
-    // GET /login or /login.html — serve login page
-    if ((path === '/login' || path === '/login.html') && method === 'GET') {
-      const errorMsg = url.searchParams.get('error') || '';
-      const loginHtml = `<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SFC Terminal | Login</title>
-    <style>
-        *{margin:0;padding:0;box-sizing:border-box}
-        body{background:#07080d;font-family:'Space Grotesk',system-ui,-apple-system,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px}
-        .login-card{background:#0e111a;border-radius:28px;padding:40px;width:100%;max-width:440px;border:1px solid rgba(255,255,255,0.08);box-shadow:0 20px 40px rgba(0,0,0,0.5)}
-        .login-card h1{font-size:28px;font-weight:700;background:linear-gradient(135deg,#fff,#7864ff);-webkit-background-clip:text;background-clip:text;color:transparent;margin-bottom:8px}
-        .login-card p{color:#8892a8;font-size:14px;margin-bottom:32px;line-height:1.5}
-        input{width:100%;padding:14px 18px;background:#1a1f2e;border:1px solid #2a3347;border-radius:16px;color:#edf1f7;font-size:16px;margin-bottom:8px;outline:none}
-        input:focus{border-color:#7864ff;box-shadow:0 0 0 2px rgba(120,100,255,0.2)}
-        button{width:100%;padding:14px;background:#7864ff;border:none;border-radius:16px;color:white;font-weight:600;font-size:16px;cursor:pointer}
-        button:hover{background:#5d4ae0}
-        button:disabled{opacity:0.5;cursor:not-allowed}
-        .note{font-size:12px;color:#5a6478;text-align:center;margin-top:24px}
-        .error{color:#ff4060;font-size:13px;margin-bottom:16px;display:${errorMsg ? 'block' : 'none'}}
-    </style>
-</head>
-<body>
-<div class="login-card">
-    <h1>SFC TERMINAL</h1>
-    <p>Enter your username to access the dashboard.</p>
-    <div class="error" id="error">${errorMsg}</div>
-    <form method="POST" action="/api/login" id="loginForm">
-        <input type="text" name="username" id="username" placeholder="Your username" autocomplete="off" autocapitalize="off" autofocus required>
-        <button type="submit" id="loginBtn">Start Trading →</button>
-    </form>
-    <div class="note">⚠ Just a username — no password.</div>
-    <div class="note" style="margin-top:4px;font-size:11px;color:#3a4460">Tip: use the same username as before to restore paper trading data.</div>
-</div>
-<script>
-document.getElementById('loginForm').addEventListener('submit', function(e) {
-  var u = document.getElementById('username').value.trim();
-  var err = document.getElementById('error');
-  if (!u || !/^[a-zA-Z0-9_-]+$/.test(u)) {
-    e.preventDefault();
-    err.textContent = !u ? 'Enter a username' : 'Letters, numbers, hyphens, underscores only';
-    err.style.display = 'block';
-    return;
-  }
-  // Also save to localStorage for the frontend
-  localStorage.setItem('sfc_username', u);
-});
-</script>
-</body>
-</html>`;
-      return new Response(loginHtml, {
-        status: 200,
-        headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache, no-store, must-revalidate', ...securityHeaders, ...getCorsHeaders(request) },
-      });
-    }
+    // REMOVED (2026-07): /api/login, /logout, and the /login page.
+    // Authentication now happens entirely at the Cloudflare Access layer
+    // (see comment near getSessionUser above) — there is no app-level
+    // login flow left to serve.
 
     // ========== EXISTING PROXY ENDPOINTS ==========
 
@@ -681,33 +538,9 @@ document.getElementById('loginForm').addEventListener('submit', function(e) {
       });
     }
 
-    // — index.html — serve dashboard to ALL users (auth handled by frontend)
+    // — index.html — serve dashboard (Cloudflare Access already verified
+    // the request before it got here; no app-level auth needed)
     if (path === '/' || path === '') {
-      const queryUser = url.searchParams.get('user');
-      
-      // Auto-login: if ?user= is present, set a signed session cookie.
-      // Validated the same way as /api/login (alphanumeric + - _, 1-32 chars)
-      // to prevent arbitrary cookie injection via a shared/malicious link
-      // (e.g. https://sfc-terminal.../?user=someone_elses_name).
-      if (queryUser && /^[a-zA-Z0-9_-]{1,32}$/.test(queryUser)) {
-        const sessionToken = await createSessionToken(env, queryUser.toLowerCase());
-        const setCookieHeader = setCookie('sfc_session', sessionToken);
-        const resp = await fetchAny(env, '/', 'text/html');
-        if (!resp) return new Response('Backend unreachable', { status: 502 });
-        const html = await resp.text();
-        return new Response(html, {
-          status: 200,
-          headers: {
-            'Content-Type': 'text/html; charset=utf-8',
-            'Set-Cookie': setCookieHeader,
-            'Cache-Control': 'public, max-age=0, must-revalidate',
-            ...securityHeaders,
-            ...getCorsHeaders(request),
-          },
-        });
-      }
-
-      // Serve dashboard for everyone (no auth required — frontend handles login)
       const resp = await fetchAny(env, '/', 'text/html');
       if (!resp) return new Response('Backend unreachable', { status: 502 });
       let html = await resp.text();

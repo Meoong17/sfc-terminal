@@ -45,8 +45,10 @@ collect_with_retry() {
 
 collect_with_retry
 
-log "Running paper trader..."
-$PYTHON trading/paper_trader.py 2>>sfc-pipeline.log || log "⚠ Paper trader skipped"
+# REMOVED (2026-07): paper_trader.py execution — Paper Trading has been
+# removed; SFC Terminal is now an analysis-only tool. trading/paper_trader.py
+# is left in place (harmless, unused) rather than deleted, in case any other
+# script references it.
 
 # ── Make git ignore index.html ──
 git update-index --skip-worktree index.html 2>/dev/null || true
