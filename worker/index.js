@@ -14,6 +14,15 @@
 
 const TUNNEL_DEFAULT = 'https://notify-directories-blanket-antibody.trycloudflare.com';
 
+// ── ANONYMOUS SHARED PAPER-TRADING STATE (2026-07) ──────────
+// Cloudflare Access was removed to make the dashboard fully open to
+// everyone (no login, no Access policy). Instead of per-user states,
+// all visitors share ONE anonymous paper-trading state. The username in
+// /user/:name/* paths is ignored — every request reads/writes this
+// single canonical KV key. This also removes the runtime dependency on
+// the Cf-Access-Authenticated-User-Email header.
+const SHARED_STATE_KEY = 'shared:paper:state';
+
 async function fetchAny(env, path, accept) {
   // Try tunnel first, then VPS direct IP (from secret env, if configured)
   const tunnel = (env && env.TUNNEL_URL) || TUNNEL_DEFAULT;
@@ -78,23 +87,17 @@ async function gzip(data) {
   return out;
 }
 
-// REMOVED (2026-07): cookie helpers (getCookie/setCookie/clearCookie) —
-// no longer needed now that identity comes from Cloudflare Access's
-// verified header instead of a self-issued session cookie.
+// REMOVED (2026-07): cookie helpers (getCookie/setCookie/clearCookie),
+// the app's own /api/login + signed-session-cookie system, AND Cloudflare
+// Access identity — all replaced by a single anonymous shared state.
 
-// ── Identity now comes from Cloudflare Access ──────────────────
-// REMOVED (2026-07): the app's own /api/login + signed-session-cookie
-// system. Access control now happens at the Cloudflare edge (Zero Trust
-// Access policy, configured in the Cloudflare dashboard) BEFORE a request
-// ever reaches this Worker — so there is no app-level login page anymore.
-// Cloudflare Access injects a verified 'Cf-Access-Authenticated-User-Email'
-// header on every request that passed its policy. getSessionUser() below
-// reads THAT header instead of a cookie this app used to issue itself —
-// this is a genuinely VERIFIED identity (Cloudflare confirmed the email via
-// OAuth/OTP), unlike the old system where a "username" was just an
-// unauthenticated string claim. Per-user state isolation (/user/:id/state)
-// still works — "id" is now the Access-verified email, not a self-claimed
-// username.
+// ── Identity layer removed: fully open dashboard ──────────────
+// To make the dashboard open to everyone (no login, no Access policy),
+// the app now keeps ONE anonymous paper-trading state shared by all
+// visitors — see SHARED_STATE_KEY. Per-user isolation is intentionally
+// dropped: the username in /user/:name/* paths is ignored. getSessionUser()
+// below is kept only as a no-op that always returns null (the
+// Cf-Access-Authenticated-User-Email header disappears once Access is off).
 
 export default {
   async fetch(request, env, ctx) {
@@ -124,12 +127,12 @@ export default {
       return {};
     }
 
-    // Identity now comes from Cloudflare Access — this header is only
-    // present/trustworthy because Cloudflare's edge already verified it
-    // before this Worker ever ran (Access policy blocks unverified
-    // requests upstream). No cookie, no app-level login needed.
+    // Identity layer removed (2026-07): no Access, no login. This now
+    // always returns null — kept as a no-op so the handlers don't need
+    // restructuring. All /user/* state is the shared anonymous state
+    // (SHARED_STATE_KEY); the username in the path is ignored.
     async function getSessionUser(request) {
-      return request.headers.get('Cf-Access-Authenticated-User-Email') || null;
+      return null;
     }
 
     // Security headers for HTML pages (clickjacking, MIME sniffing, HSTS, referrer)
@@ -189,18 +192,12 @@ export default {
     // GET /user/:username/state — load user state, create default if not exists
     const userStateMatch = path.match(/^\/user\/([^\/]+)\/state$/);
     if (userStateMatch && method === 'GET') {
-      const username = decodeURIComponent(userStateMatch[1]);
-      const normalized = username.toLowerCase();
-      // Session guard: only the logged-in user can read their own state
-      const sessionUser = await getSessionUser(request);
-      if (!sessionUser || sessionUser.toLowerCase() !== normalized) {
-        return new Response('Forbidden', { status: 403, headers: getCorsHeaders(request) });
-      }
-      const key = `user:${normalized}:state`;
+      // Anonymous shared state — the username in the path is ignored.
+      const key = SHARED_STATE_KEY;
       let raw = await env.SFC_USER_STATE.get(key);
       if (!raw) {
-        // Create default state for new user
-        const state = defaultUserState(username);
+        // Create default shared state on first access
+        const state = defaultUserState('shared');
         raw = JSON.stringify(state);
         await env.SFC_USER_STATE.put(key, raw);
       }
@@ -211,21 +208,14 @@ export default {
 
     // POST /user/:username/state — save full user state
     if (userStateMatch && method === 'POST') {
-      const username = decodeURIComponent(userStateMatch[1]);
-      const normalized = username.toLowerCase();
-      // Session guard: only the logged-in user can write their own state
-      const sessionUser = await getSessionUser(request);
-      if (!sessionUser || sessionUser.toLowerCase() !== normalized) {
-        return new Response('Forbidden', { status: 403, headers: getCorsHeaders(request) });
-      }
-      const key = `user:${normalized}:state`;
+      const key = SHARED_STATE_KEY;
       let newState;
       try {
         newState = await request.json();
       } catch (e) {
         return new Response('Invalid JSON', { status: 400, headers: getCorsHeaders(request) });
       }
-      newState.user_id = username;
+      newState.user_id = 'shared';
       newState.last_update = new Date().toISOString();
       // Trim large arrays to stay within KV limits (25MB per value, but keep it lean)
       if (newState.trades && newState.trades.length > 500) {
@@ -243,14 +233,7 @@ export default {
     // POST /user/:username/config — update config only
     const userConfigMatch = path.match(/^\/user\/([^\/]+)\/config$/);
     if (userConfigMatch && method === 'POST') {
-      const username = decodeURIComponent(userConfigMatch[1]);
-      const normalized = username.toLowerCase();
-      // Session guard
-      const sessionUser = await getSessionUser(request);
-      if (!sessionUser || sessionUser.toLowerCase() !== normalized) {
-        return new Response('Forbidden', { status: 403, headers: getCorsHeaders(request) });
-      }
-      const key = `user:${normalized}:state`;
+      const key = SHARED_STATE_KEY;
       let existing = await env.SFC_USER_STATE.get(key);
       if (!existing) {
         return new Response('User not found', { status: 404, headers: getCorsHeaders(request) });
@@ -334,17 +317,10 @@ export default {
     // GET /user/:username/status — quick summary (no full state transfer)
     const userStatusMatch = path.match(/^\/user\/([^\/]+)\/status$/);
     if (userStatusMatch && method === 'GET') {
-      const username = decodeURIComponent(userStatusMatch[1]);
-      const normalized = username.toLowerCase();
-      // Session guard
-      const sessionUser = await getSessionUser(request);
-      if (!sessionUser || sessionUser.toLowerCase() !== normalized) {
-        return new Response('Forbidden', { status: 403, headers: getCorsHeaders(request) });
-      }
-      const key = `user:${normalized}:state`;
+      const key = SHARED_STATE_KEY;
       let raw = await env.SFC_USER_STATE.get(key);
       if (!raw) {
-        return new Response(JSON.stringify({ exists: false, username }), {
+        return new Response(JSON.stringify({ exists: false, username: 'shared' }), {
           headers: { 'Content-Type': 'application/json', ...getCorsHeaders(request) },
         });
       }
