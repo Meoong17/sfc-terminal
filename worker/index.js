@@ -14,14 +14,10 @@
 
 const TUNNEL_DEFAULT = 'https://notify-directories-blanket-antibody.trycloudflare.com';
 
-// ── ANONYMOUS SHARED PAPER-TRADING STATE (2026-07) ──────────
-// Cloudflare Access was removed to make the dashboard fully open to
-// everyone (no login, no Access policy). Instead of per-user states,
-// all visitors share ONE anonymous paper-trading state. The username in
-// /user/:name/* paths is ignored — every request reads/writes this
-// single canonical KV key. This also removes the runtime dependency on
-// the Cf-Access-Authenticated-User-Email header.
-const SHARED_STATE_KEY = 'shared:paper:state';
+// ── PAPER TRADING REMOVED (2026-07) ─────────────────────────
+// SFC Terminal is analysis-only. Multi-user paper trading is gone and all
+// /user/* endpoints are disabled (see the 410 guard in the fetch handler).
+// The dashboard is fully open — no app login and no Cloudflare Access.
 
 async function fetchAny(env, path, accept) {
   // Try tunnel first, then VPS direct IP (from secret env, if configured)
@@ -38,31 +34,6 @@ async function fetchAny(env, path, accept) {
     } catch (_) {}
   }
   return null;
-}
-
-// Default state for new users
-function defaultUserState(username) {
-  const normalized = (username || '').toLowerCase();
-  return {
-    user_id: normalized || username,
-    capital: 50000,
-    initial_capital: 50000,
-    peak_capital: 50000,
-    positions: [],
-    trades: [],
-    equity_history: [],
-    daily_snapshots: {},
-    config: {
-      max_allocation_pct: 25,
-      take_profit_pct: 0,
-      trailing_stop_pct: 15,
-      stop_loss_pct: 0,
-      risk_per_trade: 2,
-      kelly_enabled: true,
-    },
-    last_update: null,
-    created_at: new Date().toISOString(),
-  };
 }
 
 // Compression helper — gzip JSON responses for ~80% size reduction
@@ -87,17 +58,10 @@ async function gzip(data) {
   return out;
 }
 
-// REMOVED (2026-07): cookie helpers (getCookie/setCookie/clearCookie),
-// the app's own /api/login + signed-session-cookie system, AND Cloudflare
-// Access identity — all replaced by a single anonymous shared state.
-
-// ── Identity layer removed: fully open dashboard ──────────────
-// To make the dashboard open to everyone (no login, no Access policy),
-// the app now keeps ONE anonymous paper-trading state shared by all
-// visitors — see SHARED_STATE_KEY. Per-user isolation is intentionally
-// dropped: the username in /user/:name/* paths is ignored. getSessionUser()
-// below is kept only as a no-op that always returns null (the
-// Cf-Access-Authenticated-User-Email header disappears once Access is off).
+// REMOVED (2026-07): cookie helpers, the app's /api/login + signed-session
+// cookie, AND Cloudflare Access identity — the dashboard is fully open and
+// analysis-only. No per-user state: paper trading (and all /user/* routes)
+// is disabled entirely; see the 410 guard in the fetch handler.
 
 export default {
   async fetch(request, env, ctx) {
@@ -125,14 +89,6 @@ export default {
       }
       // Same-origin requests don't need CORS
       return {};
-    }
-
-    // Identity layer removed (2026-07): no Access, no login. This now
-    // always returns null — kept as a no-op so the handlers don't need
-    // restructuring. All /user/* state is the shared anonymous state
-    // (SHARED_STATE_KEY); the username in the path is ignored.
-    async function getSessionUser(request) {
-      return null;
     }
 
     // Security headers for HTML pages (clickjacking, MIME sniffing, HSTS, referrer)
@@ -174,76 +130,21 @@ export default {
       return new Response(null, { headers: getCorsHeaders(request) });
     }
 
-    // ── ACCESS GUARD ─────────────────────────────────────────
-    // Protected routes require Cf-Access-Authenticated-User-Email header
-    // (set by Cloudflare Access at the edge — see getSessionUser above)
-    // (checked inline inside each handler for consistency)
+    // ── ACCESS GUARD REMOVED (2026-07) ───────────────────────
+    // Cloudflare Access is no longer in use — the dashboard is fully open
+    // and analysis-only. The __cookie_check debug endpoint (which echoed the
+    // Access identity header) has been removed along with the Access layer.
 
-    // Debug endpoint — echo the Access identity header
-    if (path === '/__cookie_check') {
-      const accessUser = request.headers.get('Cf-Access-Authenticated-User-Email') || '(none)';
-      return new Response(JSON.stringify({ accessUser, all: Object.fromEntries(request.headers) }), {
-        headers: { 'Content-Type': 'application/json', ...getCorsHeaders(request) },
-      });
-    }
-
-    // ========== MULTI-USER KV ENDPOINTS ==========
-
-    // GET /user/:username/state — load user state, create default if not exists
-    const userStateMatch = path.match(/^\/user\/([^\/]+)\/state$/);
-    if (userStateMatch && method === 'GET') {
-      // Anonymous shared state — the username in the path is ignored.
-      const key = SHARED_STATE_KEY;
-      let raw = await env.SFC_USER_STATE.get(key);
-      if (!raw) {
-        // Create default shared state on first access
-        const state = defaultUserState('shared');
-        raw = JSON.stringify(state);
-        await env.SFC_USER_STATE.put(key, raw);
-      }
-      return new Response(raw, {
-        headers: { 'Content-Type': 'application/json', ...getCorsHeaders(request) },
-      });
-    }
-
-    // POST /user/:username/state — save full user state
-    if (userStateMatch && method === 'POST') {
-      const key = SHARED_STATE_KEY;
-      let newState;
-      try {
-        newState = await request.json();
-      } catch (e) {
-        return new Response('Invalid JSON', { status: 400, headers: getCorsHeaders(request) });
-      }
-      newState.user_id = 'shared';
-      newState.last_update = new Date().toISOString();
-      // Trim large arrays to stay within KV limits (25MB per value, but keep it lean)
-      if (newState.trades && newState.trades.length > 500) {
-        newState.trades = newState.trades.slice(-500);
-      }
-      if (newState.equity_history && newState.equity_history.length > 1000) {
-        newState.equity_history = newState.equity_history.slice(-1000);
-      }
-      await env.SFC_USER_STATE.put(key, JSON.stringify(newState));
-      return new Response(JSON.stringify({ status: 'ok' }), {
-        headers: { 'Content-Type': 'application/json', ...getCorsHeaders(request) },
-      });
-    }
-
-    // POST /user/:username/config — update config only
-    const userConfigMatch = path.match(/^\/user\/([^\/]+)\/config$/);
-    if (userConfigMatch && method === 'POST') {
-      const key = SHARED_STATE_KEY;
-      let existing = await env.SFC_USER_STATE.get(key);
-      if (!existing) {
-        return new Response('User not found', { status: 404, headers: getCorsHeaders(request) });
-      }
-      const state = JSON.parse(existing);
-      const configUpdate = await request.json();
-      state.config = { ...state.config, ...configUpdate };
-      state.last_update = new Date().toISOString();
-      await env.SFC_USER_STATE.put(key, JSON.stringify(state));
-      return new Response(JSON.stringify({ status: 'ok' }), {
+    // ========== PAPER TRADING: REMOVED ==========
+    // SFC Terminal is analysis-only (2026-07). All /user/* endpoints —
+    // multi-user paper-trading state — are disabled. Any stale frontend
+    // call gets a clear 410 Gone instead of silently writing to KV.
+    if (/^\/user\//.test(path)) {
+      return new Response(JSON.stringify({
+        status: 'disabled',
+        reason: 'Paper Trading removed — SFC Terminal is analysis-only',
+      }), {
+        status: 410,
         headers: { 'Content-Type': 'application/json', ...getCorsHeaders(request) },
       });
     }
@@ -314,36 +215,9 @@ export default {
       });
     }
 
-    // GET /user/:username/status — quick summary (no full state transfer)
-    const userStatusMatch = path.match(/^\/user\/([^\/]+)\/status$/);
-    if (userStatusMatch && method === 'GET') {
-      const key = SHARED_STATE_KEY;
-      let raw = await env.SFC_USER_STATE.get(key);
-      if (!raw) {
-        return new Response(JSON.stringify({ exists: false, username: 'shared' }), {
-          headers: { 'Content-Type': 'application/json', ...getCorsHeaders(request) },
-        });
-      }
-      const state = JSON.parse(raw);
-      const summary = {
-        username: state.user_id,
-        exists: true,
-        capital: state.capital,
-        initial_capital: state.initial_capital,
-        positions_count: (state.positions || []).length,
-        trades_count: (state.trades || []).length,
-        last_update: state.last_update,
-      };
-      return new Response(JSON.stringify(summary), {
-        headers: { 'Content-Type': 'application/json', ...getCorsHeaders(request) },
-      });
-    }
-
     // ── AUTH ENDPOINTS ──────────────────────────────────────
-    // REMOVED (2026-07): /api/login, /logout, and the /login page.
-    // Authentication now happens entirely at the Cloudflare Access layer
-    // (see comment near getSessionUser above) — there is no app-level
-    // login flow left to serve.
+    // REMOVED (2026-07): /api/login, /logout, and the /login page, along
+    // with Cloudflare Access. The dashboard is fully open (analysis-only).
 
     // ========== EXISTING PROXY ENDPOINTS ==========
 
