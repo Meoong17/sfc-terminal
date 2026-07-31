@@ -349,31 +349,16 @@ export default {
       });
     }
 
-    // /paper_history.json — paper trading track record
-    if (path === '/paper_history.json') {
-      const resp = await fetchAny(env, '/paper_history.json', 'application/json');
-      if (!resp) return new Response('{"daily":[],"current":{}}', {
-        status: 200,
-        headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache', ...getCorsHeaders(request) },
-      });
-      const data = await resp.json();
-      return new Response(JSON.stringify(data), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache', ...getCorsHeaders(request) },
-      });
-    }
-
-    // /paper_trades.json — paper trading server state (for client-side init)
-    if (path === '/paper_trades.json') {
-      const resp = await fetchAny(env, '/paper_trades.json', 'application/json');
-      if (!resp) return new Response('{"capital":50000,"positions":[],"trades":[],"equity_history":[],"daily_snapshots":{}}', {
-        status: 200,
-        headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache', ...getCorsHeaders(request) },
-      });
-      const data = await resp.json();
-      return new Response(JSON.stringify(data), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache', ...getCorsHeaders(request) },
+    // /paper_history.json & /paper_trades.json — paper trading is removed
+    // (SFC Terminal is analysis-only). Return 410 Gone so any stale frontend
+    // gets a clear signal instead of silently reading stale track-record data.
+    if (path === '/paper_history.json' || path === '/paper_trades.json') {
+      return new Response(JSON.stringify({
+        status: 'disabled',
+        reason: 'Paper Trading removed — SFC Terminal is analysis-only',
+      }), {
+        status: 410,
+        headers: { 'Content-Type': 'application/json', ...getCorsHeaders(request) },
       });
     }
 
