@@ -82,11 +82,19 @@ def _sigmoid_factor(val, center, k=0.15):
 def score_factors_from_market(btc, btc_24h, dom, dvol, fng, pc_oi, m2_yoy, dxy, glo_score=None,
                                 onchain_whale=None, onchain_value=None, onchain_buy=None,
                                 onchain_market_structure=None, dxy_btc_corr=None):
-    """Score 5 factors from market data using smooth sigmoid/logistic functions. Range -3 to +3"""
+    """Score 5 factors from market data using smooth sigmoid/logistic functions. Range -3 to +3
+
+    NOTE (synced to collect.py v4.0.0, 2026-07-25): the direct m2_yoy sigmoid
+    was REMOVED from Lt in v4.0.0 — Lt is now driven only by glo_score (GLF,
+    the consolidated global-liquidity factor) and btc_24h momentum. This copy
+    previously retained a stale `if m2_yoy is not None: factors["Lt"] +=
+    _sigmoid_factor(m2_yoy, center=5.0, k=0.8)` line that collect.py no longer
+    has; it is removed here to keep this historical replay faithful to the
+    current model. (The m2_yoy parameter is still accepted for signature
+    compatibility but no longer feeds Lt.)
+    """
     factors = {"Lt": 0.0, "St": 0.0, "Rt": 0.0, "Ft": 0.0, "Sc": 0.0}
 
-    if m2_yoy is not None:
-        factors["Lt"] += _sigmoid_factor(m2_yoy, center=5.0, k=0.8)
     if glo_score is not None:
         factors["Lt"] += _sigmoid_factor(glo_score, center=50.0, k=0.08)
     if btc_24h is not None:

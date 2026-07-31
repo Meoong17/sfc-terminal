@@ -4085,7 +4085,7 @@ out = {
     "wfv_gap_30d_ci_hi": _wfv_summary.get("gap_30d_ci_hi"),
     "wfv_gap_30d_significant": _wfv_summary.get("gap_30d_significant"),
     "wfv_n_stress_pct": _wfv_summary.get("n_stress_pct"),
-    "wfv_label": "WALK-FORWARD VALIDATED (bootstrap CI on CALM-vs-STRESS forward-return gap, FRED price history since 2014)" if _wfv_available else "NOT YET RUN",
+    "wfv_label": "WALK-FORWARD VALIDATED — reduced 4-input proxy (price, DXY, M2, FNG; St/Ft=0), NOT the full 90+ method live score" if _wfv_available else "NOT YET RUN",
     # — Kelly Criterion Position Sizing (Gap 2 dari Reality Check) —
     "kelly_p_win": round(composite_confidence, 3),
     "kelly_b_payoff": 2.0,  # default risk/reward ratio
