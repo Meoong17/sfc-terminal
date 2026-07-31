@@ -20,6 +20,7 @@ COLLECT_RESULT="skipped"
 GIT_RESULT="skipped"
 
 PYTHON="/home/ubuntu/sfc/.venv/bin/python3"
+TMP_FILE="$REPO_DIR/data.json.tmp"
 
 MAX_RETRIES=2; RETRY_DELAY=10; COLLECT_TIMEOUT=150
 
@@ -27,9 +28,14 @@ collect_with_retry() {
   local attempt=1
   while [ $attempt -le $MAX_RETRIES ]; do
     log "Collecting data (attempt $attempt/$MAX_RETRIES)..."
-    timeout $COLLECT_TIMEOUT $PYTHON collect.py > data.json 2>>sfc-pipeline.log
+    rm -f "$TMP_FILE"
+    timeout $COLLECT_TIMEOUT $PYTHON collect.py > "$TMP_FILE" 2>>sfc-pipeline.log
     local exit_code=$?
-    if [ $exit_code -eq 0 ] && [ -s data.json ]; then
+    # Atomic publish: only promote tmp -> data.json when output is complete & valid JSON.
+    # Readers always see a whole file (old or new) — never empty/half-written.
+    if [ $exit_code -eq 0 ] && [ -s "$TMP_FILE" ] \
+       && $PYTHON -c 'import sys,json; json.load(open(sys.argv[1]))' "$TMP_FILE" 2>>sfc-pipeline.log; then
+      mv -f "$TMP_FILE" data.json
       log "Collect succeeded (exit=$exit_code)"
       COLLECT_RESULT="ok"
       return 0
@@ -38,7 +44,8 @@ collect_with_retry() {
     sleep $RETRY_DELAY
     attempt=$((attempt + 1))
   done
-  log "⚠ All collect attempts failed."
+  rm -f "$TMP_FILE"
+  log "⚠ All collect attempts failed — keeping previous data.json"
   COLLECT_RESULT="failed"
   return 1
 }
