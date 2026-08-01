@@ -23,6 +23,14 @@ _cg_key = os.getenv("COINGLASS_API_KEY", "")
 if _cg_key:
     COINGLASS_HEADERS["CG-API-KEY"] = _cg_key
 
+# Once CoinGlass reports its plan is insufficient (HTTP 401 / code 401 for the
+# aggregated-heatmap endpoint, which requires the paid Professional+ plan), stop
+# retrying it for the rest of this process. Without this, every cache miss calls
+# the paid endpoint (wasting a request + logging noise) only to fall back to OKX
+# anyway. Free-tier account stays on the OKX source, which already returns real
+# liquidation data.
+_cg_plan_insufficient = False
+
 # ── OKX (free, no key) ──────────────────────────────────────
 OKX_BASE = "https://www.okx.com"
 
@@ -154,6 +162,11 @@ def fetch_coinglass_heatmap(symbol="BTC", range_days="3d"):
     if not _cg_key:
         return None
 
+    # Skip the paid endpoint entirely once we know the current plan can't serve it.
+    global _cg_plan_insufficient
+    if _cg_plan_insufficient:
+        return None
+
     url = f"{COINGLASS_BASE}/futures/liquidation/aggregated-heatmap/model1"
     params = {"symbol": symbol, "range": range_days}
 
@@ -164,7 +177,8 @@ def fetch_coinglass_heatmap(symbol="BTC", range_days="3d"):
         data = r.json()
         if data.get("code") == "401":
             # Plan insufficient — don't retry this session
-            print("[liq] CoinGlass: plan upgrade needed for liquidation data", file=__import__('sys').stderr)
+            _cg_plan_insufficient = True
+            print("[liq] CoinGlass: plan upgrade needed for liquidation data (skipping for this session)", file=__import__('sys').stderr)
             return None
         if data.get("code") != "0":
             return None

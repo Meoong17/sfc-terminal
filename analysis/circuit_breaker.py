@@ -254,23 +254,43 @@ class CircuitBreaker:
         # ── 4. Consistency checks ──
         consistency_issues = []
 
-        # sfc_effective = sfc_base + liq_mod (-5 to +10) + regime boost + ML nudges.
-        # Only flag if sfc_effective dropped below what the actual liq_mod explains,
-        # plus a small margin (1pp) for other adjustments.
+        # sfc_effective final value is produced by a documented adjustment chain:
+        #   mid = sfc_base + liq_mod(-5..+10) + dw_sfc_adjustment + capped regime boost
+        #   mid = (1 - xgb_blend_weight) * mid + xgb_blend_weight * xgb_meta_prediction   # XGB blend
+        #   sfc_effective = ewma.correct(mid) * 100                                        # opaque online EWMA
+        # A hardcoded 1pp margin used to cover "ML nudges" but the XGBoost blend alone can
+        # legitimately pull sfc_effective down by up to ~30% of mid (blend weight up to 0.3
+        # toward a low stress prediction), so the old check false-alarmed almost every cycle.
+        # Now we reconstruct mid from the ACTUAL persisted adjustment fields, leaving only
+        # the opaque EWMA correction covered by a small margin.
         sfc_eff = cleaned.get("sfc_effective")
         sfc_base = cleaned.get("sfc_base")
         if isinstance(sfc_eff, (int, float)) and isinstance(sfc_base, (int, float)):
             # Use actual liq_mod value if available, else assume max negative (-5)
             liq_mod_val = cleaned.get("liq_mod")
-            if isinstance(liq_mod_val, (int, float)):
-                min_expected = sfc_base + liq_mod_val - 1.0  # 1pp margin for rounding/nudges
-            else:
-                min_expected = sfc_base - 6.0  # max negative liq_mod (-5) + 1pp margin
+            liq = liq_mod_val if isinstance(liq_mod_val, (int, float)) else -5.0
+            # DW dynamic-weighting adjustment (SIDEWAYS -> 0.0, CRISIS -> +0.9, etc.)
+            dw_adj = cleaned.get("dw_sfc_adjustment")
+            dw_adj = dw_adj if isinstance(dw_adj, (int, float)) else 0.0
+            # Regime boost is capped at +2pp when DW is active; it only raises mid so
+            # excluding it keeps the expected floor conservative (fewer false alarms).
+            mid = sfc_base + liq + dw_adj
+            # XGBoost meta-ensemble blend — apply the same weight+prediction as collect.py
+            xgb_w = cleaned.get("xgb_blend_weight")
+            xgb_pred = cleaned.get("xgb_meta_prediction")
+            if (isinstance(xgb_w, (int, float)) and xgb_w > 0
+                    and isinstance(xgb_pred, (int, float))):
+                mid = (1 - xgb_w) * mid + xgb_w * xgb_pred
+            # Small margin covers opaque EWMA online correction + rounding. Real corruption
+            # (sfc_effective dropped to ~0 or absurd) still trips this check.
+            min_expected = mid - 3.0
 
             if sfc_eff < min_expected:
                 consistency_issues.append(
                     f"sfc_effective ({sfc_eff:.1f}) < expected min ({min_expected:.1f}) "
-                    f"(base={sfc_base:.1f}, liq_mod={liq_mod_val if isinstance(liq_mod_val, (int, float)) else 'N/A'})"
+                    f"(base={sfc_base:.1f}, liq_mod={liq_mod_val if isinstance(liq_mod_val, (int, float)) else 'N/A'}, "
+                    f"dw={dw_adj:.1f}, xgb_w={xgb_w if isinstance(xgb_w, (int, float)) else 'N/A'}, "
+                    f"xgb_pred={xgb_pred if isinstance(xgb_pred, (int, float)) else 'N/A'})"
                 )
                 all_ok = False
 
@@ -542,6 +562,51 @@ def main() -> None:
     cons7 = [w for w in warns7 if "Consistency" in w]
     assert not cons7, f"Should NOT trigger consistency with liq_mod=-5: {cons7}"
     print("  ✓ PASS (liq_mod=-5, sfc_eff=14: no false alarm)")
+
+    # ── Scenario 8: XGBoost blend false alarm — regression for BUG (2026-08-01) ──
+    # Production values from data.json: sfc_base=19.18, liq_mod=1.2, dw=0.0,
+    # xgb_blend_weight=0.155, xgb_meta_prediction=1.82, sfc_effective=17.49.
+    # The XGBoost blend legitimately pulls the value down:
+    #   mid = 19.18 + 1.2 + 0 = 20.38
+    #   mid = (1-0.155)*20.38 + 0.155*1.82 ≈ 17.50  → sfc_eff 17.49 is consistent.
+    # The OLD check (min_expected = base + liq_mod - 1 = 19.38) false-flagged this
+    # every cycle and nearly tripped the breaker. Reconstructed check must NOT flag.
+    print("\n── Scenario 8: XGBoost blend false alarm — no false positive ──")
+    cb8 = CircuitBreaker()
+    xgb_case = {
+        "sfc_base": 19.18,
+        "sfc_effective": 17.49,   # post XGB-blend, consistent with mid≈17.50
+        "liq_mod": 1.2,
+        "dw_sfc_adjustment": 0.0,
+        "xgb_blend_weight": 0.155,
+        "xgb_meta_prediction": 1.82,
+        "composite_confidence": 0.106,
+    }
+    # Seed with the same value so jump detection doesn't interfere with the test.
+    cb8.validate(xgb_case)
+    cleaned8, ok8, warns8 = cb8.validate(xgb_case)
+    print(f"  Valid: {ok8}")
+    print(f"  Warnings: {warns8 if warns8 else 'None'}")
+    cons8 = [w for w in warns8 if "Consistency" in w]
+    assert ok8, f"XGB-blended sfc_effective should be valid: {warns8}"
+    assert not cons8, f"Should NOT trigger consistency with XGBoost blend: {cons8}"
+    print("  ✓ PASS (XGBoost-blended value no longer false-flagged)")
+
+    # ── Scenario 9: XGBoost blend + genuinely corrupt value STILL caught ──
+    # Same adjustment chain but sfc_effective dropped to ~0 (real corruption).
+    # Reconstructed mid ≈ 17.50, min_expected = 14.50 → 0.0 must still trip.
+    print("\n── Scenario 9: XGBoost blend must NOT mask real corruption ──")
+    cb9 = CircuitBreaker()
+    corrupt = dict(xgb_case)
+    corrupt["sfc_effective"] = 0.0
+    cb9.validate(xgb_case)          # seed valid state
+    cleaned9, ok9, warns9 = cb9.validate(corrupt)
+    print(f"  Valid: {ok9}")
+    print(f"  Warnings: {warns9}")
+    cons9 = [w for w in warns9 if "Consistency" in w]
+    assert cons9, f"sfc_effective=0.0 should still be flagged as corruption: {cons9}"
+    assert not ok9, "Corrupt value should be invalid"
+    print("  ✓ PASS (real corruption still caught under blended threshold)")
 
     print("\n" + "=" * 60)
     print("All circuit breaker tests passed!")

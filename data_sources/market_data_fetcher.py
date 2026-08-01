@@ -169,25 +169,32 @@ def _fetch_spx_twelvedata():
     key = os.getenv("TWELVEDATA_KEY", "")
     if not key:
         return None
-    try:
-        r = requests.get(
-            "https://api.twelvedata.com/time_series",
-            params={"symbol": "SPX", "interval": "1day", "outputsize": 10, "apikey": key},
-            timeout=10,
-        )
-        r.raise_for_status()
-        data = r.json()
-        values = data.get("values")
-        if not values:
-            print(f"[MarketData] Twelve Data SPX: no values in response ({data.get('message', data.get('status'))})",
-                  file=__import__("sys").stderr)
-            return None
-        # Twelve Data returns newest-first — reverse to oldest-first
-        closes = [float(v["close"]) for v in reversed(values)]
-        return _compute_rvm(closes)
-    except (requests.RequestException, ValueError, KeyError) as e:
-        print(f"[MarketData] Twelve Data SPX fetch failed: {e}", file=__import__("sys").stderr)
-        return None
+    # SPX index symbol is only available on paid Twelve Data plans (Grow/Venture);
+    # on the free tier it returns 404 ("This symbol is available starting with the
+    # Grow or Venture plan"). SPY (S&P 500 ETF) is a close proxy and works on the
+    # free plan — the same proxy the Alpha Vantage fallback already uses. Try the
+    # exact index first (in case the plan is upgraded), then fall back to SPY.
+    for symbol in ("SPX", "SPY"):
+        try:
+            r = requests.get(
+                "https://api.twelvedata.com/time_series",
+                params={"symbol": symbol, "interval": "1day", "outputsize": 10, "apikey": key},
+                timeout=10,
+            )
+            r.raise_for_status()
+            data = r.json()
+            values = data.get("values")
+            if not values:
+                print(f"[MarketData] Twelve Data {symbol}: no values in response ({data.get('message', data.get('status'))})",
+                      file=__import__("sys").stderr)
+                continue
+            # Twelve Data returns newest-first — reverse to oldest-first
+            closes = [float(v["close"]) for v in reversed(values)]
+            return _compute_rvm(closes)
+        except (requests.RequestException, ValueError, KeyError) as e:
+            print(f"[MarketData] Twelve Data {symbol} fetch failed: {e}", file=__import__("sys").stderr)
+            continue
+    return None
 
 
 def _fetch_spx_alphavantage():
