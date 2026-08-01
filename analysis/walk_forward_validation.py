@@ -74,7 +74,6 @@ try:
     from historical_backtest_m1m6 import (
         score_factors_from_market, calculate_sfc_ensemble,
         fetch_fred_series, fetch_fng_historical_dict, _nearest_prior_value,
-        compute_glo_score, _sorted_items,
     )
 except ImportError:
     print("[WalkForward] Could not import historical_backtest_m1m6.py — "
@@ -117,17 +116,10 @@ def compute_sfc_time_series():
     dxy_series = fetch_fred_series("DTWEXBGS")
     m2_series = fetch_fred_series("M2SL")
     fng_series = fetch_fng_historical_dict()
-    walcl = fetch_fred_series("WALCL")
-    ecb = fetch_fred_series("ECBASSETSW")
-    jpn = fetch_fred_series("JPNASSETS")
 
     if not btc_price:
         print("[WalkForward] No BTC price data — check FRED_API_KEY and network access.", file=sys.stderr)
         return []
-
-    walcl_items = _sorted_items(walcl)
-    ecb_items = _sorted_items(ecb)
-    jpn_items = _sorted_items(jpn)
 
     sorted_dates = sorted(btc_price.keys())
     results = []
@@ -151,13 +143,11 @@ def compute_sfc_time_series():
             if m2_year_ago:
                 m2_yoy = (m2_level - m2_year_ago) / m2_year_ago * 100
         fng = fng_series.get(date_str)
-        # GLO liquidity term (collect.py v4.0.0 Lt driver, point-in-time replay)
-        glo = compute_glo_score(date_str, walcl_items, ecb_items, jpn_items)
 
         try:
             factors = score_factors_from_market(
                 btc=price, btc_24h=btc_24h, dom=None, dvol=None, fng=fng,
-                pc_oi=None, m2_yoy=m2_yoy, dxy=dxy, glo_score=glo,
+                pc_oi=None, m2_yoy=m2_yoy, dxy=dxy,
             )
             sfc_pct = calculate_sfc_ensemble(factors)[0]
         except Exception:

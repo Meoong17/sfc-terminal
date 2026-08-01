@@ -283,67 +283,6 @@ def _nearest_prior_value(series_dict, target_date, max_lookback_days=10):
     return None
 
 
-# ── GLO score (global central-bank liquidity) replay ─────────────────────
-# collect.py v4.0.0 removed the direct m2_yoy term from Lt and REPLACED it
-# with glo_score (global liquidity, from Fed/ECB/BOJ balance-sheet growth).
-# The historical replay previously passed glo_score=None (its default), so
-# Lt collapsed to pure BTC momentum — the backtest silently tested a
-# DIFFERENT (degraded) model than the live v4.0.0 pipeline. This block
-# replicates calculate_m33_global_liquidity()'s exact math point-in-time so
-# the replay exercises the same global-liquidity term the live model uses.
-
-_GLO_SERIES = ("WALCL", "ECBASSETSW", "JPNASSETS")  # Fed / ECB / BOJ assets
-
-
-def _yoy_at(sorted_items, target_date, n_back=12):
-    """Point-in-time replication of m33's yoy_chg: value at the most recent
-    observation <= target_date, minus the value `n_back` FRED observations
-    earlier (live _fred(series,13) + yoy_chg(arr[0] vs arr[12])). For a
-    weekly series like WALCL, 13 obs spans ~13 weeks (~3 months), NOT a
-    year — we replicate the live semantics exactly, quirk and all, rather
-    than "correcting" it, so the replay matches what the pipeline computes.
-    `sorted_items` is a pre-sorted list of (date_str, value) tuples."""
-    import bisect
-    idx = bisect.bisect_right(sorted_items, target_date, key=lambda x: x[0]) - 1
-    if idx < 0:
-        return None
-    latest_val = sorted_items[idx][1]
-    prior_idx = idx - n_back
-    if prior_idx < 0:
-        return None
-    prior_val = sorted_items[prior_idx][1]
-    if prior_val == 0:
-        return 0.0
-    return (latest_val - prior_val) / prior_val * 100.0
-
-
-def _sorted_items(series_dict):
-    """Pre-sort a FRED {date: value} dict into a list of (date, value)
-    tuples, so per-date _yoy_at() calls are O(log n) instead of re-sorting
-    the whole series every time."""
-    return sorted(series_dict.items())
-
-
-def compute_glo_score(date_str, walcl_items, ecb_items, jpn_items):
-    """Replicate calculate_m33_global_liquidity()'s GLO 0-100 score for a
-    single historical date. Higher = liquid expansion (low stress).
-    Series args are pre-sorted (date, value) lists from _sorted_items()."""
-    fed_yoy = _yoy_at(walcl_items, date_str)
-    ecb_yoy = _yoy_at(ecb_items, date_str)
-    jpn_yoy = _yoy_at(jpn_items, date_str)
-    fed_z = (fed_yoy - 5.5) / 3.0 if fed_yoy is not None else 0
-    ecb_z = (ecb_yoy - 4.0) / 3.0 if ecb_yoy is not None else 0
-    jpn_z = (jpn_yoy - 3.0) / 3.0 if jpn_yoy is not None else 0
-    weights, z_vals = [], []
-    if fed_yoy is not None: weights.append(0.50); z_vals.append(fed_z)
-    if ecb_yoy is not None: weights.append(0.30); z_vals.append(ecb_z)
-    if jpn_yoy is not None: weights.append(0.20); z_vals.append(jpn_z)
-    if not z_vals:
-        return None
-    glo_z = sum(w * z for w, z in zip(weights, z_vals)) / sum(weights)
-    return max(0.0, min(100.0, 50.0 + glo_z * 20.0))
-
-
 def run_backtest():
     print("=" * 60)
     print("M1-M6 HISTORICAL BACKTEST (via FRED CBBTCUSD)")
@@ -354,9 +293,6 @@ def run_backtest():
     dxy_series = fetch_fred_series("DTWEXBGS")
     m2_series = fetch_fred_series("M2SL")
     fng_series = fetch_fng_historical_dict()
-    walcl = fetch_fred_series("WALCL")
-    ecb = fetch_fred_series("ECBASSETSW")
-    jpn = fetch_fred_series("JPNASSETS")
 
     if not btc_price:
         print("❌ No BTC price data — check FRED_API_KEY and network access.")
@@ -364,10 +300,6 @@ def run_backtest():
 
     # score_factors_from_market() and calculate_sfc_ensemble() are the
     # verbatim copies defined at module level above — no import needed.
-
-    walcl_items = _sorted_items(walcl)
-    ecb_items = _sorted_items(ecb)
-    jpn_items = _sorted_items(jpn)
 
     sorted_dates = sorted(btc_price.keys())
     results = []
@@ -394,16 +326,11 @@ def run_backtest():
                 m2_yoy = (m2_level - m2_year_ago) / m2_year_ago * 100
 
         fng = fng_series.get(date_str)  # None before ~Feb 2018, real value after
-        # GLO liquidity term — matches collect.py v4.0.0's Lt construction
-        # (m2_yoy is ignored by the function body; glo_score is now the
-        # liquidity driver, replicated point-in-time from central-bank
-        # balance sheets).
-        glo = compute_glo_score(date_str, walcl_items, ecb_items, jpn_items)
 
         try:
             factors = score_factors_from_market(
                 btc=price, btc_24h=btc_24h, dom=None, dvol=None, fng=fng,
-                pc_oi=None, m2_yoy=m2_yoy, dxy=dxy, glo_score=glo,
+                pc_oi=None, m2_yoy=m2_yoy, dxy=dxy,
             )
             p_ens_components = calculate_sfc_ensemble(factors)
             # calculate_sfc_ensemble returns (sfc_pct, zone, factors_raw,
@@ -423,7 +350,6 @@ def run_backtest():
 
         results.append({
             "date": date_str, "btc_price": price, "btc_24h": round(btc_24h, 2),
-            "glo_score": round(glo, 2) if glo is not None else None,
             "sfc_pct": round(sfc_pct, 2) if sfc_pct is not None else None,
             "m1_klr": round(m1, 4) if m1 is not None else None,
             "m2_logit": round(m2v, 4) if m2v is not None else None,
