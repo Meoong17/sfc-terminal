@@ -12,22 +12,27 @@
 //   wrangler secret put BACKUP_URL
 // and paste your VPS URL (e.g. http://YOUR_VPS_IP:8765) when prompted.
 
-const TUNNEL_DEFAULT = 'https://notify-directories-blanket-antibody.trycloudflare.com';
-
 // ── PAPER TRADING REMOVED (2026-07) ─────────────────────────
 // SFC Terminal is analysis-only. Multi-user paper trading is gone and all
 // /user/* endpoints are disabled (see the 410 guard in the fetch handler).
-// The dashboard is fully open — no app login and no Cloudflare Access.
+// SECURITY: origin must be reached with the origin token. Set the origin URL
+// via wrangler secret `SFC_ORIGIN` and the token via `SFC_ORIGIN_TOKEN` — do
+// NOT commit a live URL here. Empty default forces config to be present.
+const TUNNEL_DEFAULT = '';
 
 async function fetchAny(env, path, accept) {
-  // Try tunnel first, then VPS direct IP (from secret env, if configured)
-  const tunnel = (env && env.TUNNEL_URL) || TUNNEL_DEFAULT;
-  const backup = env && env.BACKUP_URL; // intentionally no fallback default — see note above
+  // Origin priority: explicit SFC_ORIGIN secret -> legacy TUNNEL_URL -> (none)
+  const tunnel = (env && (env.SFC_ORIGIN || env.TUNNEL_URL)) || TUNNEL_DEFAULT;
+  const backup = env && env.BACKUP_URL; // optional direct-VPS fallback (secret)
   const ordered = backup ? [tunnel, backup] : [tunnel];
+  const headers = { 'Accept': accept || '*/*', 'Accept-Encoding': 'identity' };
+  // Authenticate to the origin. sse_server.py returns 401 without this token.
+  if (env && env.SFC_ORIGIN_TOKEN) headers['Authorization'] = 'Bearer ' + env.SFC_ORIGIN_TOKEN;
   for (const base of ordered) {
+    if (!base) continue;
     try {
       const resp = await fetch(base + path, {
-        headers: { 'Accept': accept || '*/*', 'Accept-Encoding': 'identity' },
+        headers,
         signal: AbortSignal.timeout(5000),
       });
       if (resp.ok) return resp;

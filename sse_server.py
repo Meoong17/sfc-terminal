@@ -6,13 +6,13 @@ to connected browser clients via Server-Sent Events.
 
 Usage:
   cd /home/ubuntu/sfc && .venv/bin/python sse_server.py
-  # Server runs on http://0.0.0.0:8765
+  # Server runs on http://127.0.0.1:8765 (loopback only)
 """
-import asyncio, json, os, sys, time, signal
+import asyncio, json, os, secrets, sys, time, signal
 from datetime import datetime, timezone
 from pathlib import Path
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from sse_starlette.sse import EventSourceResponse
@@ -21,6 +21,24 @@ import uvicorn
 BASE_DIR = Path(__file__).parent
 BTC_WS_PATH = BASE_DIR / "btc_ws.json"
 DATA_JSON_PATH = BASE_DIR / "data.json"
+
+# ── Origin auth token (defense in depth) ─────────────────────────
+# The Cloudflare Worker is the ONLY legitimate client of this origin.
+# Set SFC_ORIGIN_TOKEN in the systemd unit (or env) to a strong random
+# value; the Worker sends it as `Authorization: Bearer <token>`. Without
+# a matching token every protected route returns 401. If the env var is
+# empty the server stays OPEN (backward-compat) — but production MUST set it.
+_ORIGIN_TOKEN = os.environ.get("SFC_ORIGIN_TOKEN", "").strip()
+
+
+def _auth(request: Request):
+    """Require Bearer token unless SFC_ORIGIN_TOKEN is unset (open mode)."""
+    if not _ORIGIN_TOKEN:
+        return  # no token configured -> open (dev/backward-compat)
+    supplied = request.headers.get("Authorization", "")
+    if not secrets.compare_digest(supplied, "Bearer " + _ORIGIN_TOKEN):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
 
 app = FastAPI(title="SFC Terminal SSE")
 
@@ -136,7 +154,7 @@ async def event_generator(request: Request):
 
 # ── Routes ──
 
-@app.get("/events")
+@app.get("/events", dependencies=[Depends(_auth)])
 async def sse_events(request: Request):
     """SSE endpoint — client connects here with EventSource."""
     return EventSourceResponse(event_generator(request))
@@ -155,7 +173,7 @@ async def health():
         "ts": datetime.now(timezone.utc).isoformat(),
     }
 
-@app.get("/snapshot")
+@app.get("/snapshot", dependencies=[Depends(_auth)])
 async def snapshot():
     """Return latest cached data (for initial page load or sync)."""
     btc = None
@@ -186,12 +204,12 @@ _PUBLIC_FILES = {
 }
 
 
-@app.get("/")
+@app.get("/", dependencies=[Depends(_auth)])
 async def index():
     return FileResponse(BASE_DIR / "index.html")
 
 
-@app.get("/{path:path}")
+@app.get("/{path:path}", dependencies=[Depends(_auth)])
 async def static_file(path: str):
     # Whitelist + normalization guard: only exact public filenames are served.
     # resolve() + is_file() blocks path traversal even if the list grows.
@@ -208,6 +226,9 @@ async def static_file(path: str):
 
 if __name__ == "__main__":
     PORT = int(os.environ.get("SSE_PORT", 8765))
-    HOST = os.environ.get("SSE_HOST", "0.0.0.0")
+    # Bind to loopback only. The Cloudflare named tunnel (cloudflared, running
+    # on this same host) reaches us via localhost; binding 127.0.0.1 keeps the
+    # origin unreachable directly from the internet (no public IP:port).
+    HOST = os.environ.get("SSE_HOST", "127.0.0.1")
     print(f"[SSE] Starting SFC SSE server on {HOST}:{PORT}", file=sys.stderr)
     uvicorn.run(app, host=HOST, port=PORT, log_level="info")
