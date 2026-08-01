@@ -14,8 +14,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from sse_starlette.sse import EventSourceResponse
 import uvicorn
 
@@ -172,10 +171,39 @@ async def snapshot():
     return {"btc": btc, "sfc": sfc, "ts": datetime.now(timezone.utc).isoformat()}
 
 
-# ── Serve static frontend files ──
+# ── Serve static frontend files (WHITELIST only) ──
+#
+# SECURITY FIX: previously this mounted the ENTIRE repo at "/", which exposed
+# .env, .git/, all *.py, logs, and trained models over the public tunnel.
+# Now only explicitly-whitelisted public assets/data are served; everything
+# else returns 404. Keep this list minimal.
+_PUBLIC_FILES = {
+    "index.html",   # SFC dashboard
+    "app.js",       # dashboard JS
+    "sw.js",        # service worker
+    "data.json",    # pipeline output (public dashboard data)
+    "btc_ws.json",  # live BTC ws data (public dashboard data)
+}
 
-# Mount static files AFTER API routes so FastAPI matches API first
-app.mount("/", StaticFiles(directory=str(BASE_DIR), html=True), name="static")
+
+@app.get("/")
+async def index():
+    return FileResponse(BASE_DIR / "index.html")
+
+
+@app.get("/{path:path}")
+async def static_file(path: str):
+    # Whitelist + normalization guard: only exact public filenames are served.
+    # resolve() + is_file() blocks path traversal even if the list grows.
+    if path in _PUBLIC_FILES:
+        fpath = (BASE_DIR / path).resolve()
+        try:
+            fpath.relative_to(BASE_DIR.resolve())
+        except ValueError:
+            return JSONResponse({"detail": "Not Found"}, status_code=404)
+        if fpath.is_file():
+            return FileResponse(fpath)
+    return JSONResponse({"detail": "Not Found"}, status_code=404)
 
 
 if __name__ == "__main__":
