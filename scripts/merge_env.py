@@ -25,10 +25,16 @@ ENV_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__
 # Key baru yang perlu ditambahkan jika belum ada / masih kosong di .env lama.
 # Hanya dipakai sebagai fallback -- kalau key ini SUDAH punya nilai di .env
 # lama, nilai lama itu yang menang, bukan nilai di sini.
+#
+# SECURITY: dulu ada nilai key ASLI di sini yang ke-commit ke repo PUBLIK.
+# Sekarang dikosongkan supaya tidak ada secret hidup di source code. Script
+# ini cuma bikin placeholder `KEY=` kosong yang diisi manual di .env. Nilai
+# yang sudah terisi di .env TIDAK akan tertimpa. (Key yang pernah ter-expose
+# tetap idealnya di-rotate — lihat README/security docs.)
 NEW_KEYS = {
-    "GOLDAPI_KEY": "goldapi-255fd754bc51d89d2e38bcfabd2bc4ce-io",
-    "TWELVEDATA_KEY": "0e26645e981c423d92ce5392a73fafc5",
-    "ALPHAVANTAGE_KEY": "8G4IWREMI11PGYWA",
+    "GOLDAPI_KEY": "",
+    "TWELVEDATA_KEY": "",
+    "ALPHAVANTAGE_KEY": "",
 }
 
 
