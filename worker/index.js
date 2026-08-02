@@ -397,11 +397,17 @@ export default {
     }
 
     // Static assets — proxy to actual path on backend
-    if (path === '/app.js' || path === '/sw.js' || path === '/manifest.json') {
+    if (path === '/app.js' || path === '/sw.js' || path === '/manifest.json'
+        || path === '/sitemap.xml' || path === '/robots.txt') {
       const resp = await fetchAny(env, path, 'application/javascript');
       if (!resp) return new Response('Not Found', { status: 404 });
       const data = await resp.text();
-      const contentType = path.endsWith('.js') ? 'application/javascript' : path.endsWith('.json') ? 'application/json' : 'text/html';
+      let contentType;
+      if (path.endsWith('.js')) contentType = 'application/javascript';
+      else if (path.endsWith('.xml')) contentType = 'application/xml';
+      else if (path.endsWith('.txt')) contentType = 'text/plain';
+      else if (path.endsWith('.json')) contentType = 'application/json';
+      else contentType = 'text/html';
       return new Response(data, {
         status: 200,
         headers: {

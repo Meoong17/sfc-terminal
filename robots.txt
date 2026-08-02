@@ -1,0 +1,28 @@
+# SFC Terminal — robots.txt
+# Allows standard search-engine crawlers (Googlebot, Bingbot, etc.) while
+# keeping the dashboard itself lightweight. Dynamic data is served via
+# /data.json and SSE; no content is blocked from indexing.
+
+User-agent: *
+Allow: /
+
+User-agent: Googlebot
+Allow: /
+
+User-agent: bingbot
+Allow: /
+
+# Do not let AI/LLM training crawlers consume the dashboard.
+User-agent: GPTBot
+Disallow: /
+
+User-agent: ClaudeBot
+Disallow: /
+
+User-agent: CCBot
+Disallow: /
+
+User-agent: Google-Extended
+Disallow: /
+
+Sitemap: https://sfcterminal.xyz/sitemap.xml
