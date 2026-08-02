@@ -206,6 +206,26 @@ except ImportError as e:
     def compute_behavior_state(*a, **k): return "UNKNOWN", {"status": "unavailable"}
 
 
+# ── P0: Regime Consolidation (single source of truth for regime label) ──
+try:
+    from data_sources.regime_consolidation import consolidate_regime
+    REGIME_CONSOLIDATION_AVAILABLE = True
+except ImportError as e:
+    REGIME_CONSOLIDATION_AVAILABLE = False
+    print(f"[SFC] Regime consolidation unavailable: {e}", file=sys.stderr)
+    def consolidate_regime(*a, **k): return "UNKNOWN", {"status": "unavailable"}
+
+
+# ── P1: Transmission Divergence (liquidity vs BTC structure) ──
+try:
+    from data_sources.transmission_divergence import classify_transmission
+    TRANSMISSION_DIVERGENCE_AVAILABLE = True
+except ImportError as e:
+    TRANSMISSION_DIVERGENCE_AVAILABLE = False
+    print(f"[SFC] Transmission divergence unavailable: {e}", file=sys.stderr)
+    def classify_transmission(*a, **k): return "UNAVAILABLE", {"status": "unavailable"}
+
+
 # Early init: M86 score starts at neutral (updated later by execution block if available)
 _m86_score = 0.5
 
@@ -3839,6 +3859,40 @@ except Exception as _bs_e:
     print(f"[L5 Behavior] Error: {_bs_e}", file=sys.stderr)
     _behavior_state, _behavior_state_details = "UNKNOWN", {"error": str(_bs_e), "status": "fallback"}
 
+# ── P0: Regime Consolidation — single consensus regime label ──
+_regime_consensus_label, _regime_consensus_details = "UNKNOWN", {"status": "unavailable"}
+try:
+    _regime_consensus_label, _regime_consensus_details = consolidate_regime(
+        regime=regime if "regime" in dir() else None,
+        regime_prob=regime_prob if "regime_prob" in dir() else None,
+        hmm_regime=_hmm_result.get('regime') if _hmm_result else None,
+        hmm_crisis_prob=_hmm_result.get('crisis_probability') if _hmm_result else None,
+        adv_regime=adv_regime.get('regime') if adv_regime else None,
+        adv_crisis_prob=adv_regime.get('crisis_probability') if adv_regime else None,
+        behavior_state=_behavior_state,
+    )
+    print(f"[P0 Regime] consensus={_regime_consensus_label} "
+          f"conflict={_regime_consensus_details.get('conflict')} "
+          f"agreement={_regime_consensus_details.get('agreement')}", file=sys.stderr)
+except Exception as _rc_e:
+    print(f"[P0 Regime] Error: {_rc_e}", file=sys.stderr)
+    _regime_consensus_label, _regime_consensus_details = "UNKNOWN", {"error": str(_rc_e), "status": "fallback"}
+
+# ── P1: Transmission Divergence — liquidity vs BTC structure ──
+_transmission_status, _transmission_details = "UNAVAILABLE", {"status": "unavailable"}
+try:
+    _transmission_status, _transmission_details = classify_transmission(
+        liquidity_stress=_glf_sfc_stress if "_glf_sfc_stress" in dir() else None,
+        structural_stress=effective_sfc if "effective_sfc" in dir() else None,
+        btc_change_24h=chg if "chg" in dir() else None,
+    )
+    print(f"[P1 Transmission] status={_transmission_status} "
+          f"tone={_transmission_details.get('tone')} "
+          f"conf={_transmission_details.get('confidence')}", file=sys.stderr)
+except Exception as _tr_e:
+    print(f"[P1 Transmission] Error: {_tr_e}", file=sys.stderr)
+    _transmission_status, _transmission_details = "UNAVAILABLE", {"error": str(_tr_e), "status": "fallback"}
+
 out = {
     "ts": datetime.now(timezone.utc).isoformat(),
     "model_version": MODEL_VERSION,
@@ -4320,6 +4374,22 @@ out = {
     "behavior_state_available": bool(_behavior_state_details.get("available")),
     "behavior_state_bull_evidence": _behavior_state_details.get("bullish_evidence"),
     "behavior_state_bear_evidence": _behavior_state_details.get("bearish_evidence"),
+    # ── P0: Regime Consolidation (single consensus regime label) ──
+    "regime_consensus": _regime_consensus_label,
+    "regime_consensus_available": bool(_regime_consensus_details.get("available")),
+    "regime_consensus_severity": _regime_consensus_details.get("severity"),
+    "regime_consensus_agreement": _regime_consensus_details.get("agreement"),
+    "regime_consensus_conflict": bool(_regime_consensus_details.get("conflict")),
+    "regime_consensus_conflict_sources": _regime_consensus_details.get("conflict_sources"),
+    "regime_consensus_sources": _regime_consensus_details.get("sources"),
+    # ── P1: Transmission Divergence (liquidity vs BTC structure) ──
+    "transmission_status": _transmission_status,
+    "transmission_available": bool(_transmission_details.get("available")),
+    "transmission_message": _transmission_details.get("message"),
+    "transmission_tone": _transmission_details.get("tone"),
+    "transmission_confidence": _transmission_details.get("confidence"),
+    "transmission_liquidity_state": _transmission_details.get("liquidity_state"),
+    "transmission_btc_state": _transmission_details.get("btc_state"),
 }
 
 # ── Circuit Breaker: validate output before writing ──
