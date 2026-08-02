@@ -236,6 +236,16 @@ except ImportError as e:
     def compute_trend_strength(*a, **k): return 50.0, {"status": "unavailable", "available": False, "label": "UNKNOWN"}
 
 
+# ── P3: Trend Continuation Probability (institutional output) ──
+try:
+    from data_sources.trend_continuation import compute_trend_continuation
+    TREND_CONTINUATION_AVAILABLE = True
+except ImportError as e:
+    TREND_CONTINUATION_AVAILABLE = False
+    print(f"[SFC] Trend continuation unavailable: {e}", file=sys.stderr)
+    def compute_trend_continuation(*a, **k): return {}, {"status": "unavailable", "available": False}
+
+
 # Early init: M86 score starts at neutral (updated later by execution block if available)
 _m86_score = 0.5
 
@@ -3923,6 +3933,21 @@ except Exception as _ts_e:
     print(f"[P2 Trend] Error: {_ts_e}", file=sys.stderr)
     _trend_score, _trend_details = 50.0, {"error": str(_ts_e), "status": "fallback", "available": False, "label": "UNKNOWN"}
 
+# ── P3: Trend Continuation Probability — from walk-forward cache ──
+_trend_cont_probs, _trend_cont_details = {}, {"status": "unavailable", "available": False}
+try:
+    _trend_cont_probs, _trend_cont_details = compute_trend_continuation(
+        sfc_effective=effective_sfc if "effective_sfc" in dir() else None,
+        sfc_zone=zone if "zone" in dir() else None,
+    )
+    print(f"[P3 Continuation] bucket={_trend_cont_details.get('bucket')} "
+          f"30d={(_trend_cont_probs.get(30,{}) or {}).get('probability')} "
+          f"90d={(_trend_cont_probs.get(90,{}) or {}).get('probability')} "
+          f"180d={(_trend_cont_probs.get(180,{}) or {}).get('probability')}", file=sys.stderr)
+except Exception as _tc_e:
+    print(f"[P3 Continuation] Error: {_tc_e}", file=sys.stderr)
+    _trend_cont_probs, _trend_cont_details = {}, {"error": str(_tc_e), "status": "fallback", "available": False}
+
 out = {
     "ts": datetime.now(timezone.utc).isoformat(),
     "model_version": MODEL_VERSION,
@@ -4425,6 +4450,14 @@ out = {
     "trend_strength_available": bool(_trend_details.get("available")),
     "trend_strength_label": _trend_details.get("label"),
     "trend_strength_domains": _trend_details.get("domain_values"),
+    # ── P3: Trend Continuation Probability (walk-forward calibrated) ──
+    "cont_available": bool(_trend_cont_details.get("available")),
+    "cont_bucket": _trend_cont_details.get("bucket"),
+    "cont_prob_30d": (_trend_cont_probs.get(30, {}) or {}).get("probability"),
+    "cont_prob_90d": (_trend_cont_probs.get(90, {}) or {}).get("probability"),
+    "cont_prob_180d": (_trend_cont_probs.get(180, {}) or {}).get("probability"),
+    "cont_rel_90d": (_trend_cont_probs.get(90, {}) or {}).get("relative"),
+    "cont_caveat": _trend_cont_details.get("caveat"),
 }
 
 # ── Circuit Breaker: validate output before writing ──
