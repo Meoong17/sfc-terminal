@@ -76,17 +76,34 @@ log "Injecting data into index.html..."
 $PYTHON inject_data.py data.json index.html 2>>sfc-pipeline.log || \
   log "⚠ Inject failed (non-fatal)"
 
-# ── Commit & push (data files ONLY) ──
-log "Committing..."
+# ── Commit & push (data files ONLY, throttled) ──
+# Auto data commits are THROTTLED to cut .git growth (~78MB/mo at 7-min cadence) and
+# network churn. Live dashboard freshness comes via SSE, so the static data snapshot
+# only needs refreshing every THROTTLE_MIN. Non-data changes (code/dashboard) and any
+# unpushed local commits always push immediately.
+log "Committing (throttled)..."
 git add data.json paper_trades.json paper_history.json
 git add -u 2>/dev/null || true
 git reset HEAD index.html 2>/dev/null || true
 
-if git diff --staged --quiet; then
+THROTTLE_MIN=60
+NOW=$(date +%s)
+LAST_PUSH=$(cat /tmp/sfc_last_data_push 2>/dev/null || echo 0)
+AHEAD=$(git status -sb | grep -c "ahead" || true)
+# staged non-data files?
+NON_DATA=$(git diff --cached --name-only 2>/dev/null | grep -v -E '^(data\.json|paper_trades\.json|paper_history\.json)$' | wc -l)
+
+if [ "$AHEAD" -eq 0 ] && [ "$NON_DATA" -eq 0 ] && [ $((NOW - LAST_PUSH)) -lt $((THROTTLE_MIN * 60)) ]; then
+    log "Throttled data commit ($(((NOW - LAST_PUSH) / 60))m < ${THROTTLE_MIN}m, data-only) — skipping commit/push"
+    git reset HEAD . 2>/dev/null || true
+    GIT_RESULT="throttled"
+elif git diff --staged --quiet && [ "$AHEAD" -eq 0 ]; then
     log "No changes — skipping push"
     GIT_RESULT="no-change"
 else
-    git commit -m "auto: SFC data $(date -u '+%Y-%m-%d %H:%M:%S')"
+    if ! git diff --staged --quiet; then
+        git commit -m "auto: SFC data $(date -u '+%Y-%m-%d %H:%M:%S')"
+    fi
     log "Syncing with remote..."
     if git pull --rebase --autostash -X theirs origin main 2>&1; then
         log "Pushing..."
@@ -107,6 +124,9 @@ else
             log "❌ Pull+push both failed!"
             GIT_RESULT="sync-failed"
         fi
+    fi
+    if [ "$GIT_RESULT" = "ok" ]; then
+        date +%s > /tmp/sfc_last_data_push
     fi
 fi
 
