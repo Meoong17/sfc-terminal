@@ -3027,9 +3027,9 @@ if _online_module and effective_sfc is not None:
 # Regime-aware zone thresholds (M2 analysis: 39.8% calm-in-crisis)
 # CRISIS lowers thresholds (0.6x) so lower SFC already flags ELEVATED/HIGH/CRITICAL;
 # BULL raises thresholds (1.2x) so calm markets need higher SFC to flag stress.
-_SFC_THRESHOLD_MULT = {"CRISIS": 0.6, "BEAR": 0.72, "BULL": 1.2, "SIDEWAYS": 1.0, "NORMAL": 1.0, "STRESS": 0.8}
+_SFC_MULT = {"CRISIS": 0.6, "BEAR": 0.72, "BULL": 1.2, "SIDEWAYS": 1.0, "NORMAL": 1.0, "STRESS": 0.8}
 if effective_sfc is not None:
-    _SFC_MULT2 = _SFC_THRESHOLD_MULT.get(str(regime).upper(), 1.0)
+    _SFC_MULT2 = _SFC_MULT.get(str(regime).upper(), 1.0)
     zone = "CRITICAL" if effective_sfc/100 > 0.75 * _SFC_MULT2 else "HIGH" if effective_sfc/100 > 0.50 * _SFC_MULT2 else "ELEVATED" if effective_sfc/100 > 0.25 * _SFC_MULT2 else "NORMAL"
 state, signal = determine_state(dvol, effective_sfc, btc, ft)
 
@@ -4195,7 +4195,8 @@ out = {
     "kelly_quarter": round(max(0, (composite_confidence * 2.0 - (1 - composite_confidence)) / 8.0) * _kelly_override, 4),
     "kelly_override_reason": _kelly_override_reason,
     # — Signal Timing (alert window estimation, monthly timeframe) —
-    "signal_type": "STRESS_TRANSITION" if transition_risk > 0.60 else "STRESS" if effective_sfc and effective_sfc > 25 * (_SFC_MULT if '_SFC_MULT' in dir() else 1.0) else "CALM",
+    "signal_threshold_mult": _SFC_MULT2 if '_SFC_MULT2' in dir() else _SFC_MULT.get(str(regime).upper(), 1.0),
+    "signal_type": "STRESS_TRANSITION" if transition_risk > 0.60 else "STRESS" if effective_sfc and effective_sfc > 25 * (_SFC_MULT.get(str(regime).upper(), 1.0)) else "CALM",
     "signal_strength": round(min(effective_sfc / 50.0 if effective_sfc else 0, 1.0), 3),
     "calibrated_confidence": _CALIBRATED_CONF,
     "reliability": _RELIABILITY,
