@@ -3768,6 +3768,77 @@ try:
 except Exception as _pht_e:
     print(f"[ProbHeadTracker] Wiring error (non-fatal): {_pht_e}", file=sys.stderr)
 
+# ════════════════════════════════════════════════════════════
+# IMBS L6 / L8 / L5 — DISPLAY-ONLY overlay computation
+# All three add fields to data.json but are deliberately NOT blended into
+# sfc_effective / signal / composite_confidence (see module docstrings).
+# ════════════════════════════════════════════════════════════
+
+# ── L6: Expectations Engine (FRED proxy, cached 6h) ──
+_expect_score, _expect_details = 50.0, {"status": "unavailable"}
+try:
+    _expect_score, _expect_details = compute_expectations()
+    print(f"[L6 Expect] score={_expect_score:.1f} gap={_expect_details.get('expectation_gap')} "
+          f"label={_expect_details.get('label','?')} status={_expect_details.get('status','?')}", file=sys.stderr)
+except Exception as _exp_e:
+    print(f"[L6 Expect] Error: {_exp_e}", file=sys.stderr)
+    _expect_score, _expect_details = 50.0, {"error": str(_exp_e), "status": "fallback"}
+
+# ── L8: Tail Risk Engine — feed live Layer-2/3/4 signals ──
+# Inputs resolved explicitly (blocker #1 in IMBS-design.md):
+#   liquidity_stress   : GLF liquidity stress (Layer 3, 0-1)
+#   behavior_stress    : blend of MPI positioning stress + systemic risk (Layer 4)
+#   expectation_shock  : L6 gap_score (Layer 6, 0-100)
+#   leverage           : MPI-derived leverage proxy (funding/OI-heavy stress) + cascade
+#   correlation        : m69 correlation-breakdown flag (0 or 100)
+_tr_leverage_proxy = None
+if _mpi_stress is not None and cascade_risk is not None:
+    # MPI stress is already positioning/derivative heavy (funding, OI, liq);
+    # blend with cascade for the leverage/stress dimension.
+    _tr_leverage_proxy = min(1.0, 0.7 * _mpi_stress + 0.3 * cascade_risk)
+elif _mpi_stress is not None:
+    _tr_leverage_proxy = _mpi_stress
+elif cascade_risk is not None:
+    _tr_leverage_proxy = cascade_risk
+
+_tail_score, _tail_details = 50.0, {"status": "unavailable"}
+try:
+    _tail_score, _tail_details = compute_tail_risk(
+        liquidity_stress=_glf_sfc_stress,                 # Layer 3 liquidity (0-1)
+        behavior_stress=(
+            0.6 * _mpi_stress + 0.4 * _m69_overall          # Layer 4 positioning + systemic
+            if _mpi_stress is not None and _m69_overall is not None else
+            _mpi_stress if _mpi_stress is not None else
+            _m69_overall if _m69_overall is not None else None
+        ),
+        expectation_shock=_expect_score,                    # L6 gap score (0-100)
+        leverage=_tr_leverage_proxy,                        # derivative leverage stress
+        correlation=(100.0 if _m69_breakdown else None),  # flag: breakdown -> 100, no breakdown -> neutral (None)
+    )
+    print(f"[L8 TailRisk] score={_tail_score:.1f} sev={_tail_details.get('severity','?')} "
+          f"active_dims={_tail_details.get('active_dimensions')}", file=sys.stderr)
+except Exception as _tr_e:
+    print(f"[L8 TailRisk] Error: {_tr_e}", file=sys.stderr)
+    _tail_score, _tail_details = 50.0, {"error": str(_tr_e), "status": "fallback"}
+
+# ── L5: Behavior-State overlay — re-combine existing participant signals ──
+_behavior_state, _behavior_state_details = "UNKNOWN", {"status": "unavailable"}
+try:
+    _behavior_state, _behavior_state_details = compute_behavior_state(
+        mpi_score=_mpi_score,
+        fng=fng,
+        cascade_risk=cascade_risk,
+        behavioral_divergence=(_divergence_details.get("regime") if _divergence_details else None),
+        etf_flow=_etf_m81_score,
+        whale_pressure=whale_pressure,
+        hmm_regime=_hmm_regime,
+    )
+    print(f"[L5 Behavior] state={_behavior_state} bull={_behavior_state_details.get('bullish_evidence')} "
+          f"bear={_behavior_state_details.get('bearish_evidence')}", file=sys.stderr)
+except Exception as _bs_e:
+    print(f"[L5 Behavior] Error: {_bs_e}", file=sys.stderr)
+    _behavior_state, _behavior_state_details = "UNKNOWN", {"error": str(_bs_e), "status": "fallback"}
+
 out = {
     "ts": datetime.now(timezone.utc).isoformat(),
     "model_version": MODEL_VERSION,
@@ -4211,6 +4282,32 @@ out = {
     "cb_tripped": _CIRCUIT_BREAKER.get_stats().get("tripped", False) if CB_AVAILABLE and _CIRCUIT_BREAKER else False,
     "cb_failures": _CIRCUIT_BREAKER.get_stats().get("consecutive_failures", 0) if CB_AVAILABLE and _CIRCUIT_BREAKER else 0,
     "cb_total_failures": _CIRCUIT_BREAKER.get_stats().get("total_failures", 0) if CB_AVAILABLE and _CIRCUIT_BREAKER else 0,
+    # ── IMBS L6: Expectations Engine (display-only FRED proxy) ──
+    "expectation_gap": _expect_details.get("expectation_gap"),
+    "expectation_score": round(_expect_score, 1) if _expect_score is not None else None,
+    "expectation_label": _expect_details.get("label"),
+    "expectation_available": bool(_expect_details.get("available")),
+    "expectation_details": {
+        "cpi_yoy_pct": _expect_details.get("cpi_yoy_pct"),
+        "breakeven_inflation": _expect_details.get("breakeven_inflation"),
+        "real_yield_10y": _expect_details.get("real_yield_10y"),
+        "curve_10y2y": _expect_details.get("curve_10y2y"),
+        "unemployment": _expect_details.get("unemployment"),
+        "status": _expect_details.get("status"),
+        "unavailable": _expect_details.get("unavailable", []),
+    },
+    # ── IMBS L8: Tail Risk Engine (display-only composite) ──
+    "tail_risk_score": _tail_details.get("score"),
+    "tail_risk_severity": _tail_details.get("severity"),
+    "tail_risk_available": bool(_tail_details.get("available")),
+    "tail_risk_dimensions": _tail_details.get("dimensions"),
+    "tail_risk_active_dims": _tail_details.get("active_dimensions"),
+    "tail_risk_missing_dims": _tail_details.get("missing_dimensions"),
+    # ── IMBS L5: Behavior-State overlay (display-only) ──
+    "behavior_state": _behavior_state,
+    "behavior_state_available": bool(_behavior_state_details.get("available")),
+    "behavior_state_bull_evidence": _behavior_state_details.get("bullish_evidence"),
+    "behavior_state_bear_evidence": _behavior_state_details.get("bearish_evidence"),
 }
 
 # ── Circuit Breaker: validate output before writing ──
