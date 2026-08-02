@@ -222,6 +222,15 @@ async def static_file(path: str):
         except ValueError:
             return JSONResponse({"detail": "Not Found"}, status_code=404)
         if fpath.is_file():
+            # SEO files (sitemap/robots) must never be cached at the edge —
+            # a stale cached 404 (e.g. before a file existed) sticks for the
+            # whole cache TTL and makes Google Search Console report
+            # "Couldn't fetch". Force revalidation every time.
+            if path in ("sitemap.xml", "robots.txt"):
+                return FileResponse(fpath, headers={
+                    "Cache-Control": "no-cache, no-store, must-revalidate",
+                    "Pragma": "no-cache",
+                })
             return FileResponse(fpath)
     return JSONResponse({"detail": "Not Found"}, status_code=404)
 
