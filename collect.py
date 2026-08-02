@@ -176,6 +176,36 @@ except ImportError as e:
     print(f"[SFC] Global Sovereign Liquidity module unavailable: {e}", file=sys.stderr)
     def compute_global_sovereign_liquidity(*a, **k): return 50.0, {"status": "unavailable"}
 
+# ── NEW (IMBS L6/L8/L5): Expectations, Tail Risk, Behavior-State ──
+# All three are DISPLAY-ONLY overlays — they add fields to data.json but are
+# deliberately NOT blended into sfc_effective / signal / composite_confidence
+# until walk-forward re-validation shows a stable edge (cautious-rollout
+# pattern of M86/M90/reflexivity). See each module's docstring.
+try:
+    from data_sources.expectations_engine import compute_expectations
+    EXPECTATIONS_AVAILABLE = True
+except ImportError as e:
+    EXPECTATIONS_AVAILABLE = False
+    print(f"[SFC] Expectations engine unavailable: {e}", file=sys.stderr)
+    def compute_expectations(*a, **k): return 50.0, {"status": "unavailable"}
+
+try:
+    from data_sources.tail_risk_engine import compute_tail_risk
+    TAIL_RISK_AVAILABLE = True
+except ImportError as e:
+    TAIL_RISK_AVAILABLE = False
+    print(f"[SFC] Tail Risk engine unavailable: {e}", file=sys.stderr)
+    def compute_tail_risk(*a, **k): return 50.0, {"status": "unavailable"}
+
+try:
+    from data_sources.behavior_state import compute_behavior_state
+    BEHAVIOR_STATE_AVAILABLE = True
+except ImportError as e:
+    BEHAVIOR_STATE_AVAILABLE = False
+    print(f"[SFC] Behavior-State overlay unavailable: {e}", file=sys.stderr)
+    def compute_behavior_state(*a, **k): return "UNKNOWN", {"status": "unavailable"}
+
+
 # Early init: M86 score starts at neutral (updated later by execution block if available)
 _m86_score = 0.5
 
