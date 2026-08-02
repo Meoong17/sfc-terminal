@@ -1883,18 +1883,17 @@ function updatePriceChart() {
           label: 'BTC Price',
           data: btcP,
           borderColor: '#00d4ff',
-          backgroundColor: btcGrad,
           borderWidth: 2,
           pointBackgroundColor: '#00d4ff',
           pointBorderColor: '#0d1220',
           pointBorderWidth: 1.5,
           pointRadius: 2.5,
           pointHoverRadius: 5,
-          fill: true,
+          fill: false,
           tension: 0.35
         },
         {
-          label: 'Realized Price',
+          label: 'Realized Price (on-chain floor)',
           data: flrP,
           borderColor: '#00ff9d',
           backgroundColor: floorGrad,
@@ -1907,6 +1906,17 @@ function updatePriceChart() {
           pointHoverRadius: 4,
           fill: true,
           tension: 0.35
+        },
+        {
+          // Legend-only swatch for the shaded deep-value zone (below Realized Price).
+          // Empty data — renders nothing on the chart; exists purely to label the zone.
+          label: 'Deep-Value Zone (MVRV<1)',
+          data: [],
+          borderColor: 'rgba(0,255,157,0.35)',
+          borderWidth: 2,
+          pointRadius: 0,
+          borderDash: [],
+          fill: false
         }
       ]
     },
@@ -2517,7 +2527,7 @@ function render(d) {
             </svg>
           </div>
           BTC vs On-Chain Floor (Realized Price)
-            <span class="title-tip" tabindex="0" data-tip="Live BTC price against the on-chain realized price (aggregate cost basis of all coins) — a true support that moves with holder cost, NOT 1:1 with spot. Price below realized = historically a deep-value accumulation zone; far above = extended."><span class="info-tip-icon">i</span></span>
+            <span class="title-tip" tabindex="0" data-tip="Live BTC price against the on-chain realized price (aggregate cost basis of all coins) — a true support that moves with holder cost, NOT 1:1 with spot. The shaded green area below the realized-price line is the Deep-Value Zone (MVRV<1): price here trades under average holder cost, historically a strong accumulation zone. Far above = extended."><span class="info-tip-icon">i</span></span>
         </div>
         <div class="card-badge" style="cursor:pointer" onclick="toggleChartVisibility()">${chartVisible?'↑ Hide':'↓ Show'}</div>
       </div>
@@ -3606,7 +3616,7 @@ function render(d) {
           <!-- 5. BTC PRICE & DYNAMIC FLOOR -->
           <div class="help-card">
             <div class="help-card-title" style="color:var(--blue)">BTC Price vs Realized Price (On-Chain Floor)</div>
-            <div class="help-body"><strong>Realized Price</strong> = on-chain aggregate cost basis: the average price at which every coin currently held last moved. It is a genuine <em>dynamic floor</em> because it shifts with holder behaviour (on-chain cost basis), <strong>not</strong> 1:1 with spot price.<ul><li>BTC below realized price = market trades under average holder cost — historically a strong accumulation / deep-value zone</li><li>BTC far above realized price = extended, limited support below</li><li>Realized price is estimated on-chain (primary: m26 Kahneman; fallback: price &divide; MVRV)</li></ul>The <strong>Price Chart</strong> plots BTC vs Realized Price over recent history. ATH and current realized-price values are shown in the KPI row. Toggle chart visibility with the Show/Hide button in the status band.</div>
+            <div class="help-body"><strong>Realized Price</strong> = on-chain aggregate cost basis: the average price at which every coin currently held last moved. It is a genuine <em>dynamic floor</em> because it shifts with holder behaviour (on-chain cost basis), <strong>not</strong> 1:1 with spot price.<ul><li>BTC below realized price = market trades under average holder cost — historically a strong accumulation / deep-value zone</li><li>BTC far above realized price = extended, limited support below</li><li>Realized price = price &divide; MVRV (true on-chain aggregate cost basis); falls back to a 30-day price SMA proxy when on-chain MVRV is unavailable</li></ul>The <strong>Price Chart</strong> plots BTC vs Realized Price over recent history. The shaded green area below the realized-price line is the <strong>Deep-Value Zone (MVRV&lt;1)</strong> — the only threshold empirically supported so far (walk-forward: directional but era-unstable, so it is NOT blended into the SFC score; shown as transparency only). ATH and current realized-price values are shown in the KPI row. Toggle chart visibility with the Show/Hide button in the status band.</div>
           </div>
 
           <!-- 6. MOMENTUM & ON-CHAIN -->
@@ -4200,13 +4210,15 @@ function cardSum(tone, html) {
 function _n(v, dp) { return (v === null || v === undefined || isNaN(v)) ? '—' : Number(v).toFixed(dp === undefined ? 1 : dp); }
 
 // Realized-price floor = on-chain aggregate cost basis (true dynamic support
-// that moves with holder cost, NOT 1:1 with spot price). Primary source:
-// m26_detail.realized_price; fallback derived from MVRV = price / realized_value.
+// that moves with holder cost, NOT 1:1 with spot price). PRIMARY: true on-chain
+// realized price = price / MVRV (MVRV from on-chain Q10 source). FALLBACK:
+// m26_detail.realized_price, which is a 30-day price SMA proxy (NOT true on-chain
+// cost basis) — used only when MVRV is unavailable.
 function floorRealized(d) {
-  var rp = d && d.m26_detail && d.m26_detail.realized_price;
-  if (rp) return rp;
   var m = d && d.q10_details && d.q10_details.mvrv_ratio && d.q10_details.mvrv_ratio.value;
   if (m && d.btc) return d.btc / m;
+  var rp = d && d.m26_detail && d.m26_detail.realized_price;
+  if (rp) return rp;
   return null;
 }
 
