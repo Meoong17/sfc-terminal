@@ -2248,6 +2248,16 @@ function render(d) {
   const liqLabel = d.liq_pressure === 'LONG_SQUEEZE' ? 'Long Squeeze' : d.liq_pressure === 'SHORT_SQUEEZE' ? 'Short Squeeze' : 'Balanced';
   const liqColor = d.liq_pressure === 'LONG_SQUEEZE' ? 'var(--red)' : d.liq_pressure === 'SHORT_SQUEEZE' ? 'var(--green)' : 'var(--amber)';
 
+  // Unified 24h liquidation volumes for BOTH the card and the On-Chain panel.
+  // Prefer the real OKX values (liq_long_vol/liq_short_vol) which the card
+  // already uses; fall back to q10_details only when OKX is absent. This
+  // removes the $687M-vs-$0 contradiction between the two panels.
+  const liqLong = (d.liq_long_vol != null && d.liq_long_vol > 0) ? d.liq_long_vol
+    : (d.q10_details?.long_liquidations_usd?.value || 0);
+  const liqShort = (d.liq_short_vol != null && d.liq_short_vol > 0) ? d.liq_short_vol
+    : (d.q10_details?.short_liquidations_usd?.value || 0);
+  const liqLongAvail = liqLong > 0, liqShortAvail = liqShort > 0;
+
   // Gauges
   const rsiCirc = 2 * Math.PI * 38;
   const rsiOff  = rsiCirc * (1 - rsi / 100);
@@ -2632,9 +2642,9 @@ function render(d) {
           <div class="info-row"><span class="info-k">Density</span><span class="info-v">${fmtNum((d.liq_density||0)*100,1)}%</span></div>
           <div class="prog-track"><div class="prog-fill pf-red" style="width:${(d.liq_density||0)*100}%"></div></div>
           <div class="info-row"><span class="info-k info-tip" tabindex="0" data-tip="Estimated probability of a leveraged liquidation cascade &mdash; a chain reaction where forced selling triggers more forced selling. Above 50% signals elevated systemic risk.">Cascade Risk<span class="info-tip-icon">i</span></span><span class="info-v" style="color:${(d.cascade_risk||0)>0.5?'var(--red)':(d.cascade_risk||0)>0.25?'var(--amber)':'var(--green)'}">${fmtNum((d.cascade_risk||0)*100,0)}%</span></div>
-          ${d.liq_total_24h ? `
-          <div class="info-row"><span class="info-k">24h Vol (OKX)</span><span class="info-v" style="font-size:11px">$${fmtNum(d.liq_total_24h)}</span></div>
-          <div class="info-row"><span class="info-k" style="font-size:9px">Long / Short</span><span class="info-v" style="font-size:10px"><span style="color:var(--green)">$${(d.liq_long_vol/1e6).toFixed(0)}M</span><span style="color:var(--text-3)"> / </span><span style="color:var(--red)">$${(d.liq_short_vol/1e6).toFixed(0)}M</span></span></div>
+          ${(d.liq_total_24h || liqLong || liqShort) ? `
+          <div class="info-row"><span class="info-k">24h Vol (OKX)</span><span class="info-v" style="font-size:11px">$${fmtNum(d.liq_total_24h || (liqLong + liqShort))}</span></div>
+          <div class="info-row"><span class="info-k" style="font-size:9px">Long / Short</span><span class="info-v" style="font-size:10px"><span style="color:var(--green)">${liqLongAvail?'$'+(liqLong/1e6).toFixed(0)+'M':'—'}</span><span style="color:var(--text-3)"> / </span><span style="color:var(--red)">${liqShortAvail?'$'+(liqShort/1e6).toFixed(0)+'M':'—'}</span></span></div>
           ` : ''}
           <div class="info-row"><span class="info-k">P/C OI</span><span class="info-v">${fmtNum(d.pc_oi,2)}</span></div>
           <div class="info-row"><span class="info-k">P/C Vol</span><span class="info-v">${fmtNum(d.pc_vol,2)}</span></div>
@@ -2774,9 +2784,9 @@ function render(d) {
           <div class="info-row"><span class="info-k">Density</span><span class="info-v">${fmtNum((d.liq_density||0)*100,1)}%</span></div>
           <div class="prog-track"><div class="prog-fill pf-red" style="width:${(d.liq_density||0)*100}%"></div></div>
           <div class="info-row"><span class="info-k info-tip" tabindex="0" data-tip="Estimated probability of a leveraged liquidation cascade &mdash; a chain reaction where forced selling triggers more forced selling. Above 50% signals elevated systemic risk.">Cascade Risk<span class="info-tip-icon">i</span></span><span class="info-v" style="color:${(d.cascade_risk||0)>0.5?'var(--red)':(d.cascade_risk||0)>0.25?'var(--amber)':'var(--green)'}">${fmtNum((d.cascade_risk||0)*100,0)}%</span></div>
-          ${d.liq_total_24h ? `
-          <div class="info-row"><span class="info-k">24h Vol (OKX)</span><span class="info-v" style="font-size:11px">$${fmtNum(d.liq_total_24h)}</span></div>
-          <div class="info-row"><span class="info-k" style="font-size:9px">Long / Short</span><span class="info-v" style="font-size:10px"><span style="color:var(--green)">$${(d.liq_long_vol/1e6).toFixed(0)}M</span><span style="color:var(--text-3)"> / </span><span style="color:var(--red)">$${(d.liq_short_vol/1e6).toFixed(0)}M</span></span></div>
+          ${(d.liq_total_24h || liqLong || liqShort) ? `
+          <div class="info-row"><span class="info-k">24h Vol (OKX)</span><span class="info-v" style="font-size:11px">$${fmtNum(d.liq_total_24h || (liqLong + liqShort))}</span></div>
+          <div class="info-row"><span class="info-k" style="font-size:9px">Long / Short</span><span class="info-v" style="font-size:10px"><span style="color:var(--green)">${liqLongAvail?'$'+(liqLong/1e6).toFixed(0)+'M':'—'}</span><span style="color:var(--text-3)"> / </span><span style="color:var(--red)">${liqShortAvail?'$'+(liqShort/1e6).toFixed(0)+'M':'—'}</span></span></div>
           ` : ''}
           <div class="info-row"><span class="info-k">P/C OI</span><span class="info-v">${fmtNum(d.pc_oi,2)}</span></div>
           <div class="info-row"><span class="info-k">P/C Vol</span><span class="info-v">${fmtNum(d.pc_vol,2)}</span></div>
@@ -2910,13 +2920,13 @@ function render(d) {
           </div>
           <div class="stat-box">
             <div class="stat-label">Long Liq (24h)</div>
-            <div class="stat-val" style="color:${d.q10_details?.long_liquidations_usd?.status==='ok'&&d.q10_details.long_liquidations_usd.value>5e7?'var(--red)':'var(--amber)'}">${d.q10_details?.long_liquidations_usd?.status==='ok'?'$'+(d.q10_details.long_liquidations_usd.value/1e6).toFixed(1)+'M':'—'}</div>
-            <div class="stat-note">${d.q10_details?.long_liquidations_usd?.status==='ok'&&d.q10_details.long_liquidations_usd.value>5e7?'Cascade risk':'Controlled'}</div>
+            <div class="stat-val" style="color:${liqLongAvail&&liqLong>5e7?'var(--red)':liqLongAvail?'var(--amber)':'var(--text-3)'}">${liqLongAvail?'$'+(liqLong/1e6).toFixed(1)+'M':'—'}</div>
+            <div class="stat-note">${liqLongAvail&&liqLong>5e7?'Cascade risk':'Controlled'}</div>
           </div>
           <div class="stat-box">
             <div class="stat-label">Short Liq (24h)</div>
-            <div class="stat-val" style="color:${d.q10_details?.short_liquidations_usd?.status==='ok'&&d.q10_details.short_liquidations_usd.value>3e7?'var(--green)':'var(--amber)'}">${d.q10_details?.short_liquidations_usd?.status==='ok'?'$'+(d.q10_details.short_liquidations_usd.value/1e6).toFixed(1)+'M':'—'}</div>
-            <div class="stat-note">${d.q10_details?.short_liquidations_usd?.status==='ok'&&d.q10_details.short_liquidations_usd.value>3e7?'Squeeze risk':'Normal'}</div>
+            <div class="stat-val" style="color:${liqShortAvail&&liqShort>3e7?'var(--green)':liqShortAvail?'var(--amber)':'var(--text-3)'}">${liqShortAvail?'$'+(liqShort/1e6).toFixed(1)+'M':'—'}</div>
+            <div class="stat-note">${liqShortAvail&&liqShort>3e7?'Squeeze risk':'Normal'}</div>
           </div>
         </div>
         <div class="stat-3 mb-12">
@@ -4278,9 +4288,11 @@ var SUM = {
   },
   liquidation: function (d) {
     var cr = (d.cascade_risk || 0) * 100, p = (d.liq_pressure || '—').replace(/_/g, ' ').toLowerCase();
-    var t = cr >= 60 ? 'bad' : cr >= 35 ? 'warn' : 'good';
+    // Tone mirrors the card's own color thresholds (>=50 red, >=25 amber,
+    // else green) so the summary banner and the Cascade Risk number agree.
+    var t = cr >= 50 ? 'bad' : cr >= 25 ? 'warn' : 'good';
     return cardSum(t, 'Pressure <b>' + p + '</b>, cascade risk <b>' + _n(cr) + '%</b>. ' +
-      (cr >= 60 ? 'A sharp move could trigger chain liquidations.' : cr >= 35 ? 'Some leverage is vulnerable.' : 'Leverage looks well absorbed.'));
+      (cr >= 50 ? 'A sharp move could trigger chain liquidations.' : cr >= 25 ? 'Some leverage is vulnerable.' : 'Leverage looks well absorbed.'));
   },
   confidence: function (d, conf) {
     var c = conf * 100, ag = (d.method_agreement || 0) * 100;
