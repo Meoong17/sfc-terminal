@@ -4194,6 +4194,17 @@ out = {
     "kelly_half": round(max(0, (composite_confidence * 2.0 - (1 - composite_confidence)) / 4.0) * _kelly_override, 4),
     "kelly_quarter": round(max(0, (composite_confidence * 2.0 - (1 - composite_confidence)) / 8.0) * _kelly_override, 4),
     "kelly_override_reason": _kelly_override_reason,
+    # — Signal decision: single source of truth for BUY/WATCH/CASH.
+    # Mirrors the frontend sigClass logic exactly (kelly + sfc vs regime-adjusted thresholds).
+    # kelly_final<=0 or sfc>=cashThresh => CASH; kelly_final>0 & sfc<buyThresh => BUY; else WATCH.
+    # kelly_final uses the SAME formula as kelly_fraction above (raw edge * override), so a low
+    # confidence that drives raw kelly to 0 correctly yields CASH even without an override.
+    "signal_decision": (
+        "CASH" if ((composite_confidence is not None and max(0, (composite_confidence * 2.0 - (1 - composite_confidence)) / 2.0) * _kelly_override <= 0)
+                   or (effective_sfc is not None and effective_sfc >= 50 * _SFC_MULT2)) else
+        "BUY" if (composite_confidence is not None and effective_sfc is not None
+                  and max(0, (composite_confidence * 2.0 - (1 - composite_confidence)) / 2.0) * _kelly_override > 0
+                  and effective_sfc < 25 * _SFC_MULT2) else "WATCH"),
     # — Signal Timing (alert window estimation, monthly timeframe) —
     "signal_threshold_mult": _SFC_MULT2 if '_SFC_MULT2' in dir() else _SFC_MULT.get(str(regime).upper(), 1.0),
     "signal_type": "STRESS_TRANSITION" if transition_risk > 0.60 else "STRESS" if effective_sfc and effective_sfc > 25 * (_SFC_MULT.get(str(regime).upper(), 1.0)) else "CALM",
