@@ -1132,66 +1132,6 @@ function render(d) {
       </div>
     </div>
 
-    <!-- ═══ IMBS: BEHAVIOR + TAIL RISK + EXPECTATIONS (L5/L8/L6, display-only) ═══ -->
-    <div class="card span-full mb-16 card-collapsed" data-lazy>
-      <div class="card-head">
-        <div class="card-title">
-          <div class="card-icon">
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-              <path d="M2 6a4 4 0 1 1 8 0" stroke="#9d7af8" stroke-width="1.3" stroke-linecap="round" fill="none"/>
-              <path d="M6 2v2M6 8v2M2 6h2M8 6h2" stroke="#00d4ff" stroke-width="1.1" stroke-linecap="round"/>
-            </svg>
-          </div>
-          IMBS Behavior Intelligence
-        </div>
-          <span class="collapse-arrow" onclick="toggleCollapseCard(this)" style="cursor:pointer;font-size:10px;color:var(--text-3);padding:4px 8px;user-select:none">▶</span>
-        <div class="card-badge" style="color:var(--text-3);font-size:9px">L5 Behavior · L8 Tail Risk · L6 Expectations · display-only</div>
-      </div>
-      <div class="card-body">
-        <div class="stat-3 mb-12">
-          <!-- L5 BEHAVIOR STATE -->
-          <div class="stat-box">
-            <div class="stat-label">Behavior State</div>
-            <div class="stat-val" style="font-size:15px;color:${d.behavior_state==='PANIC'?'var(--red)':d.behavior_state==='EUPHORIA'||d.behavior_state==='DISTRIBUTION'?'var(--amber)':d.behavior_state==='ACCUMULATION'?'var(--green)':'var(--cyan)'}">${d.behavior_state||'—'}</div>
-            <div class="stat-note" style="font-size:8px;line-height:1.5">
-              ${d.behavior_state==='ACCUMULATION'?'Smart money buying into weakness':
-                d.behavior_state==='EXPANSION'?'Healthy uptrend, improving sentiment':
-                d.behavior_state==='EUPHORIA'?'Extreme greed, crowded longs':
-                d.behavior_state==='DISTRIBUTION'?'Institutions selling into strength':
-                d.behavior_state==='PANIC'?'Extreme fear / forced selling':'No signal'}
-            </div>
-            <div style="font-size:7px;color:var(--text-3);margin-top:4px;line-height:1.5">
-              ${d.behavior_state_available ? `Bull: ${(d.behavior_state_bull_evidence||[]).join(', ')||'—'} · Bear: ${(d.behavior_state_bear_evidence||[]).join(', ')||'—'}` : 'Signals unavailable'}
-            </div>
-          </div>
-          <!-- L8 TAIL RISK -->
-          <div class="stat-box">
-            <div class="stat-label">Tail Risk</div>
-            <div class="stat-val" style="color:${(d.tail_risk_score||0)>=60?'var(--red)':(d.tail_risk_score||0)>=40?'var(--amber)':'var(--green)'}">${d.tail_risk_available?((d.tail_risk_score||0)).toFixed(0):'—'}<span style="font-size:0.5em;color:var(--text-3)">${d.tail_risk_available?'/100':''}</span></div>
-            <div class="stat-note" style="font-size:8px;color:${(d.tail_risk_score||0)>=60?'var(--red)':(d.tail_risk_score||0)>=40?'var(--amber)':'var(--green)'}">${d.tail_risk_severity||'—'}</div>
-            <div class="prog-track mt-4"><div class="prog-fill ${(d.tail_risk_score||0)>=60?'pf-red':(d.tail_risk_score||0)>=40?'pf-amber':'pf-green'}" style="width:${d.tail_risk_available?(d.tail_risk_score||0):0}%"></div></div>
-            <div style="font-size:7px;color:var(--text-3);margin-top:4px;line-height:1.5">
-              ${d.tail_risk_available
-                ? Object.entries(d.tail_risk_dimensions||{}).map(([k,v])=>`${k.replace(/_/g,' ')}: ${v.toFixed(0)}`).join(' · ')
-                : 'No dimensions available'}
-            </div>
-          </div>
-          <!-- L6 EXPECTATION GAP -->
-          <div class="stat-box">
-            <div class="stat-label">Expectation Gap</div>
-            <div class="stat-val" style="color:${d.expectation_gap==null?'var(--text-3)':d.expectation_gap<-1?'var(--red)':d.expectation_gap>1.5?'var(--amber)':'var(--green)'}">${d.expectation_gap==null?'—':(d.expectation_gap>0?'+':'')+fmtNum(d.expectation_gap,2)}<span style="font-size:0.5em;color:var(--text-3)"> pp</span></div>
-            <div class="stat-note" style="font-size:8px;color:var(--text-3)">${d.expectation_label||'—'}</div>
-            <div style="font-size:7px;color:var(--text-3);margin-top:4px;line-height:1.5">
-              ${d.expectation_available
-                ? `CPI ${fmtNum(d.expectation_details?.cpi_yoy_pct,1)}% · 10Y BE ${fmtNum(d.expectation_details?.breakeven_inflation,2)} · Real ${fmtNum(d.expectation_details?.real_yield_10y,2)} · Curve ${fmtNum(d.expectation_details?.curve_10y2y,2)}`
-                : 'FRED proxy unavailable'}
-            </div>
-            <div style="font-size:6.5px;color:var(--text-4);margin-top:2px;line-height:1.4">Market pricing (T10YIE) vs realized CPI — FRED proxy, not consensus surprise</div>
-          </div>
-        </div>
-      </div>
-    </div>
-
     <!-- BACKTEST -->
     ${d.bt_sharpe != null ? `
     <div id="backtestSection" class="card span-full mb-16">
