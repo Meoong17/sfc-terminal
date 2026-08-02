@@ -226,6 +226,16 @@ except ImportError as e:
     def classify_transmission(*a, **k): return "UNAVAILABLE", {"status": "unavailable"}
 
 
+# ── P2: Trend Strength Score (institutional output) ──
+try:
+    from data_sources.trend_strength import compute_trend_strength
+    TREND_STRENGTH_AVAILABLE = True
+except ImportError as e:
+    TREND_STRENGTH_AVAILABLE = False
+    print(f"[SFC] Trend strength unavailable: {e}", file=sys.stderr)
+    def compute_trend_strength(*a, **k): return 50.0, {"status": "unavailable", "available": False, "label": "UNKNOWN"}
+
+
 # Early init: M86 score starts at neutral (updated later by execution block if available)
 _m86_score = 0.5
 
@@ -3893,6 +3903,26 @@ except Exception as _tr_e:
     print(f"[P1 Transmission] Error: {_tr_e}", file=sys.stderr)
     _transmission_status, _transmission_details = "UNAVAILABLE", {"error": str(_tr_e), "status": "fallback"}
 
+# ── P2: Trend Strength Score — momentum + alignment + structure ──
+_trend_score, _trend_details = 50.0, {"status": "unavailable", "available": False, "label": "UNKNOWN"}
+try:
+    _afe_macd = _adv_features.get("macd_signal") if _adv_features else None
+    _afe_bb = _adv_features.get("bb_width") if _adv_features else None
+    _afe_obv = _adv_features.get("obv_norm") if _adv_features else None
+    _trend_score, _trend_details = compute_trend_strength(
+        rsi=rsi_14m if "rsi_14m" in dir() else None,
+        mtf_alignment=(_mtf_result.get('alignment_score') if _mtf_result else None),
+        hmm_regime=(_hmm_result.get('regime') if _hmm_result else None),
+        hmm_crisis_prob=(_hmm_result.get('crisis_probability') if _hmm_result else None),
+        dfs_regime=_dfs_regime if "_dfs_regime" in dir() else None,
+        macd_signal=_afe_macd, bb_width=_afe_bb, obv_norm=_afe_obv,
+    )
+    print(f"[P2 Trend] score={_trend_score} label={_trend_details.get('label')} "
+          f"domains={_trend_details.get('domain_values')}", file=sys.stderr)
+except Exception as _ts_e:
+    print(f"[P2 Trend] Error: {_ts_e}", file=sys.stderr)
+    _trend_score, _trend_details = 50.0, {"error": str(_ts_e), "status": "fallback", "available": False, "label": "UNKNOWN"}
+
 out = {
     "ts": datetime.now(timezone.utc).isoformat(),
     "model_version": MODEL_VERSION,
@@ -4390,6 +4420,11 @@ out = {
     "transmission_confidence": _transmission_details.get("confidence"),
     "transmission_liquidity_state": _transmission_details.get("liquidity_state"),
     "transmission_btc_state": _transmission_details.get("btc_state"),
+    # ── P2: Trend Strength Score ──
+    "trend_strength_score": _trend_score,
+    "trend_strength_available": bool(_trend_details.get("available")),
+    "trend_strength_label": _trend_details.get("label"),
+    "trend_strength_domains": _trend_details.get("domain_values"),
 }
 
 # ── Circuit Breaker: validate output before writing ──
