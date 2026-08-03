@@ -361,6 +361,15 @@ class CircuitBreaker:
             if self._tripped else 0,
         }
 
+    def get_last_valid(self) -> Dict[str, Any]:
+        """Return the last-known-good tracked values (persisted across runs).
+
+        Used by the pipeline when the breaker PURGES output on a trip: the
+        consumer restores these values for the fields the breaker tracks,
+        instead of publishing the corrupt values that triggered the trip.
+        """
+        return dict(self._last_valid)
+
     def reset(self) -> None:
         """Manually reset circuit breaker."""
         self._consecutive_failures = 0

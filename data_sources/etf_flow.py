@@ -178,6 +178,26 @@ def compute_etf_metrics(btc_price=None):
     if not recent_flows:
         return 0.5, 0.5, {"status": "no_recent_flows"}
 
+    # ── Staleness guard (Audit 2026-08-03) ──
+    # The cache can hold old/hardcoded rows (e.g. a manual backfill of a past
+    # month) that are still "fresh" by the cached_at TTL. If the NEWEST flow
+    # date in the cache is old, do NOT let that stale data move Rt/Lt — return
+    # neutral instead. This prevents a stale/hardcoded cache from feeding a
+    # fabricated ETF flow signal into the factor adjustments.
+    ETF_MAX_STALE_DAYS = 10
+    try:
+        _newest_dt = datetime.strptime(sorted_flows[0]["date"], "%Y-%m-%d").replace(tzinfo=timezone.utc)
+        _age_days = (datetime.now(timezone.utc) - _newest_dt).days
+    except Exception:
+        _age_days = None
+    if _age_days is not None and _age_days > ETF_MAX_STALE_DAYS:
+        return 0.5, 0.5, {
+            "status": "stale",
+            "latest_flow_date": sorted_flows[0]["date"],
+            "age_days": _age_days,
+            "note": f"ETF cache not updated in {_age_days}d — returning neutral so stale data does not move the score",
+        }
+
     # Average daily BTC flow over last 5 days
     avg_flow_btc = sum(f["total_btc"] for f in recent_flows) / len(recent_flows)
     latest_flow_btc = recent_flows[0]["total_btc"] if recent_flows else 0

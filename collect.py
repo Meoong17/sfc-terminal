@@ -4534,11 +4534,26 @@ if CB_AVAILABLE and _CIRCUIT_BREAKER is not None:
         if _CB_WARNINGS:
             for _cb_msg in _CB_WARNINGS:
                 print(f"[CB] {_cb_msg}", file=sys.stderr)
-        if _CB_OK or not _CB_OUT:
-            # OK or tripped — use validated output
-            pass
+        if _CB_OK:
+            # Valid — adopt the cleaned/clamped output (fixes NaN/Inf, clamps).
+            out = _CB_OUT if _CB_OUT else out
+        elif not _CB_OUT:
+            # TRIP/PURGE — validate() returned {} with is_valid=False. Do NOT
+            # publish the corrupt values. Audit (2026-08-03): the old
+            # `if _CB_OK or not _CB_OUT: pass` branch KEPT the original (possibly
+            # corrupt) output on a purge, silently defeating the breaker and
+            # writing bad values to data.json. Restore last-known-good for every
+            # field the breaker tracks; untracked fields are left as computed
+            # (they were not implicated in the trip).
+            _cb_last = _CIRCUIT_BREAKER.get_last_valid()
+            _restored = 0
+            for _k, _v in _cb_last.items():
+                if _k in out and _v is not None:
+                    out[_k] = _v
+                    _restored += 1
+            print(f"[CB] Output purged (trip) — restored {_restored} last-known-good tracked fields", file=sys.stderr)
         else:
-            # Warning-level issues only — still print cleaned data
+            # Warning-level issues only (uncorrectable but not purged) — use cleaned data
             out = _CB_OUT
     except Exception as _cb_e:
         print(f"[CB] Validation error: {_cb_e}", file=sys.stderr)
