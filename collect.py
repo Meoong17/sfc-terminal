@@ -1329,7 +1329,11 @@ def _fred_prefetch():
         except: return None, series
     
     # Also fetch CPI YoY in same batch
-    needed.append(("CPIAUCSL:13", "CPIAUCSL", 13))
+    # NOTE: removed the old `CPIAUCSL:13` prefetch + the block that cached a fake
+    # 3.0 into "CPIAUCSL:13_yoy". Audit A4 (2026-08-03): _fred_cpi_yoy() used to
+    # return that cached 3.0 verbatim (fallback masquerading as real data). CPI
+    # YoY is now computed on-demand in _fred_cpi_yoy() from the CPIAUCSL:24
+    # series seeded in `needed` above; returns None (honest) when unavailable.
     
     with ThreadPoolExecutor(max_workers=10) as ex:
         futures = {ex.submit(_fetch_one, s, l): (k, s) for k, s, l in needed}
@@ -1337,13 +1341,6 @@ def _fred_prefetch():
             vals, series = f.result()
             key = futures[f][0]
             _FRED_CACHE[key] = vals if vals else None
-    
-    # Precompute CPI YoY
-    cpi_13 = _FRED_CACHE.get("CPIAUCSL:13")
-    if cpi_13 and len(cpi_13) >= 13:
-        _FRED_CACHE["CPIAUCSL:13_yoy"] = (cpi_13[0] - cpi_13[12]) / cpi_13[12] * 100
-    else:
-        _FRED_CACHE["CPIAUCSL:13_yoy"] = 3.0
 
 # ── TIER 1: MACRO ECONOMICS ──
 
