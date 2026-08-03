@@ -770,6 +770,25 @@ var __EMBEDDED_DATA = {"ts": "2026-08-03T14:54:58.582063+00:00", "model_version"
 
   // ---- SSE ----
   (function () {
+    // Patch only the BTC price row on high-frequency ticker updates — avoids a
+    // full DOM re-render every second (which caused a visible flicker).
+    function updatePrice(p) {
+      window.__EMBEDDED_DATA = Object.assign({}, window.__EMBEDDED_DATA || {}, { btc: p.price, btc_24h: p.change_pct, ts: p.ts });
+      if (!document.querySelectorAll) return;
+      var rows = document.querySelectorAll('.mo-row');
+      for (var i = 0; i < rows.length; i++) {
+        var nameEl = rows[i].querySelector('.mo-name');
+        if (nameEl && /BTC/.test(nameEl.textContent)) {
+          var priceEl = rows[i].querySelector('.mo-price');
+          var chgEl = rows[i].querySelector('.mo-change');
+          if (priceEl && p.price != null) priceEl.textContent = '$' + Number(p.price).toLocaleString();
+          if (chgEl && p.change_pct != null) {
+            chgEl.textContent = (p.change_pct >= 0 ? '↑ +' : '↓ ') + Math.abs(p.change_pct).toFixed(2) + '%';
+            chgEl.style.color = (p.change_pct >= 0) ? 'var(--green)' : 'var(--red)';
+          }
+        }
+      }
+    }
     function update(payload) {
       if (!payload) return;
       try {
@@ -781,7 +800,7 @@ var __EMBEDDED_DATA = {"ts": "2026-08-03T14:54:58.582063+00:00", "model_version"
     function connect() {
       if (typeof EventSource === 'undefined') return;
       src = new EventSource('/events');
-      src.addEventListener('btc_ticker', function (e) { try { update(JSON.parse(e.data)); } catch (_) {} });
+      src.addEventListener('btc_ticker', function (e) { try { updatePrice(JSON.parse(e.data)); } catch (_) {} });
       src.addEventListener('sfc_update', function (e) { try { update(JSON.parse(e.data)); } catch (_) {} });
       src.onerror = function () {
         if (src) { src.close(); src = null; }
