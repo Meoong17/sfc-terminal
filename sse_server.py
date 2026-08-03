@@ -204,6 +204,7 @@ _PUBLIC_FILES = {
     "ai_analysis.json",  # weekly Hermes LLM analyst brief (public dashboard data)
     "sitemap.xml",  # search-engine sitemap (indexing)
     "robots.txt",   # search-engine crawl directives (indexing)
+    "static/chart.umd.min.js",  # self-hosted Chart.js (no CDN dependency)
 }
 
 

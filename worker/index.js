@@ -410,6 +410,21 @@ export default {
       });
     }
 
+    // Self-hosted Chart.js — proxy as BINARY (large minified JS; arrayBuffer
+    // avoids any text re-encoding issues) and cache long.
+    if (path === '/static/chart.umd.min.js') {
+      const resp = await fetchAny(env, path, 'application/javascript');
+      if (!resp) return new Response('Not Found', { status: 404, headers: getCorsHeaders(request) });
+      const buf = await resp.arrayBuffer();
+      return new Response(buf, {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/javascript; charset=utf-8',
+          'Cache-Control': 'public, max-age=86400, immutable',
+        },
+      });
+    }
+
     // Static assets — proxy to actual path on backend
     if (path === '/app.js' || path === '/sw.js' || path === '/manifest.json'
         || path === '/sitemap.xml' || path === '/robots.txt'
