@@ -54,7 +54,13 @@ CACHE_TTL = 300  # 5 min — regime inputs update intraday
 # Stress-severity mapping per subsystem label.
 _MAIN_MAP = {"NORMAL": 20, "STRESS": 55, "CAPITULATION": 85}
 _HMM_MAP = {"BULL": 20, "SIDEWAYS": 45, "BEAR": 60, "CRISIS": 85}
-_ADV_MAP = {"NORMAL": 20, "STRESS": 55, "CAPITULATION": 85}
+# The advanced detector (ml/sfc_advanced.py RegimeDetector) outputs in the
+# SAME 4-regime label space as the main HMM (BULL/BEAR/SIDEWAYS/CRISIS).
+# It previously listed only NORMAL/STRESS/CAPITULATION here, so adv_regime
+# labels (e.g. CRISIS) were silently DROPPED from the consensus — a hidden
+# source of "inconsistent assessment". Align it with the actual output space.
+_ADV_MAP = {"BULL": 20, "SIDEWAYS": 45, "BEAR": 60, "CRISIS": 85,
+            "NORMAL": 20, "STRESS": 55, "CAPITULATION": 85}
 # Behavior-state reinforces direction but is NOT a stress bucket by itself.
 _BEHAVIOR_STRESS = {"PANIC": 85, "DISTRIBUTION": 65, "EUPHORIA": 45,
                     "EXPANSION": 20, "ACCUMULATION": 25}
@@ -179,7 +185,8 @@ def consolidate_regime(regime=None, regime_prob=None, hmm_regime=None,
 
 if __name__ == "__main__":
     # Self-test with the live-observed contradiction (regime=STRESS, hmm=SIDEWAYS,
-    # adv=CRISIS, behavior=EXPANSION) plus calm and crisis cases.
+    # adv=CRISIS, behavior=EXPANSION) plus calm and crisis cases. Note: adv now
+    # uses the 4-regime space (CRISIS=85), so it participates in the consensus.
     import sys
     live = dict(regime="STRESS", regime_prob=0.434, hmm_regime="SIDEWAYS",
                 hmm_crisis_prob=0.05, adv_regime="CRISIS", adv_crisis_prob=0.2,

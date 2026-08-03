@@ -115,19 +115,31 @@ class RegimeDetector:
         """Get detailed regime info for current observation."""
         rid, rlabel = self.predict(current_features)
         regime_id = rid[0] if isinstance(rid, np.ndarray) else rid
-        
-        # Transition probabilities from current regime
+
+        # NOTE: `regime_id` from predict() is a MAPPED regime label (0=BULL..
+        # 3=CRISIS), but `self.transmat` is indexed by RAW k-means cluster ids
+        # (0-3 in arbitrary cluster order). Indexing transmat directly with the
+        # mapped label silently read the wrong cells — this is what produced the
+        # bogus crisis_probability=0.991 (a self-loop of an unrelated cluster)
+        # that made the advanced detector disagree spuriously with the main HMM.
+        # Map the mapped label back to its raw cluster id via `state_order`
+        # (position i holds the raw cluster id that sorts to regime i).
+        raw_current = int(self.state_order[regime_id]) if self.state_order is not None else int(regime_id)
+
+        # Transition probabilities from current raw cluster, re-labelled.
         if self.transmat is not None:
-            trans_probs = {self.regime_labels[i]: float(self.transmat[regime_id, i])
-                          for i in range(self.n_regimes)}
-            stability = 1.0 - float(self.transmat[regime_id, regime_id])
+            trans_probs = {}
+            for i in range(self.n_regimes):
+                raw_target = int(self.state_order[i]) if self.state_order is not None else i
+                trans_probs[self.regime_labels[i]] = float(self.transmat[raw_current, raw_target])
+            stability = 1.0 - trans_probs.get(rlabel[0] if isinstance(rlabel, list) else rlabel, 0.0)
             crisis_idx = self.regime_labels.index('CRISIS')
-            crisis_prob = float(self.transmat[regime_id, crisis_idx])
+            crisis_prob = float(trans_probs.get('CRISIS', 0.0))
         else:
             trans_probs = {}
             stability = 0.5
             crisis_prob = 0.0
-        
+
         return {
             'regime_id': int(regime_id),
             'regime': rlabel[0] if isinstance(rlabel, list) else rlabel,
