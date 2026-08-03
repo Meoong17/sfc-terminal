@@ -1,0 +1,26 @@
+{
+  "ts": "2026-08-03T14:19:26.509782+00:00",
+  "model": "deepseek-v4-flash (Hermes)",
+  "bias": "Neutral",
+  "summary": "BTC trades at $63,377.48 (+0.49% 24h) in a NORMAL regime with an ELEVATED zone; short-term factor St (0.696) is elevated while realized factor Rt (-1.97) is sharply negative. Sentiment is soft — RSI 45.8, Fear & Greed 34, SOPR 0.9989, Kelly fraction 0.0 and readiness score 0.228 — but continuation probability over 90d is still constructive at 0.676.",
+  "risks": [
+    [
+      "High transition risk",
+      "regime_prob is only 0.427 with transition_risk at 0.573, signaling a nontrivial chance of regime/zone shift near-term."
+    ],
+    [
+      "Walk-forward underperformance",
+      "wfv gaps are negative at -1.55 (7d) and -7.46 (30d), indicating realized signal drift below expectations."
+    ],
+    [
+      "Cautious positioning signals",
+      "Kelly fraction 0.0, readiness 0.228, and composite confidence 0.289 argue against aggressive new exposure."
+    ],
+    [
+      "Weak profitability basis",
+      "SOPR 0.9989 sits just below parity, so recent sellers are marginally underwater and RSI 45.8 shows no momentum confirmation."
+    ]
+  ],
+  "action": "Hold a standard/neutral allocation (per signal 'Standard allocation') with no new leverage; await regime_prob > 0.5 or positive wfv gaps before adding risk.",
+  "source_ts": "2026-08-03T14:12:48.134940+00:00"
+}

@@ -201,6 +201,7 @@ _PUBLIC_FILES = {
     "sw.js",        # service worker
     "data.json",    # pipeline output (public dashboard data)
     "btc_ws.json",  # live BTC ws data (public dashboard data)
+    "ai_analysis.json",  # weekly Hermes LLM analyst brief (public dashboard data)
     "sitemap.xml",  # search-engine sitemap (indexing)
     "robots.txt",   # search-engine crawl directives (indexing)
 }
