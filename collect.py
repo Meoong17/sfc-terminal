@@ -2994,6 +2994,49 @@ if _hmm_module:
     except Exception as _hmm_e:
         print(f"[HMM] Error: {_hmm_e}", file=sys.stderr)
 
+# ── P0b: STRUCTURAL Regime Consolidation — single driver for scoring ──
+# Computed EARLY (regime + hmm + adv are all available here) so its output can
+# drive zone thresholds / the regime multiplier, replacing the OLD scattered
+# path (HMM-override scoring + adv_regime_boost + _SFC_MULT-on-regime) which
+# let one buggy/divergent subsystem (e.g. adv CRISIS) move SFC inconsistently.
+# behavior_state is deliberately EXCLUDED as a scoring driver: it needs
+# cascade_risk/mpi that are only computed later (line ~3216/3283) and is by
+# design a display-only L5 overlay (see data_sources/regime_consolidation.py).
+# It is re-merged for display at the late P0 block (line ~3882).
+_regime_consensus_label, _regime_consensus_details = "UNKNOWN", {"status": "unavailable"}
+try:
+    _regime_consensus_label, _regime_consensus_details = consolidate_regime(
+        regime=regime if "regime" in dir() else None,
+        regime_prob=regime_prob if "regime_prob" in dir() else None,
+        hmm_regime=_hmm_result.get('regime') if _hmm_result else None,
+        hmm_crisis_prob=_hmm_result.get('crisis_probability') if _hmm_result else None,
+        adv_regime=adv_regime.get('regime') if adv_regime else None,
+        adv_crisis_prob=adv_regime.get('crisis_probability') if adv_regime else None,
+        behavior_state=None,  # display-only overlay; not a scoring driver
+    )
+    print(f"[P0b Regime] structural consensus={_regime_consensus_label} "
+          f"sev={_regime_consensus_details.get('severity')} "
+          f"conflict={_regime_consensus_details.get('conflict')} "
+          f"agreement={_regime_consensus_details.get('agreement')}", file=sys.stderr)
+except Exception as _rcb_e:
+    print(f"[P0b Regime] Error: {_rcb_e}", file=sys.stderr)
+    _regime_consensus_label, _regime_consensus_details = "UNKNOWN", {"error": str(_rcb_e), "status": "fallback"}
+
+# Single regime multiplier derived from consolidated severity (0-100).
+# Replaces the old _SFC_MULT-on-regime (line ~3070) so zone thresholds move off
+# ONE authoritative severity instead of whichever raw regime label won last.
+_rc_sev = _regime_consensus_details.get("severity")
+if _rc_sev is None:
+    _REGIME_DRIVER_MULT = 1.0
+else:
+    # STRESSED (>=60) tightens thresholds (0.6-0.8); BULLISH (<35) relaxes (1.2).
+    if _rc_sev >= 60:
+        _REGIME_DRIVER_MULT = 0.7
+    elif _rc_sev < 35:
+        _REGIME_DRIVER_MULT = 1.2
+    else:
+        _REGIME_DRIVER_MULT = 1.0
+
 # ── NEW: Dynamic Feature Weighting (regime-adaptive factor weights) ──
 _dw_norm_factors = {}
 _dw_z_score = 0.5
@@ -3027,12 +3070,20 @@ if DYNAMIC_WEIGHTING_AVAILABLE:
 # also factors in regime context. So regime boost needs to be REDUCED to
 # avoid double-adjustment. Cap at +2pp when DW is active.
 if (ADVANCED_AVAILABLE is None or ADVANCED_AVAILABLE) and adv_regime_boost > 0 and effective_sfc is not None:
-    old_sfc = effective_sfc
-    # Capped boost: full boost if DW unavailable, otherwise max +2pp
-    _eff_regime_boost = min(adv_regime_boost, 2.0) if DYNAMIC_WEIGHTING_AVAILABLE else adv_regime_boost
-    effective_sfc = min(effective_sfc + _eff_regime_boost, 100.0)
-    zone = "CRITICAL" if effective_sfc/100 > 0.75 else "HIGH" if effective_sfc/100 > 0.5 else "ELEVATED" if effective_sfc/100 > 0.25 else "NORMAL"
-    print(f"  [Advanced] SFC boosted by regime: {old_sfc:.1f}% → {effective_sfc:.1f}% (+{adv_regime_boost}) | Zone: {zone}", file=sys.stderr)
+    # SINGLE-DRIVER GUARD: only let the (previously buggy) adv-regime boost move
+    # SFC when the structural consolidation also flags at least ELEVATED stress
+    # (severity >= 45). A lone adv CRISIS that the other two subsystems reject no
+    # longer bumps effective_sfc — it was the source of the spurious +2pp path.
+    _adv_consensus_ok = (_rc_sev or 0) >= 45
+    if _adv_consensus_ok:
+        old_sfc = effective_sfc
+        # Capped boost: full boost if DW unavailable, otherwise max +2pp
+        _eff_regime_boost = min(adv_regime_boost, 2.0) if DYNAMIC_WEIGHTING_AVAILABLE else adv_regime_boost
+        effective_sfc = min(effective_sfc + _eff_regime_boost, 100.0)
+        zone = "CRITICAL" if effective_sfc/100 > 0.75 else "HIGH" if effective_sfc/100 > 0.5 else "ELEVATED" if effective_sfc/100 > 0.25 else "NORMAL"
+        print(f"  [Advanced] SFC boosted by regime: {old_sfc:.1f}% → {effective_sfc:.1f}% (+{adv_regime_boost}) | Zone: {zone}", file=sys.stderr)
+    else:
+        print(f"  [Advanced] adv boost suppressed (consensus sev={_rc_sev} < 45) — single-driver guard", file=sys.stderr)
 
 # ── XGBoost Blend: blend ensemble SFC with XGBoost meta-prediction ──
 if _xgb_pred is not None and _xgb_confidence is not None and _xgb_confidence > 0.3:
@@ -3065,12 +3116,16 @@ if _online_module and effective_sfc is not None:
 
 # State and signal — use post-boost effective_sfc to stay consistent with zone/signal_type
 # Regime-aware zone thresholds (M2 analysis: 39.8% calm-in-crisis)
-# CRISIS lowers thresholds (0.6x) so lower SFC already flags ELEVATED/HIGH/CRITICAL;
-# BULL raises thresholds (1.2x) so calm markets need higher SFC to flag stress.
-_SFC_MULT = {"CRISIS": 0.6, "BEAR": 0.72, "BULL": 1.2, "SIDEWAYS": 1.0, "NORMAL": 1.0, "STRESS": 0.8}
+# CRISIS lowers thresholds so lower SFC already flags ELEVATED/HIGH/CRITICAL;
+# BULL raises thresholds so calm markets need higher SFC to flag stress.
+# SINGLE DRIVER: thresholds now move off _REGIME_DRIVER_MULT (derived from the
+# early structural consolidation severity), not the last raw regime label that
+# happened to win an override. This removes the old _SFC_MULT-on-regime path
+# that let one divergent subsystem (e.g. adv CRISIS) shift zones inconsistently.
 if effective_sfc is not None:
-    _SFC_MULT2 = _SFC_MULT.get(str(regime).upper(), 1.0)
-    zone = "CRITICAL" if effective_sfc/100 > 0.75 * _SFC_MULT2 else "HIGH" if effective_sfc/100 > 0.50 * _SFC_MULT2 else "ELEVATED" if effective_sfc/100 > 0.25 * _SFC_MULT2 else "NORMAL"
+    zone = "CRITICAL" if effective_sfc/100 > 0.75 * _REGIME_DRIVER_MULT else "HIGH" if effective_sfc/100 > 0.50 * _REGIME_DRIVER_MULT else "ELEVATED" if effective_sfc/100 > 0.25 * _REGIME_DRIVER_MULT else "NORMAL"
+    print(f"[P0b Zone] sfc={effective_sfc:.1f}% mult={_REGIME_DRIVER_MULT} zone={zone} "
+          f"(consensus={_regime_consensus_label})", file=sys.stderr)
 state, signal = determine_state(dvol, effective_sfc, btc, ft)
 
 # ── BACKTEST METRICS (Estimated — NOT walk-forward validated) ──
