@@ -38,7 +38,7 @@ STABLECOIN_IDS = ["tether", "usd-coin", "dai", "first-digital-usd"]
 CG_BASE = "https://api.coingecko.com/api/v3"
 # Audit 2026-08-03: demo key was hardcoded in source (committed secret).
 # Now read from env; empty => CoinGecko 401 => _fetch_cg() degrades to neutral.
-# Add to your .env:  COINGECKO_API_KEY=REMOVED_SECRET
+# Add to your .env:  COINGECKO_API_KEY=CG-xxxx (see .env)
 CG_API_PARAM = "x_cg_demo_api_key=" + os.getenv("COINGECKO_API_KEY", "")
 
 def _fetch_cg_single(url):

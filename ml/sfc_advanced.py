@@ -785,7 +785,7 @@ def fetch_all_alternative_data(force=False):
         r = requests.get(
             "https://api.coingecko.com/api/v3/coins/bitcoin?localization=false&tickers=false"
             "&community_data=false&developer_data=false&market_data=true"
-            "&x_cg_demo_api_key=REMOVED_SECRET",
+            "&x_cg_demo_api_key=" + os.getenv("COINGECKO_API_KEY", ""),
             timeout=10
         )
         coin = r.json()

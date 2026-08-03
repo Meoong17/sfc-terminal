@@ -37,7 +37,7 @@ def _save_micro_cache(state):
 BINANCE_BASE = "https://api.binance.com"
 
 # ── CoinGecko API key ────────────────────────────────────
-CG_API_PARAM = "x_cg_demo_api_key=REMOVED_SECRET"
+CG_API_PARAM = "x_cg_demo_api_key=" + os.getenv("COINGECKO_API_KEY", "")
 
 # ── Shared CoinGecko cache (M24-M27, M31 all need market data) ──
 _CG_CACHE = {}

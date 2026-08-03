@@ -545,7 +545,7 @@ if CMC_KEY:
     CMC_HEADERS = {"X-CMC_PRO_API_KEY": CMC_KEY, "Accept": "application/json"}
 
 # ── CoinGecko API key (demo tier) ──────────────────────────────────
-CG_API_KEY = "x_cg_demo_api_key=REMOVED_SECRET"
+CG_API_KEY = "x_cg_demo_api_key=" + os.getenv("COINGECKO_API_KEY", "")
 
 # ── Model Version Tracking ─────────────────────────────────────────
 MODEL_VERSION = "4.0.0"
