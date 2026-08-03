@@ -1,9 +1,9 @@
 /**
- * Service Worker v10 — Network-first for index.html + reload guard
+ * Service Worker v11 — Network-first for index.html + reload guard
  */
 
-const CACHE_NAME = "sfc-terminal-v12";
-const DATA_CACHE = "sfc-data-v5";
+const CACHE_NAME = "sfc-terminal-v13";
+const DATA_CACHE = "sfc-data-v6";
 const MAX_DATA_AGE_MS = 5 * 60 * 1000; // 5 minutes (was 30 min — dashboard was serving stale data)
 
 const STATIC_ASSETS = [
