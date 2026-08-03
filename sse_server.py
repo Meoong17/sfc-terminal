@@ -214,9 +214,11 @@ async def index():
 
 @app.get("/{path:path}", dependencies=[Depends(_auth)])
 async def static_file(path: str):
-    # Whitelist + normalization guard: only exact public filenames are served.
+    # Whitelist + normalization guard: only explicit public filenames are served.
     # resolve() + is_file() blocks path traversal even if the list grows.
-    if path in _PUBLIC_FILES:
+    # `fonts/` prefix is allowed for the self-hosted Inter webfonts only.
+    is_font = path.startswith("fonts/") and path.endswith(".woff2")
+    if path in _PUBLIC_FILES or is_font:
         fpath = (BASE_DIR / path).resolve()
         try:
             fpath.relative_to(BASE_DIR.resolve())
