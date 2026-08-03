@@ -20,6 +20,19 @@ def inject_data_into_html(data_path, html_path, output_path=None):
         print(f"⚠ Failed to load {data_path}: {e}", file=sys.stderr)
         return False
 
+    # Merge QLSTM training history (train/val loss) for the Research chart.
+    # qlstm_history.json lives next to data.json and is NOT a data.json field.
+    try:
+        import os as _os
+        qh_path = _os.path.join(_os.path.dirname(_os.path.abspath(data_path)), 'qlstm_history.json')
+        with open(qh_path, 'r') as qf:
+            qh = json.load(qf)
+        if isinstance(qh, dict):
+            if 'train_loss' in qh: data['qlstm_train'] = qh['train_loss']
+            if 'val_loss' in qh:   data['qlstm_val']   = qh['val_loss']
+    except Exception:
+        pass  # QLSTM chart simply stays empty if history is unavailable
+
     try:
         with open(html_path, 'r') as f:
             html = f.read()
