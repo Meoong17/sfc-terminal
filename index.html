@@ -26,20 +26,23 @@
   .li-value, .flow-change, .badge-value, .mo-price, .kv-row b, .bar-track,
   .prog-fill { font-variant-numeric: tabular-nums; }
 
-  /* ---- entrance + micro-animations ---- */
+  /* ---- entrance + micro-animations ----
+     Gated behind #app.anim: the class is present only on initial load and tab
+     switches. Background updates (sfc_update every ~5 min, btc_ticker every ~1s)
+     render WITHOUT .anim so cards swap instantly with no fade/blink. */
   @keyframes fadeUp { from { opacity:0; transform:translateY(8px);} to { opacity:1; transform:none;} }
   @keyframes barGrow { from { width:0 !important; } }
   @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:.35;} }
   @keyframes ringIn { from { stroke-dashoffset:var(--ring-max);} }
   @keyframes countGlow { 0%{ opacity:.4;} 100%{ opacity:1;} }
-  .card { animation:fadeUp .45s ease both; }
-  .prog-fill { animation:barGrow .9s cubic-bezier(.25,.8,.25,1) both; }
+  #app.anim .card { animation:fadeUp .45s ease both; }
+  #app.anim .prog-fill { animation:barGrow .9s cubic-bezier(.25,.8,.25,1) both; }
+  #app.anim .tab-panel.active { animation:fadeUp .35s ease; }
   .live-dot, .market-open .dot { animation:pulse 2.4s ease-in-out infinite; }
   .card:hover { box-shadow:0 0 0 1px rgba(124,92,255,.25), 0 8px 30px rgba(0,0,0,.35); border-color:rgba(124,92,255,.4); }
   .card { transition:box-shadow .25s ease, border-color .25s ease, transform .2s ease; }
   .nav-item { transition:background .15s ease,color .15s ease; }
   .tab { transition:color .15s ease,border-color .2s ease; }
-  .tab-panel.active { animation:fadeUp .35s ease; }
   .layout { display:flex; min-height:100vh; min-width:1180px; }
 
   /* Sidebar */
@@ -743,6 +746,11 @@ var __EMBEDDED_DATA = {"ts": "2026-08-03T15:04:56.136023+00:00", "model_version"
     var el = document.getElementById('app');
     if (!el) return;
     el.innerHTML = render(window.__EMBEDDED_DATA || {});
+    // Toggle .anim so entrance animations play only on load / tab switch,
+    // never on background updates (prevents the flicker/refresh feel).
+    if (el.classList) {
+      if (animated !== false) el.classList.add('anim'); else el.classList.remove('anim');
+    }
     if (animated !== false) animateNumbers(el);
   }
   window.switchTab = function(name) {
