@@ -83,7 +83,12 @@ $PYTHON inject_data.py data.json index.html 2>>sfc-pipeline.log || \
 # unpushed local commits always push immediately.
 log "Committing (throttled)..."
 git add data.json paper_trades.json paper_history.json
-git add -u 2>/dev/null || true
+# Audit 2026-08-03: plain `git add -u` staged EVERY modified tracked file,
+# so unrelated code edits got swept into "auto: SFC data" commits with a
+# generic message (happened to collect.py/circuit_breaker.py/etf_flow.py).
+# Restrict auto-staging to the data files only — code changes stay uncommitted
+# and attributable (manual commits are still pushed via the AHEAD check below).
+git add -u data.json paper_trades.json paper_history.json 2>/dev/null || true
 git reset HEAD index.html 2>/dev/null || true
 
 THROTTLE_MIN=60
