@@ -36,7 +36,10 @@ def _save_cache(cache):
 # ── Stablecoin IDs for CoinGecko ──────────────────────────────────────
 STABLECOIN_IDS = ["tether", "usd-coin", "dai", "first-digital-usd"]
 CG_BASE = "https://api.coingecko.com/api/v3"
-CG_API_PARAM = "x_cg_demo_api_key=REMOVED_SECRET"
+# Audit 2026-08-03: demo key was hardcoded in source (committed secret).
+# Now read from env; empty => CoinGecko 401 => _fetch_cg() degrades to neutral.
+# Add to your .env:  COINGECKO_API_KEY=REMOVED_SECRET
+CG_API_PARAM = "x_cg_demo_api_key=" + os.getenv("COINGECKO_API_KEY", "")
 
 def _fetch_cg_single(url):
     try:
