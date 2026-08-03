@@ -4365,13 +4365,13 @@ out = {
     # confidence that drives raw kelly to 0 correctly yields CASH even without an override.
     "signal_decision": (
         "CASH" if ((composite_confidence is not None and max(0, (composite_confidence * 2.0 - (1 - composite_confidence)) / 2.0) * _kelly_override <= 0)
-                   or (effective_sfc is not None and effective_sfc >= 50 * _SFC_MULT2)) else
+                   or (effective_sfc is not None and effective_sfc >= 50 * _REGIME_DRIVER_MULT)) else
         "BUY" if (composite_confidence is not None and effective_sfc is not None
                   and max(0, (composite_confidence * 2.0 - (1 - composite_confidence)) / 2.0) * _kelly_override > 0
-                  and effective_sfc < 25 * _SFC_MULT2) else "WATCH"),
+                  and effective_sfc < 25 * _REGIME_DRIVER_MULT) else "WATCH"),
     # — Signal Timing (alert window estimation, monthly timeframe) —
-    "signal_threshold_mult": _SFC_MULT2 if '_SFC_MULT2' in dir() else _SFC_MULT.get(str(regime).upper(), 1.0),
-    "signal_type": "STRESS_TRANSITION" if transition_risk > 0.60 else "STRESS" if effective_sfc and effective_sfc > 25 * (_SFC_MULT.get(str(regime).upper(), 1.0)) else "CALM",
+    "signal_threshold_mult": _REGIME_DRIVER_MULT,
+    "signal_type": "STRESS_TRANSITION" if transition_risk > 0.60 else "STRESS" if effective_sfc and effective_sfc > 25 * _REGIME_DRIVER_MULT else "CALM",
     "signal_strength": round(min(effective_sfc / 50.0 if effective_sfc else 0, 1.0), 3),
     "calibrated_confidence": _CALIBRATED_CONF,
     "reliability": _RELIABILITY,
