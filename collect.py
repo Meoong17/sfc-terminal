@@ -1274,22 +1274,27 @@ def _fred(series, limit=2):
     except: return None
 
 def _fred_cpi_yoy():
-    """Fetch CPI YoY with caching (called by M7)."""
+    """Fetch CPI YoY with caching (called by M7).
+
+    Returns None (honest "unavailable") instead of a hardcoded 3.0 fallback.
+    Audit A4 (2026-08-03): the old `return 3.0` fallback masqueraded as a real
+    reading — m7_detail showed cpi_yoy=3.0 (the default) while the expectations
+    engine reported the true ~3.46. It reuses the (prefetched/cached) 13-value
+    CPIAUCSL series via _fred() so it no longer needs its own request.
+    """
     cache_key = "CPIAUCSL:13_yoy"
     if cache_key in _FRED_CACHE:
         return _FRED_CACHE[cache_key]
-    if not FRED_KEY: return 3.0
-    try:
-        r = requests.get(f"https://api.stlouisfed.org/fred/series/observations?series_id=CPIAUCSL&api_key={FRED_KEY}&file_type=json&sort_order=desc&limit=13", timeout=15)
-        obs = r.json().get("observations", [])
-        if len(obs) >= 13:
-            cpi_now = float(obs[0]["value"])
-            cpi_yr = float(obs[12]["value"])
-            result = (cpi_now - cpi_yr) / cpi_yr * 100
-            _FRED_CACHE[cache_key] = result
-            return result
-    except: pass
-    return 3.0
+    if not FRED_KEY: return None
+    vals = _fred("CPIAUCSL", 24)  # newest-first, "." filtered (see _fred)
+    if vals and len(vals) >= 2:
+        # Newest REAL value (obs[0] may be "." if the month is not yet released),
+        # and the value ~12 months back. idx clamped to the last available.
+        idx = min(12, len(vals) - 1)
+        result = (vals[0] - vals[idx]) / vals[idx] * 100
+        _FRED_CACHE[cache_key] = result
+        return result
+    return None
 
 def _fred_prefetch():
     """Prefetch ALL FRED data in ONE parallel batch."""
@@ -1299,6 +1304,7 @@ def _fred_prefetch():
     needed = [
         ("FEDFUNDS:1", "FEDFUNDS", 1),
         ("CPIAUCSL:1", "CPIAUCSL", 1),
+        ("CPIAUCSL:24", "CPIAUCSL", 24),  # A4: seed 24-mo series so _fred_cpi_yoy() reuses batch data
         ("DGS10:1", "DGS10", 1),
         ("DGS2:1", "DGS2", 1),
         ("BAMLH0A0HYM2:1", "BAMLH0A0HYM2", 1),
@@ -1347,8 +1353,9 @@ def calculate_m7_fisher():
     vals_cpi = _fred("CPIAUCSL", 1)
     if not vals_fed or not vals_cpi: return None, None
     fed_rate = vals_fed[0]
-    # Use cached CPI YoY from prefetch
+    # Use cached CPI YoY from prefetch. Returns None (honest) if unavailable.
     cpi_yoy = _fred_cpi_yoy()
+    if cpi_yoy is None: return None, None  # A4: no silent 3.0 fallback
     real_rate = fed_rate - cpi_yoy
     if real_rate > 3.0: score = 0.85
     elif real_rate > 2.0: score = 0.60
@@ -1915,6 +1922,12 @@ def _store_market_snapshot(btc, btc_24h, dom, dvol, fng, pc_oi, m2_yoy, dxy):
     entry = {
         "date": today,
         "ts": time.time(),
+        "btc": btc,  # BTC price LEVEL (not % change) — required by
+                     # _compute_dxy_btc_correlation() to compute daily returns.
+                     # Audit A1 (2026-08-03): the DXY-BTC correlation gate was
+                     # dead code because only btc_24h (% change) was stored, so
+                     # `entry.get("btc")` was always None and the POSITIVE/MIXED
+                     # Sc regimes in score_factors_from_market() never fired.
         "btc_24h": btc_24h,
         "dom": dom,
         "dvol": dvol,
@@ -3056,7 +3069,7 @@ if DYNAMIC_WEIGHTING_AVAILABLE:
             _old_sfc = effective_sfc
             effective_sfc = _dw_adjusted_sfc
             effective_sfc = max(0.0, min(100.0, effective_sfc))
-            zone = "CRITICAL" if effective_sfc/100 > 0.75 else "HIGH" if effective_sfc/100 > 0.5 else "ELEVATED" if effective_sfc/100 > 0.25 else "NORMAL"
+            zone = "CRITICAL" if effective_sfc/100 > 0.75 * _REGIME_DRIVER_MULT else "HIGH" if effective_sfc/100 > 0.50 * _REGIME_DRIVER_MULT else "ELEVATED" if effective_sfc/100 > 0.25 * _REGIME_DRIVER_MULT else "NORMAL"
             print(f"[DW] Dynamic weighting: regime={_dw_regime} adj={_dw_sfc_adjustment:+.1f}pp "
                   f"{_old_sfc:.1f}% → {effective_sfc:.1f}% | weights={_dw_weights}", file=sys.stderr)
         else:
@@ -3080,7 +3093,7 @@ if (ADVANCED_AVAILABLE is None or ADVANCED_AVAILABLE) and adv_regime_boost > 0 a
         # Capped boost: full boost if DW unavailable, otherwise max +2pp
         _eff_regime_boost = min(adv_regime_boost, 2.0) if DYNAMIC_WEIGHTING_AVAILABLE else adv_regime_boost
         effective_sfc = min(effective_sfc + _eff_regime_boost, 100.0)
-        zone = "CRITICAL" if effective_sfc/100 > 0.75 else "HIGH" if effective_sfc/100 > 0.5 else "ELEVATED" if effective_sfc/100 > 0.25 else "NORMAL"
+        zone = "CRITICAL" if effective_sfc/100 > 0.75 * _REGIME_DRIVER_MULT else "HIGH" if effective_sfc/100 > 0.50 * _REGIME_DRIVER_MULT else "ELEVATED" if effective_sfc/100 > 0.25 * _REGIME_DRIVER_MULT else "NORMAL"
         print(f"  [Advanced] SFC boosted by regime: {old_sfc:.1f}% → {effective_sfc:.1f}% (+{adv_regime_boost}) | Zone: {zone}", file=sys.stderr)
     else:
         print(f"  [Advanced] adv boost suppressed (consensus sev={_rc_sev} < 45) — single-driver guard", file=sys.stderr)
@@ -3091,7 +3104,7 @@ if _xgb_pred is not None and _xgb_confidence is not None and _xgb_confidence > 0
     _old_sfc = effective_sfc
     effective_sfc = (1 - _xgb_blend_weight) * (effective_sfc or 0) + _xgb_blend_weight * _xgb_pred
     effective_sfc = max(0.0, min(100.0, effective_sfc))
-    zone = "CRITICAL" if effective_sfc/100 > 0.75 else "HIGH" if effective_sfc/100 > 0.5 else "ELEVATED" if effective_sfc/100 > 0.25 else "NORMAL"
+    zone = "CRITICAL" if effective_sfc/100 > 0.75 * _REGIME_DRIVER_MULT else "HIGH" if effective_sfc/100 > 0.50 * _REGIME_DRIVER_MULT else "ELEVATED" if effective_sfc/100 > 0.25 * _REGIME_DRIVER_MULT else "NORMAL"
     print(f"[XGB] Blended: old={_old_sfc:.1f}% → {effective_sfc:.1f}% (weight={_xgb_blend_weight:.2f})", file=sys.stderr)
 
 # ── ONLINE LEARNING EWMA (Peningkatan 5: adaptive correction) ──
@@ -3108,7 +3121,7 @@ if _online_module and effective_sfc is not None:
             _old_sfc = effective_sfc
             effective_sfc = _corrected * 100.0
             effective_sfc = max(0.0, min(100.0, effective_sfc))
-            zone = "CRITICAL" if effective_sfc/100 > 0.75 else "HIGH" if effective_sfc/100 > 0.5 else "ELEVATED" if effective_sfc/100 > 0.25 else "NORMAL"
+            zone = "CRITICAL" if effective_sfc/100 > 0.75 * _REGIME_DRIVER_MULT else "HIGH" if effective_sfc/100 > 0.50 * _REGIME_DRIVER_MULT else "ELEVATED" if effective_sfc/100 > 0.25 * _REGIME_DRIVER_MULT else "NORMAL"
             _online_module.save_ewma(_ewma)
             print(f"[EWMA] Corrected: {_old_sfc:.1f}% → {effective_sfc:.1f}%", file=sys.stderr)
     except Exception as _ewma_e:
