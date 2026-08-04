@@ -441,6 +441,13 @@ def calculate_m80_dominance(supply_history, btc_mcap, btc_dominance_pct):
 
 
 # ── Main entry point ──────────────────────────────────────────────────
+def _fmt_num(val, fmt):
+    """Format a number for debug output; '?' if not a real number.
+    Guard against `.get(key, default)` returning None when the key is present
+    but None (format on NoneType would otherwise raise)."""
+    return f"{val:{fmt}}" if isinstance(val, (int, float)) else "?"
+
+
 def compute_all_stablecoin_metrics(btc_price=None, btc_mcap=None, 
                                     btc_dominance_pct=None, onchain_details=None,
                                     force_refresh=False):
@@ -478,7 +485,7 @@ def compute_all_stablecoin_metrics(btc_price=None, btc_mcap=None,
             results["m76_supply_growth"] = s
             details["m76_detail"] = d
             active += 1
-            print(f"  ✓ M76 (SupplyGrowth): {s:.3f} — 30d={d.get('growth_30d_pct','?'):+.2f}%", file=sys.stderr)
+            print(f"  ✓ M76 (SupplyGrowth): {s:.3f} — 30d={_fmt_num(d.get('growth_30d_pct'), '+.2f')}%", file=sys.stderr)
     except Exception as e:
         print(f"[SC] M76 error: {e}", file=sys.stderr)
     
@@ -489,7 +496,7 @@ def compute_all_stablecoin_metrics(btc_price=None, btc_mcap=None,
             results["m77_ssr"] = s
             details["m77_detail"] = d
             active += 1
-            print(f"  ✓ M77 (SSR): {s:.3f} — SSR={d.get('ssr','?'):.2f} | {d.get('label','?')}", file=sys.stderr)
+            print(f"  ✓ M77 (SSR): {s:.3f} — SSR={_fmt_num(d.get('ssr'), '.2f')} | {d.get('label','?')}", file=sys.stderr)
     except Exception as e:
         print(f"[SC] M77 error: {e}", file=sys.stderr)
     
@@ -500,7 +507,7 @@ def compute_all_stablecoin_metrics(btc_price=None, btc_mcap=None,
             results["m78_exchange_flow"] = s
             details["m78_detail"] = d
             active += 1
-            print(f"  ✓ M78 (ExchangeFlow): {s:.3f} — netflow={d.get('netflow','?'):+.2e} | {d.get('label','?')}", file=sys.stderr)
+            print(f"  ✓ M78 (ExchangeFlow): {s:.3f} — netflow={_fmt_num(d.get('netflow'), '+.2e')} | {d.get('label','?')}", file=sys.stderr)
     except Exception as e:
         print(f"[SC] M78 error: {e}", file=sys.stderr)
     
@@ -511,7 +518,7 @@ def compute_all_stablecoin_metrics(btc_price=None, btc_mcap=None,
             results["m79_velocity"] = s
             details["m79_detail"] = d
             active += 1
-            print(f"  ✓ M79 (Velocity): {s:.3f} — vel={d.get('velocity','?'):.4f} | {d.get('label','?')}", file=sys.stderr)
+            print(f"  ✓ M79 (Velocity): {s:.3f} — vel={_fmt_num(d.get('velocity'), '.4f')} | {d.get('label','?')}", file=sys.stderr)
     except Exception as e:
         print(f"[SC] M79 error: {e}", file=sys.stderr)
     
@@ -522,7 +529,7 @@ def compute_all_stablecoin_metrics(btc_price=None, btc_mcap=None,
             results["m80_dominance"] = s
             details["m80_detail"] = d
             active += 1
-            print(f"  ✓ M80 (Dominance): {s:.3f} — dom={d.get('dominance_pct','?'):.2f}% | {d.get('trend','?')}", file=sys.stderr)
+            print(f"  ✓ M80 (Dominance): {s:.3f} — dom={_fmt_num(d.get('dominance_pct'), '.2f')}% | {d.get('trend','?')}", file=sys.stderr)
     except Exception as e:
         print(f"[SC] M80 error: {e}", file=sys.stderr)
     
