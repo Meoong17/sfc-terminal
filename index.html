@@ -3134,7 +3134,7 @@ function render(d) {
           Q10 On-Chain Intelligence
             <span class="title-tip" tabindex="0" data-tip="Four on-chain behaviour signals: Whale Pressure (large-holder accumulation vs distribution), Value Flow (net exchange in/outflow), Buying Power (stablecoin dry powder available), Market Structure (derivatives positioning). Each 0-100; above 60 = supportive, below 40 = pressuring."><span class="info-tip-icon">i</span></span>
         </div>
-          <span class="collapse-arrow" onclick="toggleCollapseCard(this)" style="cursor:pointer;font-size:10px;color:var(--text-3);padding:4px 8px;user-select:none">▶</span>
+          
       </div>
       <div class="card-body">
           ${SUM.q10(d)}
@@ -3177,7 +3177,7 @@ function render(d) {
     </div>
 
     <!-- MARKET STRUCTURE (Derivatives Risk) — Q10+ Enhanced -->
-    <div class="card span-full mb-16 card-collapsed" data-lazy style="display:${d.q10_available?'block':'none'}">
+    <div class="card span-full mb-16" data-lazy style="display:${d.q10_available?'block':'none'}">
       <div class="card-head">
         <div class="card-title">
           <div class="card-icon">
@@ -3191,7 +3191,7 @@ function render(d) {
           Market Structure
             <span class="title-tip" tabindex="0" data-tip="Derivatives-side risk: funding rate (positive = longs paying shorts), open interest change, basis spread, and liquidation skew. Elevated readings mean leverage is crowded on one side and vulnerable to a squeeze."><span class="info-tip-icon">i</span></span>
         </div>
-          <span class="collapse-arrow" onclick="toggleCollapseCard(this)" style="cursor:pointer;font-size:10px;color:var(--text-3);padding:4px 8px;user-select:none">▶</span>
+          
         <div class="card-badge" style="color:var(--text-3);font-size:9px">Derivatives Risk · Q10+</div>
       </div>
       <div class="card-body">
@@ -3426,7 +3426,7 @@ function render(d) {
         </div>
       </div>
     <div class="section-head"><div class="section-head-label">Position Sizing</div><div class="section-head-line"></div></div>
-    <div class="card span-full mb-16 card-collapsed" data-lazy>
+    <div class="card span-full mb-16" data-lazy>
       <div class="card-head">
         <div class="card-title">
           <div class="card-icon">
@@ -3440,7 +3440,7 @@ function render(d) {
           Kelly Position Sizing
             <span class="title-tip" tabindex="0" data-tip="Kelly criterion allocation based on the model's estimated edge and win rate. Full Kelly is aggressive; Half and Quarter Kelly are the practical variants. Kelly at or below 0 means no positive edge — the model suggests staying in cash."><span class="info-tip-icon">i</span></span>
         </div>
-          <span class="collapse-arrow" onclick="toggleCollapseCard(this)" style="cursor:pointer;font-size:10px;color:var(--text-3);padding:4px 8px;user-select:none">▶</span>
+          
         <div class="card-badge">Allocation Guide</div>
       </div>
       <div class="card-body">
@@ -3471,7 +3471,7 @@ function render(d) {
     </div>
 
     <!-- ═══ IMBS: BEHAVIOR + TAIL RISK + EXPECTATIONS (L5/L8/L6, display-only) ═══ -->
-    <div class="card span-full mb-16 card-collapsed" data-lazy>
+    <div class="card span-full mb-16" data-lazy>
       <div class="card-head">
         <div class="card-title">
           <div class="card-icon">
@@ -3483,7 +3483,7 @@ function render(d) {
           IMBS Behavior Intelligence
             <span class="title-tip" tabindex="0" data-tip="Three macro-behavior gauges from the IMBS blueprint. L5 Behavior State classifies what market participants are doing (Accumulation/Expansion/Euphoria/Distribution/Panic) by re-combining existing signals. L8 Tail Risk is the geometric mean of Liquidity, Behavior, Expectation, Leverage and Correlation stress &mdash; it spikes only when several hit together. L6 Expectation Gap compares market-priced inflation (10Y breakeven) to realized CPI. All three are display-only &mdash; not used in the SFC stress score."><span class="info-tip-icon">i</span></span>
         </div>
-          <span class="collapse-arrow" onclick="toggleCollapseCard(this)" style="cursor:pointer;font-size:10px;color:var(--text-3);padding:4px 8px;user-select:none">▶</span>
+          
         <div class="card-badge" style="color:var(--text-3);font-size:9px">L5 Behavior · L8 Tail Risk · L6 Expectations · display-only</div>
       </div>
       <div class="card-body">
@@ -3533,7 +3533,7 @@ function render(d) {
     </div>
 
     <!-- P0/P1: REGIME CONSENSUS + TRANSMISSION DIVERGENCE -->
-    <div class="card span-full mb-16 card-collapsed" id="transmissionSection">
+    <div class="card span-full mb-16" id="transmissionSection">
       <div class="card-head">
         <div class="card-title">
           <div class="card-icon">
@@ -3545,7 +3545,7 @@ function render(d) {
           Transmission &amp; Regime Consensus
           <span class="title-tip" tabindex="0" data-tip="Two institutional-level outputs. TRANSMISSION compares the direction of macro liquidity (GLF) vs the structure of BTC (SFC) to detect whether money is actually reaching BTC (TRANSMITTING / STRENGTHENING), rotating away (TRANSMISSION_GAP), or BTC diverging from tightening liquidity (DIVERGENCE). REGIME CONSENSUS merges the four subsystem regimes (ensemble, HMM, advanced, behavior-state) into ONE label, with an agreement score and a conflict flag when they disagree. Both display-only &mdash; not used in the SFC stress score."><span class="info-tip-icon">i</span></span>
         </div>
-        <span class="collapse-arrow" onclick="toggleCollapseCard(this)" style="cursor:pointer;font-size:10px;color:var(--text-3);padding:4px 8px;user-select:none">▶</span>
+        
         <div class="card-badge" style="color:var(--text-3);font-size:9px">liquidity→BTC transmission · regime single-source · display-only</div>
       </div>
       <div class="card-body">
