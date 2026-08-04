@@ -2495,8 +2495,7 @@ _m75_score, _m75_detail = calculate_m75_liquidity_composite(
     _m72_score, _m72_detail, _m73_score, _m73_detail, _m74_score, _m74_detail
 )
 _macro_active = sum(1 for x in [_m72_score, _m73_score, _m74_score, _m75_score] if x is not None)
-_macro_avg = round(sum(x for x in [_m72_score, _m73_score, _m74_score, _m75_score] if x is not None) / max(_macro_active, 1), 3)
-print(f"[SFC] M72-M75: {_macro_active}/4 active, avg={_macro_avg}, regime={_m75_detail.get('regime','N/A') if _m75_detail else 'N/A'}", file=sys.stderr)
+print(f"[SFC] M72-M75: {_macro_active}/4 active, regime={_m75_detail.get('regime','N/A') if _m75_detail else 'N/A'}", file=sys.stderr)
 
 # ── CAUSAL INFERENCE FILTER ──
 print("[SFC] Running causal inference filter...", file=sys.stderr)
@@ -4214,7 +4213,6 @@ out = {
     "glf_component_detail": _glf_details.get("components") if _glf_details else None,
     # Macro liquidity (M72-M75 / Layer 1)
     "macro_methods_active": _macro_active,
-    "macro_methods_avg": _macro_avg if _macro_active > 0 else None,
     "m72_m2_growth": round(_m72_score, 3) if _m72_score is not None else None,
     "m72_detail": _m72_detail,
     "m73_m2_momentum": round(_m73_score, 3) if _m73_score is not None else None,

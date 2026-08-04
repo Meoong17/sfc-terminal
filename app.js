@@ -1015,7 +1015,7 @@ function render(d) {
           <div class="stat-box" style="justify-content:center;align-items:center">
             <div style="font-size:10px;color:var(--text-3);line-height:1.5;text-align:center">
               <div>Layer 1 Macro Liquidity</div>
-              <div style="margin-top:4px;font-size:9px;color:var(--text-4)">${d.macro_methods_active||0}/4 · avg ${d.macro_methods_avg!=null?fmtNum(d.macro_methods_avg*100,0)+'%':'—'}</div>
+              <div style="margin-top:4px;font-size:9px;color:var(--text-4)">${d.macro_methods_active||0}/4</div>
               <div style="margin-top:2px;font-size:8px;color:var(--text-4)">M72 M2 Growth · M73 M2 Momentum<br>M74 Fed Balance · M75 Composite</div>
             </div>
           </div>
