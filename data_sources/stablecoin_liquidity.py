@@ -526,10 +526,9 @@ def compute_all_stablecoin_metrics(btc_price=None, btc_mcap=None,
     except Exception as e:
         print(f"[SC] M80 error: {e}", file=sys.stderr)
     
-    avg = round(sum(results.values()) / len(results), 3) if results else None
-    print(f"[SC] M76-M80: {active}/5 active, avg={avg:.3f}", file=sys.stderr)
+    print(f"[SC] M76-M80: {active}/5 active", file=sys.stderr)
     
-    return results, details, active, avg
+    return results, details, active
 
 
 # ── CLI test ──────────────────────────────────────────────────────────
@@ -548,12 +547,12 @@ if __name__ == "__main__":
         print(f"[CLI] On-chain data unavailable: {e}")
         onchain_details = {}
     
-    results, details, active, avg = compute_all_stablecoin_metrics(
+    results, details, active = compute_all_stablecoin_metrics(
         btc_price=64000,
         btc_dominance_pct=58.3,
         onchain_details=onchain_details,
         force_refresh=False,
     )
     
-    print(f"\nResults: {active}/5 active, avg_score={avg}")
+    print(f"\nResults: {active}/5 active")
     print(json.dumps({"results": results, "details": details}, indent=2))

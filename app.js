@@ -1081,7 +1081,7 @@ function render(d) {
           <div class="stat-box" style="justify-content:center;align-items:center">
             <div style="font-size:10px;color:var(--text-3);line-height:1.5;text-align:center">
               <div>Layer 2 Crypto Liquidity</div>
-              <div style="margin-top:4px;font-size:9px;color:var(--text-4)">${d.sc_methods_active||0}/5 · avg ${d.sc_methods_avg!=null?fmtNum(d.sc_methods_avg*100,0)+'%':'—'}</div>
+              <div style="margin-top:4px;font-size:9px;color:var(--text-4)">${d.sc_methods_active||0}/5</div>
               <div style="margin-top:2px;font-size:8px;color:var(--text-4)">M76 Supply Growth · M77 SSR<br>M78 Exchange Flow · M79 Velocity · M80 Dominance</div>
             </div>
           </div>

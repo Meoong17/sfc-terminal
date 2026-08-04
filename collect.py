@@ -136,7 +136,7 @@ try:
 except ImportError as e:
     STABLECOIN_AVAILABLE = False
     print(f"[SFC] Stablecoin liquidity module unavailable: {e}", file=sys.stderr)
-    def compute_all_stablecoin_metrics(*a, **k): return {}, {}, 0, None
+    def compute_all_stablecoin_metrics(*a, **k): return {}, {}, 0
 
 # Import ETF flow module (M81-M82)
 try:
@@ -2151,20 +2151,20 @@ except Exception as e:
 
 # ── STABLECOIN LIQUIDITY METRICS (M76-M80 / Layer 2 Crypto Liquidity) ──
 print("[SFC] Computing M76-M80 stablecoin liquidity metrics...", file=sys.stderr)
-_sc_results, sc_details, sc_active, sc_avg = {}, {}, 0, None
+_sc_results, sc_details, sc_active = {}, {}, 0
 if STABLECOIN_AVAILABLE:
     try:
         # Get BTC dominance from existing data
         _btc_dom_for_sc = dom if dom else 58.3
         _onchain_details_for_sc = onchain_scores.get("details", {}) if onchain_scores else {}
-        _sc_results, sc_details, sc_active, sc_avg = compute_all_stablecoin_metrics(
+        _sc_results, sc_details, sc_active = compute_all_stablecoin_metrics(
             btc_price=btc,
             btc_mcap=mcap,
             btc_dominance_pct=_btc_dom_for_sc,
             onchain_details=_onchain_details_for_sc,
             force_refresh=False,
         )
-        print(f"[SFC] M76-M80: {sc_active}/5 active, avg={sc_avg}", file=sys.stderr)
+        print(f"[SFC] M76-M80: {sc_active}/5 active", file=sys.stderr)
     except Exception as e:
         print(f"[SFC] Stablecoin metrics failed: {e}", file=sys.stderr)
 
@@ -4131,7 +4131,6 @@ out = {
     "inst_methods_avg": round(inst_avg_value, 3) if inst_active_count > 0 and inst_avg_value is not None else None,
     # Stablecoin liquidity (M76-M80)
     "sc_methods_active": sc_active,
-    "sc_methods_avg": round(sc_avg, 3) if sc_active > 0 and sc_avg is not None else None,
     "total_methods_active": total_active_methods + sc_active,
     # M20-M31 individual scores
     "m20_obi": round(inst_results.get("m20_obi", 0), 3) if "m20_obi" in inst_results else None,
