@@ -3094,14 +3094,21 @@ if (ADVANCED_AVAILABLE is None or ADVANCED_AVAILABLE) and adv_regime_boost > 0 a
     else:
         print(f"  [Advanced] adv boost suppressed (consensus sev={_rc_sev} < 45) — single-driver guard", file=sys.stderr)
 
-# ── XGBoost Blend: blend ensemble SFC with XGBoost meta-prediction ──
-if _xgb_pred is not None and _xgb_confidence is not None and _xgb_confidence > 0.3:
-    _xgb_blend_weight = 0.3 * _xgb_confidence  # 0-30% weight based on confidence
+# ── XGBoost Blend: DISABLED (pending walk-forward validation) ──
+# 2026-08-07: the XGBoost meta-ensemble predicts a RARE 6h forward price-drop
+# probability (base rate 2.8%, positives 1.8%), not a stress index, yet it was
+# blended 1:1 into the 0-100 effective_sfc stress scale, with a weight derived
+# from a circular heuristic confidence and validated only by a single 85/15
+# chronological split (NOT walk-forward). Per the "no unvalidated blend" rule,
+# the blend is gated OFF: _xgb_pred / _xgb_confidence remain DISPLAY-ONLY.
+# Re-enable only after XGBoost passes walk-forward validation + scale
+# calibration. _xgb_blend_weight is pinned to 0.0 so the circuit breaker
+# (which mirrors this chain) stays consistent with the unblended value.
+_xgb_blend_weight = 0.0
+if _xgb_pred is not None:
     _old_sfc = effective_sfc
-    effective_sfc = (1 - _xgb_blend_weight) * (effective_sfc or 0) + _xgb_blend_weight * _xgb_pred
-    effective_sfc = max(0.0, min(100.0, effective_sfc))
-    zone = "CRITICAL" if effective_sfc/100 > 0.75 * _REGIME_DRIVER_MULT else "HIGH" if effective_sfc/100 > 0.50 * _REGIME_DRIVER_MULT else "ELEVATED" if effective_sfc/100 > 0.25 * _REGIME_DRIVER_MULT else "NORMAL"
-    print(f"[XGB] Blended: old={_old_sfc:.1f}% → {effective_sfc:.1f}% (weight={_xgb_blend_weight:.2f})", file=sys.stderr)
+    print(f"[XGB] Blend DISABLED — effective_sfc stays {_old_sfc:.1f}% "
+          f"(xgb_pred={_xgb_pred:.1f}% display-only, conf={_xgb_confidence:.2f})", file=sys.stderr)
 
 # ── ONLINE LEARNING EWMA (Peningkatan 5: adaptive correction) ──
 _online_module = _get_adv_online()
