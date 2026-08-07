@@ -3442,36 +3442,42 @@ if m8_d is not None:
 
 # Execution risk factors (Layer 2) — multiplicative, affect sizing/timing
 
-# Continuous squeeze magnitude (0-1) = one-sidedness × volume magnitude
-# Bukan binary flag — proporsional terhadap tekanan likuidasi sesungguhnya
-_squeeze_magnitude = 0.0
+# Liquidation one-sidedness (0-1) = |long−short| / total.
+# Computed ONCE and used by squeeze_magnitude ONLY — feeding it into both
+# squeeze AND funding double-counted the same signal and inflated execution
+# risk (a heavy one-sided liquidation day looked worse than it was).
+_liq_side = 0.0
 if liq_total_24h is not None and liq_long_vol is not None and liq_short_vol is not None:
     _liq_tot = liq_long_vol + liq_short_vol
     if _liq_tot > 0:
-        _side = abs(liq_long_vol - liq_short_vol) / _liq_tot  # 0=balanced, 1=one-sided
-        _squeeze_magnitude = _side * liq_density
+        _liq_side = abs(liq_long_vol - liq_short_vol) / _liq_tot  # 0=balanced, 1=one-sided
+
+# Continuous squeeze magnitude (0-1) = one-sidedness × volume magnitude
+# Bukan binary flag — proporsional terhadap tekanan likuidasi sesungguhnya
+_squeeze_magnitude = 0.0
+if _liq_side > 0 and liq_density is not None:
+    _squeeze_magnitude = _liq_side * liq_density
 elif liq_pressure in ('LONG_SQUEEZE', 'SHORT_SQUEEZE'):
     # Fallback: RSI extremity × dvol-based density
     _rsi_ext = min(abs((rsi_14m or 50) - 50) / 50, 1.0) if rsi_14m is not None else 0.5
     _squeeze_magnitude = _rsi_ext * liq_density
 
-# Funding imbalance — from liquidation flow or funding rate
-_imb_funding = 0.0
-if liq_total_24h is not None and liq_long_vol is not None and liq_short_vol is not None:
-    _liq_tot = liq_long_vol + liq_short_vol
-    if _liq_tot > 0:
-        _imb_funding = abs(liq_long_vol - liq_short_vol) / _liq_tot
-elif m13_d and isinstance(m13_d, dict):
+# Funding imbalance — REAL derivative funding rate only (m13_d).
+# Liquidation asymmetry is already captured by squeeze_magnitude, so using it
+# here as well would double-count the same signal. When funding rate is
+# unavailable -> 0.0 (no funding signal), NOT a liquidation proxy.
+_funding_imbalance = 0.0
+if m13_d and isinstance(m13_d, dict):
     _fr = m13_d.get("funding_rate")
     if _fr is not None:
-        _imb_funding = min(abs(_fr) * 10, 1.0)
+        _funding_imbalance = min(abs(_fr) * 10, 1.0)
 
 # Continuous execution risk factor: R = 0.4×cascade + 0.3×squeeze + 0.3×funding
 # Capped at 0.95 so confidence floor stays at 5%
 _execution_risk = min(
     0.40 * cascade_risk +
     0.30 * _squeeze_magnitude +
-    0.30 * _imb_funding,
+    0.30 * _funding_imbalance,
     0.95
 )
 
@@ -4083,7 +4089,7 @@ out = {
         "macro_confidence": round(macro_confidence, 3),
         "execution_risk": round(_execution_risk, 3),
         "cascade_risk_raw": round(cascade_risk, 3),
-        "funding_imbalance": round(_imb_funding, 3),
+        "funding_imbalance": round(_funding_imbalance, 3),
         "squeeze_magnitude": round(_squeeze_magnitude, 3),
         "cascade_penalty": round(-(0.40 * cascade_risk), 3),  # continuous contribution to execution_risk, not stale step-function
         "fear_penalty": round(-_pen_fng, 3),  # references real _pen_fng (covers fng<15 AND fng>85)
