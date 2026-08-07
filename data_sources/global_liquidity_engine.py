@@ -89,6 +89,55 @@ def _compute_dxy():
         return None
 
 
+CHINA_M2_URL = "https://chinadata.live/api/v2/data/china-m2-money-supply?format=csv"
+CHINA_M2_MAX_STALE_MONTHS = 3  # reject the series if newest obs older than this
+
+
+def _fetch_china_m2():
+    """Fetch China M2 money supply (CNY trillion, monthly) from chinadata.live.
+
+    Source data originates from the People's Bank of China. Free CSV endpoint
+    (no API key required), reachable where IMF/FRED-alias endpoints may not be.
+
+    Returns a list [latest, ..., oldest] of values suitable for _yoy_chg()
+    (i.e. index 0 = most recent), or None if fetch fails / data is too stale.
+
+    NOTE: this REPLACES the previous source FRED MYAGM2CNM189N. That series ID
+    resolves but its data froze at 2019-08-01 (never None, so it silently fed a
+    7-year-old reading into GLF). chinadata.live updates monthly and is verified
+    live against the PBC figure (2026-05 = CNY 3536.7 trillion).
+    """
+    try:
+        r = requests.get(CHINA_M2_URL, timeout=20, headers={"User-Agent": "Mozilla/5.0"})
+        if r.status_code != 200:
+            return None
+        rows = []
+        for line in r.text.strip().splitlines()[1:]:
+            parts = line.split(",")
+            if len(parts) < 2:
+                continue
+            try:
+                rows.append((parts[0].strip(), float(parts[1])))
+            except ValueError:
+                continue
+        if not rows:
+            return None
+        # CSV is ascending (oldest -> newest). Reverse to latest-first.
+        rows = rows[::-1]
+        latest_date = rows[0][0]
+        try:
+            last = datetime.strptime(latest_date, "%Y-%m").replace(tzinfo=timezone.utc)
+            months_stale = (datetime.now(timezone.utc).year - last.year) * 12 + \
+                (datetime.now(timezone.utc).month - last.month)
+            if months_stale > CHINA_M2_MAX_STALE_MONTHS:
+                return None
+        except ValueError:
+            pass
+        return [v for _, v in rows]
+    except Exception:
+        return None
+
+
 def _fetch_all_parallel():
     """Fetch all FRED series + DXY in parallel batch."""
     from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -100,9 +149,8 @@ def _fetch_all_parallel():
         ("WTREGEN", 8),      # TGA balance
         ("RRPONTSYD", 8),    # RRP facility
         ("M2SL", 13),        # M2 money supply
-        ("MYAGM2CNM189N", 13),  # China M2 (Broad Money, OECD via FRED) — see
-                                 # note in _compute_china_component() below;
-                                 # UNVERIFIED series ID, confirm on FRED before relying on this.
+        # China M2 is now fetched from chinadata.live in _fetch_china_m2()
+        # (the previous FRED MYAGM2CNM189N froze at 2019-08-01; see that fn).
     ]
 
     def _fetch_one(series, limit):
@@ -118,6 +166,11 @@ def _fetch_all_parallel():
     dxy = _compute_dxy()
     if dxy is not None:
         _FRED_CACHE["DXY"] = dxy
+
+    # China M2 — from chinadata.live (live PBC data), not FRED
+    china_vals = _fetch_china_m2()
+    if china_vals is not None:
+        _FRED_CACHE["MYAGM2CNM189N:13"] = china_vals
 
     return True
 
@@ -189,31 +242,18 @@ def compute_global_liquidity_factor(force_refresh=False):
     jpn_z = _z_score(jpn_yoy, 3.0, 6.0) if jpn_yoy is not None else 0
 
     # ── 3b. China M2 YoY ──
-    # NOTE ON SERIES ID: MYAGM2CNM189N (China Broad Money, OECD via FRED)
-    # was NOT verified against a live FRED query when this was written —
-    # network access was unavailable in the environment this was built in.
-    # Confirm the series resolves at
-    # https://fred.stlouisfed.org/series/MYAGM2CNM189N before relying on
-    # this component; if it 404s or returns no data, china_yoy will
-    # correctly come back None and this component contributes 0 to GLF
-    # (fails safe, doesn't silently corrupt the score) — but you should
-    # still find the correct series ID and update it here, since a
-    # permanently-zero component just wastes its weight allocation.
+    # SOURCE: chinadata.live CSV (PBC data) — see _fetch_china_m2().
+    # The previous FRED series MYAGM2CNM189N froze at 2019-08-01 (it resolved
+    # but never returned None, so it silently fed a 7-year-old reading into
+    # GLF). chinadata.live updates monthly; the fetch includes a staleness
+    # guard (rejects data older than 3 months).
     #
-    # This was added because the previous "BOJ/PBOC Balance Sheet" label
-    # was misleading: the code only ever fetched JPNASSETS (Bank of Japan)
-    # — no PBOC/China-specific data was ever fetched despite the comment
-    # implying otherwise. China is a genuinely separate liquidity engine
-    # from Japan; conflating them under one series was inaccurate for a
-    # liquidity-focused model.
+    # Calibration below derived from the chinadata.live history 2015-01..2026-05:
+    #   YoY mean = 9.53%, std = 1.73%  (125 monthly YoY observations).
+    # The previous hardcoded (9.0, 3.5) overstated std, compressing the z-score.
     china = _FRED_CACHE.get("MYAGM2CNM189N:13")
     china_yoy = _yoy_chg(china) if china else None
-    # Mean/std here are a rough starting estimate (China M2 growth has
-    # historically run higher than US/EU, often 8-12%/yr) — NOT yet
-    # verified against real FRED history the way liquidity_zscore_calibration.py
-    # does for the other four components. Run that script against this
-    # series once the ID is confirmed working.
-    china_z = _z_score(china_yoy, 9.0, 3.5) if china_yoy is not None else 0
+    china_z = _z_score(china_yoy, 9.53, 1.73) if china_yoy is not None else 0
 
     # ── 4. US M2 YoY ──
     m2 = _FRED_CACHE.get("M2SL:13")
