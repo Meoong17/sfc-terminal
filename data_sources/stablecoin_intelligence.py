@@ -258,7 +258,11 @@ def compute_stablecoin_liquidity_index(
         return 50.0, 0.50, {"error": "no data available", "status": "fallback"}
 
     total_w = sum(w for _, w in component_scores.values())
-    sli_z = sum((v - 0.5) * w for v, w in component_scores.values()) / total_w
+    # Components are scored HIGH = bearish/liquidity stress. Invert so a
+    # bearish signal (v high) drives sli_z NEGATIVE (SLI low), and a bullish
+    # one (v low) drives it positive. The previous sign ((v - 0.5)) turned
+    # every bearish component into a bullish contribution, inflating SLI.
+    sli_z = sum((0.5 - v) * w for v, w in component_scores.values()) / total_w
 
     # Map to SLI 0-100
     # sli_z = 0 (neutral) → SLI=55
@@ -290,7 +294,7 @@ def compute_stablecoin_liquidity_index(
         comp_detail[name] = {
             "score": round(val, 3),
             "weight": weight,
-            "contribution": round((val - 0.5) * weight / total_w, 4),
+            "contribution": round((0.5 - val) * weight / total_w, 4),
         }
 
     details = {

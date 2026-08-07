@@ -90,19 +90,27 @@ def fetch_stablecoin_supply_history(force_refresh=False):
         _save_cache(cache)
         return cache.get("supply_history", {})
     
-    # Merge: sum mcaps across stablecoin IDs for each day
-    # Build { timestamp: total_mcap }
-    merged = {}
+    # Merge: sum mcaps across stablecoin IDs for each day, but ONLY count a
+    # day when EVERY stablecoin has a data point. A partial day (one coin
+    # missing from its market_chart that day) would otherwise sum a subset and
+    # be misread as a supply collapse (e.g. 260B -> 4.9B when only DAI+FDUSD
+    # reported that day), which poisons M76 growth, SSR and SLI.
+    merged = {}      # day_key -> total_mcap
+    day_counts = {}  # day_key -> # of distinct coins with a point that day
+    n_coins = len(all_series)
     for sid, series in all_series.items():
         for ts, mcap in series:
             day_key = int(ts / 86400) * 86400  # daily bucket
-            merged.setdefault(day_key, 0)
-            merged[day_key] += mcap
-    
-    # Convert to sorted date-keyed dict
-    sorted_days = sorted(merged.keys())
+            merged[day_key] = merged.get(day_key, 0) + mcap
+            day_counts[day_key] = day_counts.get(day_key, 0) + 1
+
+    # Convert to sorted date-keyed dict, dropping incomplete days
     history = {}
-    for ts in sorted_days:
+    for ts in sorted(merged.keys()):
+        if day_counts[ts] < n_coins:
+            # incomplete day (not all stablecoins present) — skip so it can't
+            # be read as a real supply change
+            continue
         date_str = datetime.fromtimestamp(ts / 1000, tz=timezone.utc).strftime("%Y-%m-%d")
         history[date_str] = round(merged[ts], 2)
     
