@@ -16,7 +16,7 @@ Usage:
     result = predict_ensemble({"m1_klr": 5.9, "m2_logit": 6.7, ...})
 """
 
-import json, os, sys, subprocess, logging, traceback
+import json, os, sys, subprocess, logging, traceback, math
 from datetime import datetime, timedelta
 import numpy as np
 from pathlib import Path
@@ -42,6 +42,14 @@ METHOD_FIELDS = [
     "m23_liquidity", "m24_cape", "m25_minsky", "m26_kahneman", "m27_taleb",
     "m28_summers", "m29_debt", "m30_rajan", "m31_altman",
 ]
+
+# Std of the training target (y = 6h forward price-drop probability), measured on
+# the 18,287-sample training set (y.std ≈ 0.12). Used to normalize the tree-ensemble
+# confidence (CI width vs this natural target variation) so it's scale-relative.
+TARGET_STD = 0.12
+
+# Neutral confidence returned when tree-ensemble std cannot be computed.
+_FALLBACK_CONF = 0.5
 
 # ── LOGGING ──
 logging.basicConfig(
@@ -155,25 +163,34 @@ class XGBoostMetaEnsemble:
         vec = self._dict_to_vector(scores_dict)
         pred = self.predict(vec.reshape(1, -1))[0]
 
-        # Confidence: use tree ensemble std if available
-        if hasattr(self.model, 'predict') and hasattr(self.model, 'get_booster'):
-            try:
-                # Get per-tree predictions for std estimate
-                preds_trees = self.model.get_booster().predict(
-                    xgb.DMatrix(vec.reshape(1, -1)),
-                    output_margin=True,
-                    pred_leaf=False,
-                    iteration_range=(0, self.model.get_booster().best_ntree_limit
-                                     if hasattr(self.model.get_booster(), 'best_ntree_limit')
-                                     else self.model.n_estimators),
-                )
-                # If we can get tree-level predictions, use std / sqrt(n_trees)
-                # Fallback: use a fixed confidence based on model's feature count
-                confidence = min(1.0, 0.5 + 0.5 * (1.0 - abs(pred - 50.0) / 50.0))
-            except Exception:
-                confidence = min(1.0, 0.5 + 0.5 * (1.0 - abs(pred - 50.0) / 50.0))
-        else:
-            confidence = min(1.0, 0.5 + 0.5 * (1.0 - abs(pred - 50.0) / 50.0))
+        # Confidence: genuine tree-ensemble uncertainty (NOT a function of `pred`).
+        # 2026-08-07: the old confidence was `0.5 + 0.5*(1 - |pred-50|/50)` — derived
+        # from the prediction value itself (circular), and the tree-std branch was
+        # dead code. Now we estimate per-tree marginal contributions via
+        # Booster.predict(iteration_range=(0,k)) differences, so confidence reflects
+        # how much the trees DISAGREE, independent of the point estimate.
+        # NOTE: this measures internal tree agreement, NOT predictive skill or
+        # calibration — those belong to walk-forward validation (see step 3).
+        confidence = _FALLBACK_CONF
+        try:
+            booster = self.model.get_booster()
+            n = booster.num_boosted_rounds()
+            dm = xgb.DMatrix(vec.reshape(1, -1))
+            if n > 1:
+                prev = booster.predict(dm, iteration_range=(0, 0))[0]
+                contribs = np.empty(n, dtype=np.float64)
+                for k in range(1, n + 1):
+                    cur = booster.predict(dm, iteration_range=(0, k))[0]
+                    contribs[k - 1] = cur - prev
+                    prev = cur
+                margin_std = float(contribs.std())
+                se = margin_std / math.sqrt(n)
+                # ~95% CI width (both sides), normalized by the training target std:
+                # a narrower CI relative to natural target variation = higher confidence.
+                ci_width = 2.0 * 1.96 * se
+                confidence = max(0.0, min(1.0, 1.0 - ci_width / TARGET_STD))
+        except Exception:
+            confidence = _FALLBACK_CONF
 
         return float(pred), float(confidence)
 
