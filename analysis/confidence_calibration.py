@@ -32,13 +32,22 @@ STATE_PATH = os.path.join(SFC_DIR, ".calibration_state.json")
 
 # ── Price-Outcome Ground Truth Config ──
 # Adaptive threshold: scales by sqrt of actual time elapsed between snapshots
-# At the base interval (~5 min), threshold = BASE_THRESHOLD_ABS
-# At longer intervals (e.g., 30 min), threshold scales up: BASE_THRESHOLD_ABS * sqrt(Δt / 5min)
-PRICE_BASE_INTERVAL_MINUTES = 5    # Reference interval for threshold scaling
-PRICE_BASE_THRESHOLD_ABS = 0.003   # ±0.3% at base 5-min interval, scales with √(Δt)
-PRICE_MIN_THRESHOLD = 0.002        # Floor: never go below ±0.2% even at very short intervals
-PRICE_MAX_THRESHOLD = 0.05         # Ceiling: never exceed ±5% even at very long intervals
-PRICE_LOOKAHEAD_STEPS = 6          # Look ~30 min ahead (6 snapshots × ~5 min)
+# At the base interval (~72 min, the real production cadence), threshold =
+# BASE_THRESHOLD_ABS. At longer intervals it scales up: BASE_THRESHOLD_ABS * √(Δt / base).
+#
+# TUNED EMPIRICALLY 2026-08-08 (see analysis/calibration_param_tune.py):
+#   Stock values (base=5min, thr=0.003, look=6) assumed a 5-min cadence that
+#   does NOT match production (median spacing ~72 min). That mismatch made the
+#   6-step lookahead span ~7h and the scaled threshold reach ~2.6-5%, so 97.9%
+#   of snapshots classified FLAT and the 0.70 price-outcome weight was dormant
+#   (only 17/802 labeled). Tuning to the real cadence (base=72, thr=0.005,
+#   look=3) yields ~18% labeled AND validated OUT-OF-SAMPLE:
+#   ECE 0.182 -> 0.039, Brier 0.275 -> 0.253 (both improved on held-out data).
+PRICE_BASE_INTERVAL_MINUTES = 72   # real median snapshot spacing (not 5 min)
+PRICE_BASE_THRESHOLD_ABS = 0.005   # ±0.5% at base 72-min interval, scales with √(Δt)
+PRICE_MIN_THRESHOLD = 0.002        # Floor: never go below ±0.2%
+PRICE_MAX_THRESHOLD = 0.05         # Ceiling: never exceed ±5%
+PRICE_LOOKAHEAD_STEPS = 3          # ~3-4h ahead at real cadence (3 snapshots × ~72 min)
 PRICE_OUTCOME_WEIGHT = 0.7
 
 
