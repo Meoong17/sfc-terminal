@@ -216,3 +216,21 @@ Actions taken:
 Re-enable policy: XGBoost may be re-blended only after walk-forward validation
 shows calibrated, era-stable discrimination AND the output is scale-calibrated
 onto the stress index (percentile mapping, not 1:1).
+
+## Metode akademik — validasi bertahap (2026-08-08)
+
+Riset metode akademis (matematika/ekonomi/coding) → docs/ACADEMIC_METHODS.md,
+sketsa implementasi → analysis/sfc_methods_academic.py. Setiap metode diuji
+empiris wajib sebelum integrasi. Hasil:
+
+| Tahap | Metode | Uji empiris | Verdict |
+|-------|--------|-------------|---------|
+| 1 | EVT-POT VaR/ES | `analysis/sfc_evt_validate.py` — backtest walk-forward 1531 hari OOS | **TIDAK tervalidasi** atas incumbent. Incumbent `m11_var` (empirical percentile) di 95% lebih baik (err 0.12 vs EVT 0.20, Kupiec p=0.253 vs 0.059); di 99% seri. EVT tak lebih baik → jangan ganti m11_var. Catatan: uji awal vs normal (strawman) menyesatkan; koreksi dibanding incumbent. |
+| 2 | CISS composite | `analysis/sfc_ciss_validate.py` — panel harian 17 titik (git data.json) | **TIDAK tervalidasi.** Sampel terlalu kecil & rezim tenang (komponen nyaris konstan); korelasi komposit→forward-30d positif & tak signifikan (rho +0.22, p=0.39); CISS nyaris identik (corr 0.994). Integrasi ditunda sampai panel lebih panjang dgn episode stress. |
+| 3 | Purged/embargo CV XGBoost | `analysis/walk_forward_xgboost_purged.py` — embargo 6, bootstrap CI | **STAY_DISABLED diperkuat.** Pooled AUC 0.486 < 0.5 (CI [0.464,0.563]), gate kalibrasi gagal (resolution 0). Embargo MENGUNGKAP look-ahead leakage pada WFV single-path (AUC fold-awal 0.726/0.617 → 0.274/0.383 setelah purge). XGBoost tetap display-only. |
+
+Pembelajaran utama: (a) bandingkan metode baru dgn INCUMBENT (empirical percentile),
+bukan strawman; (b) validasi model yang labelnya bergantung masa depan WAJIB
+purged-CV + embargo (López de Prado), bukan single-path WFV — single-path
+over-estimates skill; (c) purged-CV kini menjadi standar validasi yang dianjurkan
+untuk menilai faktor baru sebelum masuk ke sinyal efektif.

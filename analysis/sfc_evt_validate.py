@@ -41,6 +41,15 @@ def normal_var(returns, q):
     return mu + z * s  # loss > 0
 
 
+def empirical_var(returns, q):
+    """Incumbent collect.py calculate_m11_var: historical percentile (empirical)."""
+    arr = np.asarray(returns, dtype=float)
+    var_p = np.percentile(arr, (1 - q) * 100)   # q=0.95 -> pct 5
+    tail = arr[arr <= var_p]
+    es = np.mean(tail) if len(tail) > 0 else var_p
+    return -var_p, -es                          # positif = besar kerugian
+
+
 def evt_var(returns, q, threshold_q=0.90):
     """EVT-POT VaR (positive loss magnitude) dari jendela trailing."""
     r = returns[~np.isnan(returns)]
@@ -93,39 +102,43 @@ def christoffersen_indep(hits_vec):
 
 def backtest(returns, window=500, alphas=(0.95, 0.99)):
     n = len(returns)
+    methods = ["norm", "emp", "evt"]
     out = {}
     for a in alphas:
-        hits_norm, hits_evt = 0, 0
-        norm_vec, evt_vec = [], []
-        es_norm_sum, es_evt_sum = 0.0, 0.0
-        es_norm_cnt, es_evt_cnt = 0, 0
+        hits = {m: 0 for m in methods}
+        vec = {m: [] for m in methods}
+        mean_excess = {m: (0.0, 0) for m in methods}
         for t in range(window, n):
             win = returns[t - window:t]
             r_t = returns[t]
-            vn = normal_var(win, a)
-            ve = evt_var(win, a)
-            hit_n = float(r_t < -vn); hit_e = float(r_t < -ve)
-            hits_norm += hit_n; hits_evt += hit_e
-            norm_vec.append(hit_n); evt_vec.append(hit_e)
-            if hit_n:
-                es_norm_sum += -r_t; es_norm_cnt += 1
-            if hit_e:
-                es_evt_sum += -r_t; es_evt_cnt += 1
-        m = n - window
-        out[a] = {
-            "n_test": m,
-            "nominal": 1 - a,
-            "norm_hit_rate": hits_norm / m,
-            "evt_hit_rate": hits_evt / m,
-            "norm_kupiec_p": kupiec_pof(hits_norm, m, 1 - a),
-            "evt_kupiec_p": kupiec_pof(hits_evt, m, 1 - a),
-            "norm_chris_p": christoffersen_indep(np.array(norm_vec)),
-            "evt_chris_p": christoffersen_indep(np.array(evt_vec)),
-            # ES precision: mean realized excess (for hits) vs normal-fit ES proxy
-            "norm_mean_excess": es_norm_sum / es_norm_cnt if es_norm_cnt else float("nan"),
-            "evt_mean_excess": es_evt_sum / es_evt_cnt if es_evt_cnt else float("nan"),
-        }
+            v = {
+                "norm": normal_var(win, a),
+                "emp": empirical_var(win, a)[0],
+                "evt": evt_var(win, a),
+            }
+            for m in methods:
+                hit = float(r_t < -v[m])
+                hits[m] += hit
+                vec[m].append(hit)
+                if hit:
+                    s, c = mean_excess[m]
+                    mean_excess[m] = (s + (-r_t), c + 1)
+        m_n = n - window
+        row = {"n_test": m_n, "nominal": 1 - a}
+        for m in methods:
+            ex_sum, ex_cnt = mean_excess[m]
+            row[f"{m}_hit_rate"] = hits[m] / m_n
+            row[f"{m}_kupiec_p"] = kupiec_pof(hits[m], m_n, 1 - a)
+            row[f"{m}_chris_p"] = christoffersen_indep(np.array(vec[m]))
+            row[f"{m}_mean_excess"] = ex_sum / ex_cnt if ex_cnt else float("nan")
+        out[a] = row
     return out
+
+
+def _fmt(r, m, nominal):
+    err = abs(r[f"{m}_hit_rate"] - nominal) / nominal
+    return (f"{r[f'{m}_hit_rate']:.2%} (Kupiec p={r[f'{m}_kupiec_p']:.3f}, "
+            f"Chris p={r[f'{m}_chris_p']:.3f}) err={err:.2f} excess={r[f'{m}_mean_excess']:.2%}")
 
 
 def main():
@@ -137,22 +150,17 @@ def main():
 
     res = backtest(rets)
     for a, r in res.items():
-        print(f"=== VaR {int(a*100)}% (nominal exceedance {r['nominal']:.1%}) — OOS n={r['n_test']} ===")
-        print(f"  NORMAL: hit-rate {r['norm_hit_rate']:.2%}  "
-              f"(Kupiec p={r['norm_kupiec_p']:.3f}, Christoffersen p={r['norm_chris_p']:.3f})  "
-              f"mean-excess {r['norm_mean_excess']:.2%}")
-        print(f"  EVT   : hit-rate {r['evt_hit_rate']:.2%}  "
-              f"(Kupiec p={r['evt_kupiec_p']:.3f}, Christoffersen p={r['evt_chris_p']:.3f})  "
-              f"mean-excess {r['evt_mean_excess']:.2%}")
+        nom = r["nominal"]
+        print(f"=== VaR {int(a*100)}% (nominal {nom:.1%}) — OOS n={r['n_test']} ===")
+        print(f"  NORMAL    : {_fmt(r,'norm',nom)}")
+        print(f"  EMPIRICAL (incumbent collect.py): {_fmt(r,'emp',nom)}")
+        print(f"  EVT       : {_fmt(r,'evt',nom)}")
 
-        # verdict per level
-        nrate, erate = r["norm_hit_rate"], r["evt_hit_rate"]
-        n_err = abs(nrate - r["nominal"]) / r["nominal"]
-        e_err = abs(erate - r["nominal"]) / r["nominal"]
-        better = "NORMAL" if n_err <= e_err else "EVT"
-        well_cal = "YA (close to nominal)" if e_err < 0.5 else "TIDAK"
-        print(f"  -> lebih dekat nominal: {better} | EVT kalibrasi-wajar: {well_cal} "
-              f"(err normal {n_err:.2f} vs EVT {e_err:.2f})\n")
+        # nearest-to-nominal among the three
+        err = {m: abs(r[f"{m}_hit_rate"] - nom) / nom for m in ("norm", "emp", "evt")}
+        best = min(err, key=err.get)
+        print(f"  -> paling dekat nominal: {best.upper()} "
+              f"(err norm {err['norm']:.2f} / emp {err['emp']:.2f} / evt {err['evt']:.2f})\n")
 
 
 if __name__ == "__main__":
