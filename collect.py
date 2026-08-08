@@ -1113,9 +1113,15 @@ def calculate_sfc_ensemble(factors):
     # 2026-08 audit of effective contribution (11.7k snapshots) found St hovers
     # near zero (mean|val|=0.16, inputs sit at sigmoid centers) — its weight was
     # the largest yet contributed the least (~9.9%). Normalized St to 1.0 and
-    # redistributed the freed 0.34 proportionally to preserve total scale
-    # (sum=5, same as equal weighting) so z_score range is unchanged.
-    _FACTOR_WT = {"Lt": 0.72, "St": 1.0, "Rt": 1.09, "Ft": 1.09, "Sc": 1.10}
+    # redistributed the freed 0.34 proportionally to preserve total scale.
+    # Then (2026-08) Rt reduced 1.09 -> 0.80: Rt/FNG dominated ~43% of effective
+    # contribution but is ERA-UNSTABLE — no purged-CV return edge and its
+    # defensive (downside) polarity FLIPS across eras (docs/feature_weight_audit.md
+    # §2, §6). The freed 0.29 went to Lt (liquidity: btc_24h + onchain_value +
+    # ETF/fiscal), the structurally-defensible primary-driver domain and the
+    # lowest-weighted factor — a "least-bad" choice, NOT an evidence endorsement
+    # (no factor is proven OOS-strong). Total preserved at 5.0.
+    _FACTOR_WT = {"Lt": 1.01, "St": 1.0, "Rt": 0.80, "Ft": 1.09, "Sc": 1.10}
     norm = {k: v/6 for k, v in factors.items()}
     # FIX: use raw factors (not norm/6) for z_score — original [-15, +15] range
     z_score = sum(factors[k] * _FACTOR_WT[k] for k in factors)

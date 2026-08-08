@@ -73,10 +73,17 @@ live masuk ensemble via method m33_glo (method_scores_dict['m33_glo']), BUKAN fa
 Lt. Jadi:
 1. **Dihapus**: cabang dead code GLO di score_factors_from_market (Lt hanya btc_24h
    + onchain_value + ETF/fiscal adjustments). Tanpa perubahan perilaku (sudah None).
-2. **St weight 1.34 → 1.0**: redistribusi ke total tetap 5 (Lt 0.72, St 1.0, Rt 1.09,
-   Ft 1.09, Sc 1.10) supaya z_score scale tak bergeser. Dampak kecil (St dorman).
+2. **St weight 1.34 → 1.0**: redistribusi ke total tetap 5. Dampak kecil (St dorman).
+   BOBOT AKHIR `_FACTOR_WT` (setelah semua sesi ini): Lt 1.01, St 1.0, Rt 0.80,
+   Ft 1.09, Sc 1.10 (total=5.0) — lihat §4b.
 3. **TIDAK disentuh**: m33_glo method — butuh analisis kontribusi ensemble terpisah
    sebelum keputusan (dicatat sebagai follow-up hipotesis, lihat §5).
+
+## 4b. Bobot final `_FACTOR_WT` (2026-08-08, total=5.0, scale terjaga)
+- Lt 1.01 (naik dari 0.72: dapat 0.29 dari pemangkasan Rt)
+- St 1.0 (turun dari 1.34: kontribusi efektif cuma ~9.9%, faktor dorman)
+- Rt 0.80 (turun dari 1.09: FNG era-unstable di return & downside)
+- Ft 1.09, Sc 1.10 (tidak berubah di babak ini)
 
 ## 5. Follow-up: m33_glo method — KONFIRMASI INERT (2026-08-08)
 Diperiksa tuntas cara m33_glo masuk ke skor akhir:
@@ -126,6 +133,8 @@ prediksi downside (era-flip).
 
 Nuansa jujur: di rezim SEKARANG (2022-26) FNG defensif (IC negatif) → tak bisa
 diklaim tak berguna mutlak. Tapi era-flip historis = nilai bergantung rezim; bobot
-DOMINAN tidak bisa dibenarkan oleh bukti. Rekomendasi: JANGAN menaikkan bobot Rt/FNG;
-pertahankan moderat (bukan dominan). Perubahan bobot produksi lebih lanjut hanya
-jika ingin mengeksekusi, bukan di-wire otomatis.
+DOMINAN tidak bisa dibenarkan oleh bukti. TINDAKAN (2026-08-08, setelah konfirmasi
+user): Rt weight 1.09 → 0.80, freed 0.29 dialihkan ke Lt (liquidity — domain paling
+defensibel struktural & bobot terendah). "Least-bad" choice, bukan endorsement bukti
+(tidak ada faktor terbukti OOS-kuat). FNG tetap aktif (proteksi rezim berjalan), hanya
+dominasinya dikurangi. Verifikasi: py_compile OK, weight sum=5, ensemble normal.
