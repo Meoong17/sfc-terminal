@@ -105,3 +105,27 @@ Perubahan yang DITERAPKAN:
 
 Verifikasi: py_compile OK; AST menegaskan total_active_methods tak lagi memakai
 m33_glo_score; sfc/composite tak berubah (perubahan hanya display count).
+
+## 6. Follow-up: Rt/FNG — uji DEFENSIF (downside) era-FLIP (2026-08-08)
+FNG tak punya edge di prediksi return (purged-CV, §2). Karena SFC adalah skor STRESS,
+uji yang TEPAT untuk input defensif adalah: apakah FNG rendah (takut) memprediksi
+DRAWDOWN ke depan (IC negatif = defensif). Skrip `analysis/audit_rt_fng_downside.py`:
+
+| h | metrik | IC full | era1(17-21) | era2(22-26) | pola |
+|---|---|---|---|---|---|
+| 30d | max drawdown | -0.032 | +0.095 | -0.132 | ERA-FLIP |
+| 90d | max drawdown | -0.114 | +0.055 | -0.291 | ERA-FLIP |
+| 90d | worst-day | -0.124 | +0.275 | -0.260 | ERA-FLIP |
+| 90d | downside semidev | -0.024 | +0.252 | -0.194 | ERA-FLIP |
+| 30d/90d | SFC core replay IC(sfc, maxdd) | -0.006 / +0.050 | | | nol / arah salah |
+
+Kesimpulan: **FNG/Rt TIDAK stabil sebagai sinyal defensif pun** — polaritas balik
+lintas era (2017-21 kontra-defensif, 2022-26 defensif). Bobot besar Rt/FNG (43%
+kontribusi) tidak dibenarkan baik untuk prediksi return (tak ada edge) MAUPUN
+prediksi downside (era-flip).
+
+Nuansa jujur: di rezim SEKARANG (2022-26) FNG defensif (IC negatif) → tak bisa
+diklaim tak berguna mutlak. Tapi era-flip historis = nilai bergantung rezim; bobot
+DOMINAN tidak bisa dibenarkan oleh bukti. Rekomendasi: JANGAN menaikkan bobot Rt/FNG;
+pertahankan moderat (bukan dominan). Perubahan bobot produksi lebih lanjut hanya
+jika ingin mengeksekusi, bukan di-wire otomatis.
