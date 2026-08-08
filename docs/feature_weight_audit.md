@@ -138,3 +138,29 @@ user): Rt weight 1.09 → 0.80, freed 0.29 dialihkan ke Lt (liquidity — domain
 defensibel struktural & bobot terendah). "Least-bad" choice, bukan endorsement bukti
 (tidak ada faktor terbukti OOS-kuat). FNG tetap aktif (proteksi rezim berjalan), hanya
 dominasinya dikurangi. Verifikasi: py_compile OK, weight sum=5, ensemble normal.
+
+## 7. Peta fitur inert / display-only (audit menyeluruh 2026-08-08)
+Detektor AST (variabel di-assign tapi load≤1) + pelacakan jalur skor mengidentifikasi
+metode yang DIHITUNG + DILAPORKAN + DI-COUNT tapi TIDAK menggeser skor (sama pola
+dengan m33_glo):
+
+| Metode | Status | Keterangan |
+|---|---|---|
+| m33_glo | INERT | sudah dibersihkan (kredit palsu dihapus, §5) |
+| m65 (CNN attention) | DISPLAY-ONLY | affects_sfc_score=False (explicit) |
+| m68 (DRL) | DISPLAY-ONLY | affects_sfc_score=False (explicit) |
+| m72-m75 (macro liquidity) | INERT | composite dihitung+dioutput, TIDAK feed skor (liq_mod pakai m2_yoy raw, bukan _m75) |
+| m32_mamba | DISABLED | adjustment selalu 0 ("numerical explosion"); inference tetap jalan = compute mubazir |
+
+YANG TIDAK inert (aktif, jangan sentuh):
+- m69 systemic → feed structural score (line 3954: 0.6·mpi + 0.4·m69)
+- m81/m82 etf → feed faktor Lt/Rt (2303-2304)
+- m86 repo → feed Ft; fiscal tga/rrp → feed Lt; qlstm m32 → nudge sfc_pct
+- liq_mod (m2_yoy) → feed effective_sfc
+
+Nilai dashboard: card m72-m75 (index.html ~2909) & field m65/m68/m69 ditampilkan
+sebagai DIAGNOSTIK, bukan input skor. Card punya `data-lazy` + `display:none` bila
+field null → menghapus compute otomatis menyembunyikan card. Karena user suka card
+tampil penuh, fitur display-only ini BERGUNA untuk diagnostik walau inert di skor.
+Tindakan yang layak: (a) biarkan sebagai diagnostik, atau (b) matikan compute mamba
+(disabled, murni buang CPU) tanpa kehilangan card. Keputusan: lihat percakapan.
