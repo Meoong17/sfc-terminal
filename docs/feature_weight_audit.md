@@ -164,3 +164,20 @@ field null → menghapus compute otomatis menyembunyikan card. Karena user suka 
 tampil penuh, fitur display-only ini BERGUNA untuk diagnostik walau inert di skor.
 Tindakan yang layak: (a) biarkan sebagai diagnostik, atau (b) matikan compute mamba
 (disabled, murni buang CPU) tanpa kehilangan card. Keputusan: lihat percakapan.
+
+## 8. Diterapkan: hapus compute m65 + m68 + mamba (2026-08-08, setelah konfirmasi user)
+User memilih "hapus compute m65+m68+mamba (dead code tak terlihat), pertahankan
+m72-m75 card". Ketiganya display-only & tidak dirender sebagai card:
+- m65 (CNN attention): dulu jalankan CNN inference tiap cycle utk nol dampak skor.
+  Kini `_m65_stress=0.5`, `_m65_pattern="DISABLED"` (tanpa load/inference CNN).
+- m68 (DRL): dulu load Q-table + get_trading_signal tiap cycle utk nol dampak.
+  Kini `_m68_signal="DISABLED"` (tanpa load/get_trading_signal).
+- m32_mamba: adjustment selalu 0 (SSM collapse), tapi data-dict + DFS filter + load
+  model + inference tetap jalan tiap cycle. Kini mamba_pred/ok/result/adjustment
+  tetap default (None/False/0), tanpa compute.
+
+Verifikasi: py_compile OK; pipeline jalan bersih; composite_confidence 0.312 &
+sfc_effective 11.64 TIDAK berubah (ketiganya memang inert); data.json laporkan
+m65_pattern=DISABLED, m68_drl_signal=DISABLED, m32_mamba=None/active=False/adj=0;
+total_methods_active 38 (tidak berubah — ketiganya tak pernah dihitung di sana).
+Card m72-m75 tetap tampil (diagnostik macro, bukan input skor).

@@ -2686,68 +2686,12 @@ mamba_pred = None
 mamba_ok = False
 mamba_result = None
 mamba_adjustment = 0
-try:
-    # Build data dict from ALL available variables for feature extraction
-    _mamba_data = {
-        "btc": btc, "btc_24h": chg, "btc_mcap": mcap,
-        "dom": dom, "dvol": dvol,
-        "rsi_14": rsi_14m, "pc_oi": pc_oi, "pc_vol": pc_vol,
-        "fng": fng, "fng_cls": fcls,
-        "zone": zone, "regime": regime if "regime" in dir() else "NORMAL",
-        "sfc_base": sfc_pct, "sfc_effective": sfc_pct,
-        "m2_yoy": m2_yoy, "dxy": dxy,
-        "method_agreement": method_agreement,
-        "composite_confidence": composite_confidence if "composite_confidence" in dir() else None,
-        "m1_klr": m1_klr*100, "m2_logit": m2_logit*100, "m4_ewc": m4_ewc*100, "m5_qreg": m5_qreg,
-        "m3_bayes": m3_bayes if "m3_bayes" in dir() else None,
-        "factors": factors,
-        "sopr_proxy": sopr_proxy if "sopr_proxy" in dir() else None,
-        "cascade_risk": cascade_risk if "cascade_risk" in dir() else None,
-        "liq_density": liq_density if "liq_density" in dir() else None,
-        "liq_mod": liq_mod if "liq_mod" in dir() else None,
-        "regime_prob": regime_prob if "regime_prob" in dir() else None,
-        "transition_risk": transition_risk if "transition_risk" in dir() else None,
-    }
-    if whale_pressure is not None:
-        _mamba_data.update({
-            "q10_whale_pressure": whale_pressure,
-            "q10_onchain_value": onchain_value,
-            "q10_buying_power": buying_power,
-            "q10_market_structure": market_structure,
-        })
-    # ── Filter mamba input by DFS regime ──
-    _mamba_dropped = []
-    if DFS_AVAILABLE and _DFS_SELECTOR is not None:
-        try:
-            _dfs_mamba_regime = regime if 'regime' in dir() else 'NORMAL'
-            _mamba_filtered, _mamba_dropped = _DFS_SELECTOR.filter_mamba_input(
-                _dfs_mamba_regime, _mamba_data
-            )
-            if _mamba_dropped:
-                _mamba_data = _mamba_filtered
-                print(f"[DFS] Mamba input filtered for {_dfs_mamba_regime}: "
-                      f"dropped {len(_mamba_dropped)} keys: {', '.join(_mamba_dropped)}", file=sys.stderr)
-        except Exception as _dfs_mamba_e:
-            print(f"[DFS] Mamba filter error: {_dfs_mamba_e}", file=sys.stderr)
-
-    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-    from models.mamba_encoder import get_mamba_prediction as _mamba_infer
-    mamba_result = _mamba_infer(_mamba_data, force=False)
-    if mamba_result.get('available'):
-        mamba_pred = mamba_result['combined']
-        mamba_ok = True
-        mamba_sfc = mamba_pred * 100
-        mamba_diff = mamba_sfc - sfc_pct
-        mamba_adjustment = 0  # DISABLED: Mamba SSM output collapsed (all zeros due to numerical explosion in selective scan)
-        mamba_ok = False  # Mark inactive so dashboard shows DISABLED
-        sfc_pct += mamba_adjustment
-        zone = "CRITICAL" if sfc_pct/100 > 0.75 else "HIGH" if sfc_pct/100 > 0.5 else "ELEVATED" if sfc_pct/100 > 0.25 else "NORMAL"
-        print(f"[SFC] Mamba: SFC={mamba_sfc:.1f}% conf={mamba_result['confidence']*100:.1f}% "
-              f"adj={mamba_adjustment:+.2f}pp → {sfc_pct:.1f}%", file=sys.stderr)
-    else:
-        print("[SFC] Mamba unavailable", file=sys.stderr)
-except Exception as e:
-    print(f"[SFC] Mamba error: {e}", file=sys.stderr)
+# Mamba (m32_mamba) DISABLED (2026-08 audit) — mamba_adjustment was hardcoded to 0
+# (SSM output collapsed to all zeros due to numerical explosion), but the full data
+# dict + DFS filter + model load + inference still ran every cycle for zero score
+# impact. Compute removed to save CPU. Output fields below read mamba_pred/ok/result,
+# all None/False here, so data.json reports DISABLED cleanly.
+print("[SFC] Mamba compute disabled (inert, adjustment was always 0)", file=sys.stderr)
 
 print("[SFC] Aggregating news...", file=sys.stderr)
 cp_key = os.getenv("CRYPTOPANIC_KEY", "")
@@ -3592,50 +3536,27 @@ def _build_m65_input_window():
     # before all_method_scores exists in scope, or completely empty history).
     return np.array([[0.5] * 41], dtype=np.float32)
 
-if _get_cnn_attention():
-    try:
-        _m65_input = _build_m65_input_window()
-        _m65_result = calculate_cnn_attention_stress(_m65_input)
-    except Exception as _m65_e:
-        _m65_result = {"m65_cnn_attention": 0.5, "attention_focus": [], "pattern_type": "FALLBACK"}
-else:
-    _m65_result = {"m65_cnn_attention": 0.5, "attention_focus": [], "pattern_type": "FALLBACK — CNN not available"}
-_m65_stress = _m65_result.get("m65_cnn_attention", 0.5)
-_m65_pattern = _m65_result.get("pattern_type", "FALLBACK")
+# M65: CNN+Attention DISABLED (2026-08 audit) — display-only (affects_sfc_score=False),
+# not rendered as a dashboard card, yet ran CNN inference every cycle for zero score
+# impact. Compute removed to save CPU; keep neutral output fields (m65_available stays
+# None -> card/data hidden, matching the previous fallback path).
+_m65_result = {"m65_cnn_attention": 0.5, "attention_focus": [], "pattern_type": "DISABLED"}
+_m65_stress = 0.5
+_m65_pattern = "DISABLED"
 
-# M68: DRL Trading Signal
+# M68: DRL Trading Signal DISABLED (2026-08 audit) — display-only
+# (affects_sfc_score=False), not rendered as a dashboard card. Q-table load +
+# get_trading_signal() ran every cycle for zero score impact. Compute removed to
+# save CPU; keep neutral output fields.
 _drl_market_state = {
     "stress": effective_sfc / 100.0 if effective_sfc else 0.5,
     "rsi": rsi_14m or 50,
     "price": btc or 60000,
     "momentum": (chg or 0) / 100.0,
 }
-# ── Load trained Q-learning agent, if available (NEW) ──
-# Previously get_trading_signal() was always called WITHOUT an agent,
-# meaning the trained-agent branch inside that function was permanently
-# unreachable — every cycle silently used the simple rule-based
-# fallback while being labeled "M68 DRL Signal", regardless of whether
-# train_drl_agent_script.py had ever been run. This loads a saved
-# Q-table if train_drl_agent_script.py has produced one; falls back to
-# the same rule-based behavior as before (agent=None) if the file
-# doesn't exist yet or fails to load for any reason — so this is safe
-# to deploy even before ever running the training script once.
 _drl_agent = None
 _drl_agent_loaded = False
-if DRL_AVAILABLE:
-    try:
-        _drl_model_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "models", "drl_agent.pkl")
-        if os.path.exists(_drl_model_path):
-            from trading.drl_agent import QLearningAgent
-            _drl_agent = QLearningAgent()
-            _drl_agent.load(_drl_model_path)
-            _drl_agent_loaded = True
-    except Exception as _drl_load_e:
-        print(f"[M68] Failed to load trained agent, using rule-based fallback: {_drl_load_e}", file=sys.stderr)
-        _drl_agent = None
-        _drl_agent_loaded = False
-
-_m68_signal = get_trading_signal(_drl_market_state, agent=_drl_agent)
+_m68_signal = "DISABLED"
 
 # M69: GNN Systemic Risk
 #
