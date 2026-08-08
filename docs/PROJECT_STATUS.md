@@ -234,3 +234,16 @@ bukan strawman; (b) validasi model yang labelnya bergantung masa depan WAJIB
 purged-CV + embargo (López de Prado), bukan single-path WFV — single-path
 over-estimates skill; (c) purged-CV kini menjadi standar validasi yang dianjurkan
 untuk menilai faktor baru sebelum masuk ke sinyal efektif.
+
+## Re-validasi seri kanonik 9 tahun (2026-08-08) — docs/canonical_revalidation.md
+Re-run walk-forward pada HARGA KANONIK Binance BTCUSDT (2017-2026) + era-split:
+- **L8 subset (GLF liq + L6 expect): ERA-UNSTABLE.** Signifikan kuat di window penuh
+  (30d +0.072***, 90d +0.264***, 365d +0.51***) TAPI era-split membalik tanda:
+  2017-21 +0.20/+0.61 vs 2022-26 −0.11/−0.37. Signifikansi didorong 2017-21; efek
+  INVERT di rezim terbaru. → jangan diandalkan utk live/naikkan cutoff.
+- **SFC pct (trend continuation): ERA-KONSISTEN di 30d/90d** (era1 +0.047/+0.335,
+  era2 +0.056/+0.139, keduanya positif), meski 365d membalik (−0.48). Lebih robust
+  dari L8 di horizon pendek-menengah.
+Skrip `analysis/revalidate_canonical.py` (murni analisis, baca cache + Binance, tak
+fetch FRED). Cron bulanan Binance juga re-run validasi ini.
+
