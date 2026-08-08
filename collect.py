@@ -1000,11 +1000,11 @@ def score_factors_from_market(btc, btc_24h, dom, dvol, fng, pc_oi, m2_yoy, dxy, 
     onchain_market_structure: 0-100 score from derivatives data (Q10+)"""
     factors = {"Lt": 0.0, "St": 0.0, "Rt": 0.0, "Ft": 0.0, "Sc": 0.0}
     
-    # Lt (Liquidity) — based on GLO and BTC momentum
-    if glo_score is not None:
-        # GLO maps: 0=contractive(bearish) -> -3, 100=expansive(bullish) -> +3
-        # Map GLO 0-100 to sigmoid center at 50
-        factors["Lt"] += _sigmoid_factor(glo_score, center=50.0, k=0.08)
+    # Lt (Liquidity) — BTC momentum. GLO global-liquidity is NOT fed into Lt:
+    # the live call site (~line 2287) never passes glo_score (defaults None), so
+    # the old GLO branch here was dead code at runtime. Live global-liquidity
+    # enters the ensemble via the separate m33_glo METHOD (method_scores_dict
+    # ['m33_glo']), not the Lt factor. Removed 2026-08 (audit: GLO-as-Lt dead).
     if btc_24h is not None:
         factors["Lt"] += _sigmoid_factor(btc_24h, center=0.0, k=0.15)
     
@@ -1109,9 +1109,13 @@ def calculate_sfc_ensemble(factors):
     Fix restores original design range: z_score from raw factors [-15,+15],
     norm[-0.5,+0.5] thresholds scaled by /6, M4 uses raw factors.
     """
-    # Apply Lt/St weights from correlation analysis (Lt|r|=0.057, St|r|=0.114)
-    # Weights adjusted to preserve total scale (sum=5, same as equal weighting)
-    _FACTOR_WT = {"Lt": 0.66, "St": 1.34, "Rt": 1.0, "Ft": 1.0, "Sc": 1.0}
+    # Apply Lt/St weights. St was 1.34 (from an early correlation result), but a
+    # 2026-08 audit of effective contribution (11.7k snapshots) found St hovers
+    # near zero (mean|val|=0.16, inputs sit at sigmoid centers) — its weight was
+    # the largest yet contributed the least (~9.9%). Normalized St to 1.0 and
+    # redistributed the freed 0.34 proportionally to preserve total scale
+    # (sum=5, same as equal weighting) so z_score range is unchanged.
+    _FACTOR_WT = {"Lt": 0.72, "St": 1.0, "Rt": 1.09, "Ft": 1.09, "Sc": 1.10}
     norm = {k: v/6 for k, v in factors.items()}
     # FIX: use raw factors (not norm/6) for z_score — original [-15, +15] range
     z_score = sum(factors[k] * _FACTOR_WT[k] for k in factors)
