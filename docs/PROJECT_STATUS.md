@@ -247,3 +247,12 @@ Re-run walk-forward pada HARGA KANONIK Binance BTCUSDT (2017-2026) + era-split:
 Skrip `analysis/revalidate_canonical.py` (murni analisis, baca cache + Binance, tak
 fetch FRED). Cron bulanan Binance juga re-run validasi ini.
 
+## Purged-CV momentum (2026-08-08) — MOMENTUM DITOLAK (docs/feature_validation.md)
+Layar IC non-purged sempat menandai momentum (mom_30/90) sebagai fitur "paling robust"
+(era-stabil, lolos BH). Validasi purged-CV leakage-free (embargo=h, `analysis/
+purged_cv_momentum.py`) membantah: pooled AUC mom_30 hanya 0.520 di 7d (marginal),
+0.413 di 30d & 0.371 di 90d (DI BAWAH kebetulan); mom_90 <0.5. **Momentum TIDAK punya
+edge OOS andal** — edge tampak adalah artefak overlapping-label yang menggelembungkan
+n sampel efektif. → JANGAN tambahkan momentum ke sinyal/pipeline. Menegaskan standar
+purged-CV/embargo (IC non-purged over-estimates skill).
+

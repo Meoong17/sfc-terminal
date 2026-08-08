@@ -43,12 +43,22 @@ koreksi Benjamini-Hochberg (q) lintas semua uji, dan era-split (2017-21 vs 2022-
 4. **VOLUME & TAKER_RATIO**: lemah; hanya signifikan di horizon panjang, taker_ratio
    satu-arah tapi efek kecil.
 
-## Implikasi
-- Momentum layak dipertimbangkan sebagai fitur tambahan (setelah validasi purged-CV
-  formal / masuk pipeline). Belum dipakai di produksi.
-- Funding/premium/vol tidak boleh dijadikan andalan tanpa spesifikasi tanda & horizon
-  yang ketat — pola yang sama yang menolak China M2/JPY carry/HY.
-- Tidak ada perubahan produksi.
+## KOREKSI (2026-08-08) — momentum BUKAN prediktor andal di bawah purged-CV
+Layar IC DI ATAS MENYESATKAN. Karena label forward-return antar hari bertumpang
+tindih, observasi tidak independen → ukuran sampel efektif menggelembung → p-value
+IC terlalu optimis. Validasi purged-CV (López de Prado, embargo=h) yang leakage-free:
+
+| Fitur | h | pooled AUC | mean-fold AUC | Verdict |
+|---|---|---|---|---|
+| mom_30 | 7d | 0.520 | 0.526 ± 0.008 | edge kecil (marginal) |
+| mom_30 | 30d | **0.413** | 0.494 ± 0.025 | TIDAK ada edge |
+| mom_30 | 90d | **0.371** | 0.510 ± 0.031 | TIDAK ada edge |
+| mom_90 | 7d/30d/90d | <0.5 | 0.46-0.49 | TIDAK ada edge |
+
+Skrip `analysis/purged_cv_momentum.py`. Kesimpulan: **momentum TIDAK boleh ditambahkan
+ke sinyal/pipeline** — edge-nya hilang (atau terbalik) setelah koreksi leakage label.
+Ini menegaskan kenapa purged-CV/embargo wajib (lihat PROJECT_STATUS): IC non-purged
+over-estimates skill.
 
 ## Cara run
 ```
