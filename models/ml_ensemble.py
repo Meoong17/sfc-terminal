@@ -39,6 +39,54 @@ def save_collection(data):
     with open(COLLECTION_FILE, "w") as f:
         json.dump(data, f)
 
+# ──────────────────────────────────────────────────────
+# DAILY REGIME COLLECTION — 1 row per calendar day
+# ──────────────────────────────────────────────────────
+# The 5-min data_collection.json (2000-row cap) only retains ~10 days, far too
+# short for regime detection or walk-forward validation of the adv regime
+# detector. This separate series stores ONE summary row per calendar day, so
+# regime history accumulates for years in a small file. Same normalized 0-1
+# feature space (cols 0-4 = m1..m5). Not truncated (regime detection needs
+# months/years of history).
+DAILY_COLLECTION_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)),
+                                     "data_collection_daily.json")
+
+
+def load_daily_collection():
+    if not os.path.exists(DAILY_COLLECTION_FILE):
+        return {"features": [], "labels": [], "predictions": [], "dates": []}
+    try:
+        with open(DAILY_COLLECTION_FILE, "r") as f:
+            return json.load(f)
+    except Exception:
+        return {"features": [], "labels": [], "predictions": [], "dates": []}
+
+
+def save_daily_collection(data):
+    with open(DAILY_COLLECTION_FILE, "w") as f:
+        json.dump(data, f)
+
+
+def add_daily_observation(feature_vector, date_str=None):
+    """Record ONE daily summary observation (deduped by calendar date).
+
+    Called once per day (or repeatedly — it skips if today is already recorded).
+    Stores cols m1..m5 in the same normalized 0-1 space as add_observation, so
+    the regime detector can be fit on this series and predict the current
+    (normalized) feature vector consistently.
+    """
+    date_str = date_str or datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    data = load_daily_collection()
+    if data["dates"] and data["dates"][-1] == date_str:
+        return data  # today already recorded
+    vec = [float(v) if v is not None else 0.5 for v in feature_vector][:5]
+    data["features"].append(vec)
+    data["labels"].append(None)
+    data["predictions"].append(None)
+    data["dates"].append(date_str)
+    save_daily_collection(data)
+    return data
+
 def record_price_snapshot(btc_price, date_str=None):
     """
     Append a lightweight {ts, btc} snapshot to the collection's own

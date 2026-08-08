@@ -421,13 +421,14 @@ except ImportError as e:
 try:
     from models.ml_ensemble import (
         predict_with_ml, add_observation, evaluate_accuracy, retrain_on_errors,
-        record_price_snapshot, resolve_pending_labels,
+        record_price_snapshot, resolve_pending_labels, add_daily_observation,
     )
     ML_AVAILABLE = True
 except ImportError as e:
     print(f"[SFC] ML ensemble not available: {e}", file=sys.stderr)
     def predict_with_ml(*a, **k): return 0.5, 0.0, "ML unavailable"
     def add_observation(*a, **k): return None
+    def add_daily_observation(*a, **k): return None
     def evaluate_accuracy(): return {"accuracy": None}
     def retrain_on_errors(): return None
     def record_price_snapshot(*a, **k): return None
@@ -2736,17 +2737,20 @@ if ADVANCED_AVAILABLE is None or ADVANCED_AVAILABLE:
                 # was a *completely different feature space* than what k-means was
                 # clustering on, making the classification meaningless.
                 feat_dict = {
-                    'm1_klr': m1_klr if m1_klr is not None else 0.5,
-                    'm2_logit': m2_logit if m2_logit is not None else 0.5,
-                    'm3_bayes': m3_bayes if m3_bayes is not None else 0.5,
-                    'm4_ewc': m4_ewc if m4_ewc is not None else 0.5,
+                    'm1_klr': (m1_klr / 100.0) if m1_klr is not None else 0.5,
+                    'm2_logit': (m2_logit / 100.0) if m2_logit is not None else 0.5,
+                    'm3_bayes': (m3_bayes / 100.0) if m3_bayes is not None else 0.5,
+                    'm4_ewc': (m4_ewc / 100.0) if m4_ewc is not None else 0.5,
                     'm5_qreg': (m5_qreg / 100.0) if m5_qreg is not None else 0.5,
                 }
                 
-                # Use historical data for regime fitting
+                # Use historical data for regime fitting — the DAILY series
+                # (data_collection_daily.json, 1 row/day, accumulates for years),
+                # NOT the 5-min data_collection.json (2000-cap ~10 days). Fitted
+                # features are normalized 0-1, matching the normalized feat_dict.
                 all_feats = []
                 try:
-                    with open(os.path.join(os.path.dirname(__file__), "data_collection.json")) as f:
+                    with open(os.path.join(os.path.dirname(__file__), "data_collection_daily.json")) as f:
                         hist = json.load(f)
                     feat_list = hist.get("features", [])
                     if len(feat_list) > 20:
@@ -2877,6 +2881,15 @@ record_price_snapshot(btc)
 # LABEL_LOOKAHEAD_MINUTES, by resolve_pending_labels() below — never at
 # observation time.
 add_observation(all_method_scores, prediction=ml_score)
+
+# Daily regime collection: record ONE summary row per calendar day (deduped by
+# date). Feeds the adv regime detector's fit — it needs months/years of regime
+# history, which the 5-min data_collection's 2000-row cap (~10 days) can't hold.
+# Display-only: adv_regime no longer drives scoring/consensus (see P0b).
+try:
+    add_daily_observation(all_method_scores)
+except Exception as _ado_e:
+    print(f"[DailyRegime] add_daily_observation error (non-fatal): {_ado_e}", file=sys.stderr)
 
 # Try to resolve any observations that are now old enough to have a known
 # real-world outcome.
