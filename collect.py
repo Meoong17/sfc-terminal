@@ -3275,18 +3275,28 @@ try:
         else:
             liq_pressure = "BALANCED"
 
-        # Density: normalise total liquidation volume (BTC-only)
-        # $2B+ in 24h = extreme density
-        liq_density = round(min(total_v / 2_000_000_000, 1.0), 3)
+        # Density = liquidation VOLUME RATE, window-aware (BTC-only). The OKX
+        # liquidation-orders endpoint returns the most recent ~100 orders (an
+        # irregular short-window snapshot), NOT a 24h aggregate — so normalising
+        # by a fixed "$2B/24h" cap mismatched the semantics. Use the per-hour rate
+        # vs a "$500M/hr = extreme" reference (same ref liq_intensity uses).
+        _window_hours = (liq_data.get("window_hours") or 0.0)
+        _per_hour = liq_data.get("per_hour_usd")
+        if _per_hour is None and _window_hours > 0:
+            _per_hour = total_v / _window_hours
+        if _per_hour is None:
+            _per_hour = total_v / 24.0  # conservative fallback if no window known
+        liq_density = round(min(_per_hour / 500_000_000, 1.0), 3)
 
-        # Cascade risk = liquidation ONE-SIDEDNESS (0-1): direction of the
-        # chain-liquidation pressure. Pure direction only — volume magnitude is
-        # carried separately by squeeze_magnitude (liq_density) so the single
-        # liquidation signal is NOT counted twice in execution_risk.
-        # (previously = imbalance*0.5 + total_v/5B; the volume term duplicated
-        #  the density already in squeeze_magnitude. See note near line 3452.)
+        # Cascade risk = liquidation ONE-SIDEDNESS gated by VOLUME SIGNIFICANCE.
+        # A one-sided ratio from a tiny-volume snapshot (a few $M) is statistically
+        # meaningless and must not pin risk at max — gate direction by magnitude so
+        # cascade ≈ 0 when there is no real liquidation volume. This now carries
+        # BOTH direction and magnitude, so squeeze_magnitude is zeroed below on the
+        # OKX path to keep the single liquidation signal counted exactly once.
+        # No artificial 0.95 cap: imbalance ∈ [0,1] × density ∈ [0,1] ⇒ ≤ 1.0.
         imbalance = abs(liq_ratio - 0.5) * 2  # 0 = balanced, 1 = entirely one-sided
-        cascade_risk = round(min(imbalance, 0.95), 3)
+        cascade_risk = round(imbalance * liq_density, 3)
 
     elif liq_data and liq_data.get("source") == "coinglass":
         # CoinGlass data — higher quality
@@ -3304,7 +3314,7 @@ if liq_total_24h is None:
     # (sopr_score*0.3 + dvol/200) while liq_density = dvol/150, re-counting the
     # same dvol signal across cascade AND squeeze in execution_risk.
     _rsi_ext = min(abs((rsi_14m or 50) - 50) / 50, 1.0) if rsi_14m is not None else 0.5
-    cascade_risk = round(min(_rsi_ext, 0.95), 3)
+    cascade_risk = round(_rsi_ext, 3)
     if dvol is not None:
         # Magnitude (volume) proxy — the orthogonal component carried by squeeze_magnitude.
         liq_density = round(min(dvol / 150.0, 1.0), 3)
@@ -3426,8 +3436,14 @@ if m8_d is not None:
 # inflating risk on one-sided liquidation days. Fixed 2026-08 by assigning
 # direction to cascade_risk only and magnitude to squeeze_magnitude only.
 _squeeze_magnitude = 0.0
-if liq_density is not None:
-    # Volume magnitude of the liquidation event (0-1). Orthogonal to direction.
+if liq_total_24h is not None:
+    # OKX real-data path: liquidation magnitude is already folded into cascade_risk
+    # (direction × density), so zero squeeze_magnitude here to avoid counting the
+    # same liquidation signal twice in execution_risk (0.4×cascade + 0.3×squeeze).
+    _squeeze_magnitude = 0.0
+elif liq_density is not None:
+    # No real liq data: keep the dvol-based volume magnitude proxy (orthogonal to
+    # the RSI-extremity direction proxy carried by cascade_risk on this path).
     _squeeze_magnitude = liq_density
 elif liq_pressure in ('LONG_SQUEEZE', 'SHORT_SQUEEZE'):
     # No density data: RSI extremity as a crude magnitude proxy.

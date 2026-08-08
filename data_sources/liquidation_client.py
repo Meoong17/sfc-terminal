@@ -105,6 +105,7 @@ def fetch_okx_liquidations(symbol="BTC-USDT-SWAP", limit=100):
         long_vol = 0.0   # longs liquidated (side=sell = long liq)
         short_vol = 0.0  # shorts liquidated (side=buy = short liq)
         count = 0
+        ts_list = []     # per-detail timestamps (ms) -> derive snapshot window
 
         for event in orders:
             details = event.get("details", [])
@@ -118,10 +119,27 @@ def fetch_okx_liquidations(symbol="BTC-USDT-SWAP", limit=100):
                 elif side == "buy":  # shorts being liquidated (buying pressure)
                     short_vol += vol_usd
                 count += 1
+                _t = d.get("ts")
+                if _t:
+                    try:
+                        ts_list.append(int(_t))
+                    except (ValueError, TypeError):
+                        pass
 
         total = long_vol + short_vol
         if total == 0:
             return None
+
+        # The OKX endpoint returns the MOST RECENT liquidation orders (limit<=100),
+        # NOT a fixed 24h aggregate. Derive the actual time span of the snapshot so
+        # downstream magnitude normalisation is window-aware (per-hour rate) instead
+        # of assuming a false "24h" window.
+        window_hours = 0.0
+        per_hour_usd = 0.0
+        if ts_list:
+            span_ms = max(ts_list) - min(ts_list)
+            window_hours = max(span_ms / 3.6e6, 1.0 / 3600.0)  # floor 1s, avoid div-by-zero
+            per_hour_usd = total / window_hours
 
         # Determine dominant side (now correctly: long_vol = long-side liquidated)
         ratio = long_vol / total if total > 0 else 0.5
@@ -132,14 +150,16 @@ def fetch_okx_liquidations(symbol="BTC-USDT-SWAP", limit=100):
         else:
             dominant = "balanced"
 
-        # Intensity: normalise by historical max (~$500M is extreme for 1h)
-        intensity = min(total / 500_000_000, 1.0)
+        # Intensity: normalise the per-hour liquidation rate (~$500M/hr is extreme)
+        intensity = min(per_hour_usd / 500_000_000, 1.0) if per_hour_usd > 0 else 0.0
 
         return {
             "long_vol_usd": round(long_vol, 2),
             "short_vol_usd": round(short_vol, 2),
             "total_vol_usd": round(total, 2),
             "order_count": count,
+            "window_hours": round(window_hours, 3),
+            "per_hour_usd": round(per_hour_usd, 2),
             "dominant": dominant,
             "long_ratio": round(ratio, 3),
             "liq_intensity": round(intensity, 3),
