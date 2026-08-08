@@ -844,15 +844,8 @@ def get_put_call_ratio():
     except:
         return None, None
 
-def get_btc_ohlcv_daily(days=30):
-    try:
-        r = requests.get(f"https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days={days}&interval=daily&{CG_API_KEY}", timeout=15)
-        d = r.json()
-        prices = d.get("prices", [])
-        volumes = d.get("total_volumes", [])
-        return [{"time": prices[i][0], "close": prices[i][1], "volume": volumes[i][1] if i < len(volumes) else 0} for i in range(len(prices))]
-    except:
-        return []
+# get_btc_ohlcv_daily removed (2026-08 audit): dead code — zero references anywhere
+# (replaced by get_btc_ohlcv_monthly via ex.submit). Removing the orphan.
 
 def _binance_klines(days=30):
     """Fetch BTC klines from Binance as fallback (free, no key)."""
