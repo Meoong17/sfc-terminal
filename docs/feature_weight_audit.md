@@ -78,7 +78,30 @@ Lt. Jadi:
 3. **TIDAK disentuh**: m33_glo method — butuh analisis kontribusi ensemble terpisah
    sebelum keputusan (dicatat sebagai follow-up hipotesis, lihat §5).
 
-## 5. Follow-up hipotesis (belum dieksekusi)
-- **m33_glo method** (bukan faktor Lt): temuan audit "GLO terbalik+era-flip" kena ke
-  method ini. Untuk menurunkan/menghapusnya butuh ukur kontribusinya di ensemble
-  m1-m31 vs m32-m90, bukan sekadar forward return. Bila ingin, lanjut di sesi terpisah.
+## 5. Follow-up: m33_glo method — KONFIRMASI INERT (2026-08-08)
+Diperiksa tuntas cara m33_glo masuk ke skor akhir:
+- sfc_pct = p1·m1m6_avg + p2·new_avg + p3·inst_avg (collect.py ~2645).
+- Grup m1m6/m7m19/m20m31 memakai daftar nama HARDCODED m1-m31 (~2611-2613) yang
+  TIDAK memuat m33_glo; tidak ada pembacaan downstream atas filtered_scores[
+  "m33_glo"].
+- m33_glo_score hanya: masuk method_scores_dict (2555), +1 ke total_active_methods
+  (count tampilan, 2947), dan dilaporkan ke data.json (4231). NOL dampak ke
+  sfc_pct / composite_confidence / sfc_effective.
+
+Kesimpulan: **m33_glo DIHITUNG & DILAPORKAN tapi TIDAK memengaruhi skor** (metode
+yatim — tampaknya sempat dimaksudkan masuk ensemble via causal_filter, tapi daftar
+grup tak pernah diperluas ke m32/m33). Dan karena sinyal GLO sendiri terbalik +
+era-flip (lihat §2), ia TIDAK boleh diwire ke ensemble (akan menambah sinyal
+merugikan).
+
+Perubahan yang DITERAPKAN:
+1. Hapus kredit `+1` m33_glo dari total_active_methods (2947) — sebelumnya
+   menyesatkan (seolah aktif memberi kontribusi). Hanya memengaruhi count tampilan,
+   skor tidak berubah.
+2. Tambah komentar di method_scores_dict["m33_glo"] (2555) mendokumentasikan status
+   inert + larangan wiring.
+3. Compute m33_glo TETAP dijalankan & dilaporkan (dashboard/transparansi), tapi
+   tidak dianggap memberi kontribusi skor.
+
+Verifikasi: py_compile OK; AST menegaskan total_active_methods tak lagi memakai
+m33_glo_score; sfc/composite tak berubah (perubahan hanya display count).

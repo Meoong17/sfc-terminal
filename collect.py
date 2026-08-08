@@ -2553,6 +2553,13 @@ for i, name in enumerate(["m20_obi", "m21_trade_flow", "m22_spread", "m23_liquid
         method_scores_dict[name] = 0.5
 # M33 — Global Liquidity Index
 method_scores_dict["m33_glo"] = m33_glo_score if m33_glo_score is not None else 0.5
+# NOTE (2026-08 audit): m33_glo is COMPUTED and reported (data.json) but does NOT
+# feed the final score. The ensemble group averages below (m1m6/m7m19/m20m31,
+# lines ~2611-2613) use hardcoded m1-m31 name lists that exclude m33_glo, and no
+# downstream read consumes filtered_scores["m33_glo"]. It is an orphaned method:
+# it only adds +1 to the total_active_methods display count. DO NOT wire it into
+# the ensemble — the GLO liquidity signal is reversed + era-flip (see
+# docs/feature_weight_audit.md), so blending it would ADD a harmful signal.
 
 # Apply causal filter to get weighted scores
 if causal_filter and causal_weights:
@@ -2944,7 +2951,8 @@ _fiscal_active = (1 if isinstance(_fiscal_details.get("m83"), dict) and _fiscal_
 total_active_methods = (
     6 + new_active + inst_active_count 
     + (1 if qlstm_ok else 0) 
-    + (1 if m33_glo_score is not None else 0)
+    # m33_glo excluded (2026-08 audit): computed/reported but not blended into the
+    # score — crediting it here overstated the active count. See the m33_glo note.
     + sc_active
     + _macro_active
     + (2 if isinstance(_etf_details, dict) and _etf_details.get("status") == "ok" else 0)
