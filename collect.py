@@ -2974,8 +2974,11 @@ try:
         regime_prob=regime_prob if "regime_prob" in dir() else None,
         hmm_regime=_hmm_result.get('regime') if _hmm_result else None,
         hmm_crisis_prob=_hmm_result.get('crisis_probability') if _hmm_result else None,
-        adv_regime=adv_regime.get('regime') if adv_regime else None,
-        adv_crisis_prob=adv_regime.get('crisis_probability') if adv_regime else None,
+        adv_regime=None,  # DISPLAY-ONLY (2026-08): the adv k-means+Markov detector is fit on
+        adv_crisis_prob=None,  # ~5 days of data_collection (no walk-forward possible — too
+                               # short, no price overlap), so its labels are noise. Excluded
+                               # from the SCORING driver (severity/mult); still shown for
+                               # transparency in the late P0 display call (line ~3920).
         behavior_state=None,  # display-only overlay; not a scoring driver
     )
     print(f"[P0b Regime] structural consensus={_regime_consensus_label} "
@@ -3033,21 +3036,15 @@ if DYNAMIC_WEIGHTING_AVAILABLE:
 # NOTE: DW already adjusts for regime (+0.9pp CRISIS). XGBoost meta-ensemble
 # also factors in regime context. So regime boost needs to be REDUCED to
 # avoid double-adjustment. Cap at +2pp when DW is active.
-if (ADVANCED_AVAILABLE is None or ADVANCED_AVAILABLE) and adv_regime_boost > 0 and effective_sfc is not None:
-    # SINGLE-DRIVER GUARD: only let the (previously buggy) adv-regime boost move
-    # SFC when the structural consolidation also flags at least ELEVATED stress
-    # (severity >= 45). A lone adv CRISIS that the other two subsystems reject no
-    # longer bumps effective_sfc — it was the source of the spurious +2pp path.
-    _adv_consensus_ok = (_rc_sev or 0) >= 45
-    if _adv_consensus_ok:
-        old_sfc = effective_sfc
-        # Capped boost: full boost if DW unavailable, otherwise max +2pp
-        _eff_regime_boost = min(adv_regime_boost, 2.0) if DYNAMIC_WEIGHTING_AVAILABLE else adv_regime_boost
-        effective_sfc = min(effective_sfc + _eff_regime_boost, 100.0)
-        zone = "CRITICAL" if effective_sfc/100 > 0.75 * _REGIME_DRIVER_MULT else "HIGH" if effective_sfc/100 > 0.50 * _REGIME_DRIVER_MULT else "ELEVATED" if effective_sfc/100 > 0.25 * _REGIME_DRIVER_MULT else "NORMAL"
-        print(f"  [Advanced] SFC boosted by regime: {old_sfc:.1f}% → {effective_sfc:.1f}% (+{adv_regime_boost}) | Zone: {zone}", file=sys.stderr)
-    else:
-        print(f"  [Advanced] adv boost suppressed (consensus sev={_rc_sev} < 45) — single-driver guard", file=sys.stderr)
+if (ADVANCED_AVAILABLE is None or ADVANCED_AVAILABLE) and effective_sfc is not None:
+    # DISPLAY-ONLY (2026-08): adv_regime now comes from a k-means+Markov detector fit on
+    # ~5 days of data_collection — its labels are noise (no walk-forward possible: data too
+    # short, no price overlap), so it must NOT drive scoring. It is shown on the dashboard
+    # for transparency but excluded from the scoring consolidation (adv_regime=None at the
+    # early P0b call above) and its boost is NOT applied to effective_sfc. Re-enable the
+    # +2pp regime boost only after the detector is walk-forward validated on months of data.
+    print(f"  [Advanced] adv_regime={adv_regime.get('regime') if adv_regime else 'N/A'} "
+          f"display-only — boost ({adv_regime_boost}) NOT applied to SFC", file=sys.stderr)
 
 # ── XGBoost Blend: DISABLED (pending walk-forward validation) ──
 # 2026-08-07: the XGBoost meta-ensemble predicts a RARE 6h forward price-drop
@@ -3922,8 +3919,10 @@ try:
         regime_prob=regime_prob if "regime_prob" in dir() else None,
         hmm_regime=_hmm_result.get('regime') if _hmm_result else None,
         hmm_crisis_prob=_hmm_result.get('crisis_probability') if _hmm_result else None,
-        adv_regime=adv_regime.get('regime') if adv_regime else None,
-        adv_crisis_prob=adv_regime.get('crisis_probability') if adv_regime else None,
+        adv_regime=None,  # DISPLAY-ONLY: excluded from consensus label too (same reasoning as
+        adv_crisis_prob=None,  # the early call) — a noisy adv CRISIS must not push the shown
+                               # consensus to STRESSED. adv_regime still emitted as its own
+                               # output field/card for transparency (see data.json adv_regime).
         behavior_state=_behavior_state,
     )
     print(f"[P0 Regime] consensus={_regime_consensus_label} "
