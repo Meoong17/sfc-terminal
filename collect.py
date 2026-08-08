@@ -3324,9 +3324,14 @@ try:
         # $2B+ in 24h = extreme density
         liq_density = round(min(total_v / 2_000_000_000, 1.0), 3)
 
-        # Cascade risk: extreme one-sided = higher risk
+        # Cascade risk = liquidation ONE-SIDEDNESS (0-1): direction of the
+        # chain-liquidation pressure. Pure direction only — volume magnitude is
+        # carried separately by squeeze_magnitude (liq_density) so the single
+        # liquidation signal is NOT counted twice in execution_risk.
+        # (previously = imbalance*0.5 + total_v/5B; the volume term duplicated
+        #  the density already in squeeze_magnitude. See note near line 3452.)
         imbalance = abs(liq_ratio - 0.5) * 2  # 0 = balanced, 1 = entirely one-sided
-        cascade_risk = round(min(imbalance * 0.5 + (total_v / 5_000_000_000), 0.95), 3)
+        cascade_risk = round(min(imbalance, 0.95), 3)
 
     elif liq_data and liq_data.get("source") == "coinglass":
         # CoinGlass data — higher quality
@@ -3339,9 +3344,15 @@ except Exception as e:
 
 # If real data didn't produce valid values, use proxy estimates
 if liq_total_24h is None:
+    # Direction proxy (one-sidedness): RSI stretch. Kept ORTHOGONAL to the
+    # dvol-based magnitude below — the old cascade_risk here used
+    # (sopr_score*0.3 + dvol/200) while liq_density = dvol/150, re-counting the
+    # same dvol signal across cascade AND squeeze in execution_risk.
+    _rsi_ext = min(abs((rsi_14m or 50) - 50) / 50, 1.0) if rsi_14m is not None else 0.5
+    cascade_risk = round(min(_rsi_ext, 0.95), 3)
     if dvol is not None:
+        # Magnitude (volume) proxy — the orthogonal component carried by squeeze_magnitude.
         liq_density = round(min(dvol / 150.0, 1.0), 3)
-        cascade_risk = round(min((sopr_score or 0.5) * 0.3 + (dvol / 200.0), 0.95), 3)
     # Liquidation pressure based on RSI + trend
     if rsi_14m is not None:
         if rsi_14m < 25 and sopr_proxy and sopr_proxy < 0.97:
@@ -3449,28 +3460,27 @@ if m8_d is not None:
 
 # Execution risk factors (Layer 2) — multiplicative, affect sizing/timing
 
-# Liquidation one-sidedness (0-1) = |long−short| / total.
-# Computed ONCE and used by squeeze_magnitude ONLY — feeding it into both
-# squeeze AND funding double-counted the same signal and inflated execution
-# risk (a heavy one-sided liquidation day looked worse than it was).
-_liq_side = 0.0
-if liq_total_24h is not None and liq_long_vol is not None and liq_short_vol is not None:
-    _liq_tot = liq_long_vol + liq_short_vol
-    if _liq_tot > 0:
-        _liq_side = abs(liq_long_vol - liq_short_vol) / _liq_tot  # 0=balanced, 1=one-sided
-
-# Continuous squeeze magnitude (0-1) = one-sidedness × volume magnitude
-# Bukan binary flag — proporsional terhadap tekanan likuidasi sesungguhnya
+# Execution risk (Layer 2) must decompose into THREE ORTHOGONAL factors so the
+# single underlying liquidation signal is counted exactly once:
+#   cascade_risk     = one-sidedness (DIRECTION)      -> carried by cascade_risk
+#   squeeze_magnitude= liquidation volume (MAGNITUDE) -> liq_density
+#   funding_imbalance= derivative funding (INDEPENDENT)-> real funding rate
+# Historical bug: one-sidedness was fed into BOTH cascade_risk (imbalance*0.5)
+# AND squeeze_magnitude (_liq_side × density), giving the same liquidation
+# asymmetry an effective weight of 0.40+0.30 = 0.70 in execution_risk and
+# inflating risk on one-sided liquidation days. Fixed 2026-08 by assigning
+# direction to cascade_risk only and magnitude to squeeze_magnitude only.
 _squeeze_magnitude = 0.0
-if _liq_side > 0 and liq_density is not None:
-    _squeeze_magnitude = _liq_side * liq_density
+if liq_density is not None:
+    # Volume magnitude of the liquidation event (0-1). Orthogonal to direction.
+    _squeeze_magnitude = liq_density
 elif liq_pressure in ('LONG_SQUEEZE', 'SHORT_SQUEEZE'):
-    # Fallback: RSI extremity × dvol-based density
+    # No density data: RSI extremity as a crude magnitude proxy.
     _rsi_ext = min(abs((rsi_14m or 50) - 50) / 50, 1.0) if rsi_14m is not None else 0.5
-    _squeeze_magnitude = _rsi_ext * liq_density
+    _squeeze_magnitude = _rsi_ext * 0.5
 
 # Funding imbalance — REAL derivative funding rate only (m13_d).
-# Liquidation asymmetry is already captured by squeeze_magnitude, so using it
+# Liquidation asymmetry is already captured by cascade_risk, so using it
 # here as well would double-count the same signal. When funding rate is
 # unavailable -> 0.0 (no funding signal), NOT a liquidation proxy.
 _funding_imbalance = 0.0
