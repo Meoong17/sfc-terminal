@@ -24,12 +24,20 @@ CONSENSUS RULE (defensible, not arbitrary):
 
     Mapping to stress severity (0-100):
         main regime : NORMAL=20, STRESS=55, CAPITULATION=85
-        hmm regime  : BULL=20, SIDEWAYS=45, BEAR=60, CRISIS=85
-        adv regime  : NORMAL=20, STRESS=55, CAPITULATION=85
+        hmm regime  : BULL=20, SIDEWAYS=25, BEAR=60, CRISIS=85
+        adv regime  : BULL=20, SIDEWAYS=25, BEAR=60, CRISIS=85,
+                      NORMAL=20, STRESS=55, CAPITULATION=85
+
+    SIDEWAYS = 25 (NOT 45): a sideways state is neutral/non-trending, not
+    stress. Rating it 45 (ELEVATED bucket) made a single neutral HMM source
+    veto an otherwise bullish majority and overstate risk even when
+    crisis_prob == 0. It is now aligned with NORMAL/ACCUMULATION severity.
+    Crisis risk is governed by crisis_prob / CAPITULATION / CRISIS, not by
+    the sideways label itself.
 
     Consensus severity = max of available. Label buckets:
-        0-35   BULLISH     (calm / expansion / accumulation)
-        35-60  ELEVATED    (sideways / distribution / moderate stress)
+        0-35   BULLISH     (calm / expansion / accumulation / sideways)
+        35-60  ELEVATED    (distribution / moderate stress)
         60+    STRESSED    (stress / bear / crisis / capitulation)
 
     Conflict = count of sources whose bucket differs from the consensus
@@ -53,13 +61,13 @@ CACHE_TTL = 300  # 5 min — regime inputs update intraday
 
 # Stress-severity mapping per subsystem label.
 _MAIN_MAP = {"NORMAL": 20, "STRESS": 55, "CAPITULATION": 85}
-_HMM_MAP = {"BULL": 20, "SIDEWAYS": 45, "BEAR": 60, "CRISIS": 85}
+_HMM_MAP = {"BULL": 20, "SIDEWAYS": 25, "BEAR": 60, "CRISIS": 85}
 # The advanced detector (ml/sfc_advanced.py RegimeDetector) outputs in the
 # SAME 4-regime label space as the main HMM (BULL/BEAR/SIDEWAYS/CRISIS).
 # It previously listed only NORMAL/STRESS/CAPITULATION here, so adv_regime
 # labels (e.g. CRISIS) were silently DROPPED from the consensus — a hidden
 # source of "inconsistent assessment". Align it with the actual output space.
-_ADV_MAP = {"BULL": 20, "SIDEWAYS": 45, "BEAR": 60, "CRISIS": 85,
+_ADV_MAP = {"BULL": 20, "SIDEWAYS": 25, "BEAR": 60, "CRISIS": 85,
             "NORMAL": 20, "STRESS": 55, "CAPITULATION": 85}
 # Behavior-state reinforces direction but is NOT a stress bucket by itself.
 _BEHAVIOR_STRESS = {"PANIC": 85, "DISTRIBUTION": 65, "EUPHORIA": 45,
