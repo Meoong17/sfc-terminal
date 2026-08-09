@@ -217,42 +217,41 @@ Re-enable policy: XGBoost may be re-blended only after walk-forward validation
 shows calibrated, era-stable discrimination AND the output is scale-calibrated
 onto the stress index (percentile mapping, not 1:1).
 
-## Metode akademik — validasi bertahap (2026-08-08)
+## Academic methods — staged validation (2026-08-08)
 
-Riset metode akademis (matematika/ekonomi/coding) → docs/ACADEMIC_METHODS.md,
-sketsa implementasi → analysis/sfc_methods_academic.py. Setiap metode diuji
-empiris wajib sebelum integrasi. Hasil:
+Academic method research (mathematics/economics/coding) → `docs/ACADEMIC_METHODS.md`; implementation sketches → `analysis/sfc_methods_academic.py`. Every method is empirically tested before integration. Results:
 
-| Tahap | Metode | Uji empiris | Verdict |
+| Stage | Method | Empirical test | Verdict |
 |-------|--------|-------------|---------|
-| 1 | EVT-POT VaR/ES | `analysis/sfc_evt_validate.py` — backtest walk-forward 1531 hari OOS | **TIDAK tervalidasi** atas incumbent. Incumbent `m11_var` (empirical percentile) di 95% lebih baik (err 0.12 vs EVT 0.20, Kupiec p=0.253 vs 0.059); di 99% seri. EVT tak lebih baik → jangan ganti m11_var. Catatan: uji awal vs normal (strawman) menyesatkan; koreksi dibanding incumbent. |
-| 2 | CISS composite | `analysis/sfc_ciss_validate.py` — panel harian 17 titik (git data.json) | **TIDAK tervalidasi.** Sampel terlalu kecil & rezim tenang (komponen nyaris konstan); korelasi komposit→forward-30d positif & tak signifikan (rho +0.22, p=0.39); CISS nyaris identik (corr 0.994). Integrasi ditunda sampai panel lebih panjang dgn episode stress. |
-| 3 | Purged/embargo CV XGBoost | `analysis/walk_forward_xgboost_purged.py` — embargo 6, bootstrap CI | **STAY_DISABLED diperkuat.** Pooled AUC 0.486 < 0.5 (CI [0.464,0.563]), gate kalibrasi gagal (resolution 0). Embargo MENGUNGKAP look-ahead leakage pada WFV single-path (AUC fold-awal 0.726/0.617 → 0.274/0.383 setelah purge). XGBoost tetap display-only. |
+| 1 | EVT-POT VaR/ES | `analysis/sfc_evt_validate.py` — walk-forward backtest, 1531 OOS days | **NOT validated** vs the incumbent. The incumbent `m11_var` (empirical percentile) is better at 95% (err 0.12 vs EVT 0.20, Kupiec p=0.253 vs 0.059); tied at 99%. EVT is not better → do not replace m11_var. Note: the initial test vs a normal (strawman) baseline was misleading; corrected to compare against the incumbent. |
+| 2 | CISS composite | `analysis/sfc_ciss_validate.py` — daily panel of 17 points (git data.json) | **NOT validated.** Sample too small and regime too calm (components nearly constant); composite→forward-30d correlation positive but insignificant (rho +0.22, p=0.39); near-identical to CISS (corr 0.994). Integration deferred until a longer panel with stress episodes is available. |
+| 3 | Purged/embargo CV XGBoost | `analysis/walk_forward_xgboost_purged.py` — embargo 6, bootstrap CI | **STAY_DISABLED reinforced.** Pooled AUC 0.486 < 0.5 (CI [0.464,0.563]); calibration gate failed (resolution 0). Embargo REVEALS look-ahead leakage in single-path WFV (early-fold AUC 0.726/0.617 → 0.274/0.383 after purging). XGBoost remains display-only. |
 
-Pembelajaran utama: (a) bandingkan metode baru dgn INCUMBENT (empirical percentile),
-bukan strawman; (b) validasi model yang labelnya bergantung masa depan WAJIB
-purged-CV + embargo (López de Prado), bukan single-path WFV — single-path
-over-estimates skill; (c) purged-CV kini menjadi standar validasi yang dianjurkan
-untuk menilai faktor baru sebelum masuk ke sinyal efektif.
+Key lessons: (a) compare new methods against the INCUMBENT (empirical
+percentile), not a strawman; (b) models whose labels depend on the future
+MUST be validated with purged-CV + embargo (López de Prado), not
+single-path WFV — single-path over-estimates skill; (c) purged-CV is now
+the recommended validation standard for assessing new factors before they
+enter the effective signal.
 
-## Re-validasi seri kanonik 9 tahun (2026-08-08) — docs/canonical_revalidation.md
-Re-run walk-forward pada HARGA KANONIK Binance BTCUSDT (2017-2026) + era-split:
-- **L8 subset (GLF liq + L6 expect): ERA-UNSTABLE.** Signifikan kuat di window penuh
-  (30d +0.072***, 90d +0.264***, 365d +0.51***) TAPI era-split membalik tanda:
-  2017-21 +0.20/+0.61 vs 2022-26 −0.11/−0.37. Signifikansi didorong 2017-21; efek
-  INVERT di rezim terbaru. → jangan diandalkan utk live/naikkan cutoff.
-- **SFC pct (trend continuation): ERA-KONSISTEN di 30d/90d** (era1 +0.047/+0.335,
-  era2 +0.056/+0.139, keduanya positif), meski 365d membalik (−0.48). Lebih robust
-  dari L8 di horizon pendek-menengah.
-Skrip `analysis/revalidate_canonical.py` (murni analisis, baca cache + Binance, tak
-fetch FRED). Cron bulanan Binance juga re-run validasi ini.
+## 9-year canonical series re-validation (2026-08-08) — docs/canonical_revalidation.md
+Walk-forward re-run on the CANONICAL Binance BTCUSDT prices (2017-2026) + era-split:
+- **L8 subset (GLF liq + L6 expect): ERA-UNSTABLE.** Strongly significant over the full
+  window (30d +0.072***, 90d +0.264***, 365d +0.51***) BUT the era-split flips sign:
+  2017-21 +0.20/+0.61 vs 2022-26 −0.11/−0.37. Significance is driven by 2017-21; the effect
+  INVERTS in the most recent regime. → do not rely on it for live / do not raise the cutoff.
+- **SFC pct (trend continuation): ERA-CONSISTENT at 30d/90d** (era1 +0.047/+0.335,
+  era2 +0.056/+0.139, both positive), although 365d inverts (−0.48). More robust
+  than L8 at short-to-medium horizons.
+Script `analysis/revalidate_canonical.py` (purely analytical, reads cache + Binance, does not
+fetch FRED). The monthly Binance cron also re-runs this validation.
 
-## Purged-CV momentum (2026-08-08) — MOMENTUM DITOLAK (docs/feature_validation.md)
-Layar IC non-purged sempat menandai momentum (mom_30/90) sebagai fitur "paling robust"
-(era-stabil, lolos BH). Validasi purged-CV leakage-free (embargo=h, `analysis/
-purged_cv_momentum.py`) membantah: pooled AUC mom_30 hanya 0.520 di 7d (marginal),
-0.413 di 30d & 0.371 di 90d (DI BAWAH kebetulan); mom_90 <0.5. **Momentum TIDAK punya
-edge OOS andal** — edge tampak adalah artefak overlapping-label yang menggelembungkan
-n sampel efektif. → JANGAN tambahkan momentum ke sinyal/pipeline. Menegaskan standar
-purged-CV/embargo (IC non-purged over-estimates skill).
+## Purged-CV momentum (2026-08-08) — MOMENTUM REJECTED (docs/feature_validation.md)
+A non-purged IC screen had flagged momentum (mom_30/90) as the "most robust" feature
+(era-stable, passed BH). Leakage-free purged-CV validation (embargo=h, `analysis/
+purged_cv_momentum.py`) contradicts it: pooled mom_30 AUC only 0.520 at 7d (marginal),
+0.413 at 30d & 0.371 at 90d (BELOW chance); mom_90 <0.5. **Momentum has no reliable
+OOS edge** — the apparent edge is an overlapping-label artifact that inflates effective
+sample size n. → Do NOT add momentum to the signal/pipeline. Reinforces the
+purged-CV/embargo standard (non-purged IC over-estimates skill).
 
