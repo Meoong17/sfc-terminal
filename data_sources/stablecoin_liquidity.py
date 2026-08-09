@@ -35,28 +35,123 @@ def _save_cache(cache):
 
 # ── Stablecoin IDs for CoinGecko ──────────────────────────────────────
 STABLECOIN_IDS = ["tether", "usd-coin", "dai", "first-digital-usd"]
+# CoinGecko ID → DefiLlama symbol (for fallback)
+DEFILLAMA_SYMBOLS = {"tether": "USDT", "usd-coin": "USDC", "dai": "DAI", "first-digital-usd": "FDUSD"}
 CG_BASE = "https://api.coingecko.com/api/v3"
+DL_BASE = "https://stablecoins.llama.fi"
 # Audit 2026-08-03: demo key was hardcoded in source (committed secret).
 # Now read from env; empty => CoinGecko 401 => _fetch_cg() degrades to neutral.
-# Add to your .env:  COINGECKO_API_KEY=CG-xxxx (see .env)
-CG_API_PARAM = "x_cg_demo_api_key=" + os.getenv("COINGECKO_API_KEY", "")
+# Audit 2026-08-10: use header auth (x-cg-demo-api-key / x-cg-pro-api-key),
+# NOT the demo-only query param, which is rejected for pro keys. If the key is
+# missing we hit the free public tier (works but throttles on parallel bursts).
+_CG_KEY = os.getenv("COINGECKO_API_KEY", "")
 
-def _fetch_cg_single(url):
-    try:
-        r = requests.get(url, timeout=15)
-        if r.status_code == 200:
-            return r.json()
-        return None
-    except Exception as e:
-        print(f"[SC] CG fetch failed: {url[:60]}... — {e}", file=sys.stderr)
-        return None
+def _cg_headers():
+    h = {"Accept": "application/json"}
+    if _CG_KEY:
+        # CoinGecko keys auth via header; demo vs pro key differ by header name.
+        # Send whichever applies; the free tier works with no key at all.
+        h["x-cg-demo-api-key"] = _CG_KEY
+        h["x-cg-pro-api-key"] = _CG_KEY
+    return h
 
-def _fetch_market_chart(coin_id, days=365):
-    url = f"{CG_BASE}/coins/{coin_id}/market_chart?vs_currency=usd&days={days}&{CG_API_PARAM}"
+def _fetch_cg_single(url, retries=2):
+    """GET a CoinGecko URL with retry + exponential backoff on 429/5xx.
+    retries=2 keeps fallback latency bounded when CG is fully throttled;
+    DefiLlama covers the all-down case."""
+    import time as _time
+    for attempt in range(retries):
+        try:
+            r = requests.get(url, headers=_cg_headers(), timeout=20)
+            if r.status_code == 200:
+                return r.json()
+            if r.status_code in (429, 502, 503, 504):
+                backoff = 2 ** attempt + (attempt * 1.5)
+                print(f"[SC] CG {r.status_code} on {url[:55]}... retry in {backoff:.1f}s", file=sys.stderr)
+                _time.sleep(backoff)
+                continue
+            # 401/403/404 → auth/not-found, no point retrying
+            return None
+        except Exception as e:
+            print(f"[SC] CG fetch failed: {url[:60]}... — {e}", file=sys.stderr)
+            return None
+    return None
+
+def _fetch_market_chart(coin_id, days=30):
+    """Fetch stablecoin market-cap history. days=30 (not 365) — enough for
+    M76 7d/30d growth and far smaller payload (less throttling)."""
+    url = f"{CG_BASE}/coins/{coin_id}/market_chart?vs_currency=usd&days={days}"
     data = _fetch_cg_single(url)
     if data and "market_caps" in data and data["market_caps"]:
         return data["market_caps"]  # [[ts, mcap], ...]
     return None
+
+# ── DefiLlama fallback (free, no rate limit) ─────────────────────────
+def _fetch_defillama_supply():
+    """Fetch 4-coin stablecoin circulating supply snapshot from DefiLlama.
+
+    Returns {coin_id: {"latest": mcap, "mcap_30d_ago": mcap, "mcap_7d_ago": mcap}}
+    or None on failure. DefiLlama provides cur / prevDay / prevWeek / prevMonth
+    per asset, which is exactly what M76 growth needs — no full 365d series,
+    but always returns all coins (no partial-sum poisoning).
+    """
+    try:
+        r = requests.get(f"{DL_BASE}/stablecoins", headers={"Accept": "application/json"}, timeout=25)
+        if r.status_code != 200:
+            return None
+        data = r.json()
+        by_sym = {}
+        for a in data.get("peggedAssets", []):
+            by_sym[a.get("symbol")] = a
+        out = {}
+        for cid, sym in DEFILLAMA_SYMBOLS.items():
+            a = by_sym.get(sym)
+            if not a:
+                continue
+            cur = (a.get("circulating") or {}).get("peggedUSD")
+            pw = (a.get("circulatingPrevWeek") or {}).get("peggedUSD")
+            pm = (a.get("circulatingPrevMonth") or {}).get("peggedUSD")
+            if cur and pm:
+                out[cid] = {"latest": cur, "mcap_30d_ago": pm, "mcap_7d_ago": pw if pw else None}
+        return out
+    except Exception as e:
+        print(f"[SC] DefiLlama fallback failed: {e}", file=sys.stderr)
+        return None
+
+def _fetch_supply_from_defillama():
+    """Build supply_history (day-keyed dict) from DefiLlama snapshot.
+
+    DefiLlama lacks a per-coin daily series endpoint, so we synthesize a
+    minimal history with latest / 7d-ago / 30d-ago timestamps (UTC). This is
+    enough for M76 growth, M77 SSR, M80 dominance — the same fields M76-M80
+    actually consume.
+    """
+    snap = _fetch_defillama_supply()
+    if not snap:
+        return {}
+    today = time.time()
+    points = {0: today, 7: today - 7 * 86400, 30: today - 30 * 86400}
+    history = {}
+    for off, ts in points.items():
+        day = int(ts / 86400) * 86400
+        date_str = datetime.fromtimestamp(day, tz=timezone.utc).strftime("%Y-%m-%d")
+        total = 0.0
+        ok = True
+        for cid in STABLECOIN_IDS:
+            s = snap.get(cid)
+            if off == 0:
+                v = s["latest"] if s else None
+            elif off == 7:
+                v = s["mcap_7d_ago"] if s else None
+            else:
+                v = s["mcap_30d_ago"] if s else None
+            if v is None:
+                ok = False
+                break
+            total += v
+        if ok:
+            history[date_str] = round(total, 2)
+    return history
 
 def fetch_stablecoin_supply_history(force_refresh=False):
     """Fetch total stablecoin market cap history (daily, 365d).
@@ -73,9 +168,11 @@ def fetch_stablecoin_supply_history(force_refresh=False):
     
     print("[SC] Fetching stablecoin market cap data from CoinGecko...", file=sys.stderr)
     
-    # Fetch all stablecoin market charts in parallel
+    # Fetch stablecoin market charts in parallel (max 2 workers — lower than
+    # 4 to avoid CoinGecko 429 on parallel bursts). Retry/backoff handled per
+    # request in _fetch_cg_single.
     all_series = {}
-    with ThreadPoolExecutor(max_workers=len(STABLECOIN_IDS)) as ex:
+    with ThreadPoolExecutor(max_workers=2) as ex:
         futures = {ex.submit(_fetch_market_chart, sid): sid for sid in STABLECOIN_IDS}
         for f in as_completed(futures):
             sid = futures[f]
@@ -83,6 +180,25 @@ def fetch_stablecoin_supply_history(force_refresh=False):
             if result:
                 all_series[sid] = result
                 print(f"[SC] {sid}: {len(result)} data points", file=sys.stderr)
+
+    # If CoinGecko failed to return ALL stablecoins, fall back to DefiLlama.
+    # CG returning a subset (e.g. only 2 of 4 coins on 429) would poison the
+    # partial-sum guard into building a reduced-supply history (260B -> 187B),
+    # so we prefer a complete DefiLlama snapshot (always 4 coins) instead.
+    if len(all_series) < len(STABLECOIN_IDS):
+        missing = [sid for sid in STABLECOIN_IDS if sid not in all_series]
+        print(f"[SC] CoinGecko partial ({len(all_series)}/{len(STABLECOIN_IDS)}) — "
+              f"missing {missing}. Falling back to DefiLlama...", file=sys.stderr)
+        dl_hist = _fetch_supply_from_defillama()
+        if dl_hist:
+            cache["supply_history"] = dl_hist
+            cache["raw"]["n_stablecoins"] = len(STABLECOIN_IDS)
+            cache["raw"]["source"] = "defillama"
+            _save_cache(cache)
+            print(f"[SC] DefiLlama fallback: {len(dl_hist)} synthetic day-points, "
+                  f"{len(STABLECOIN_IDS)} stablecoins", file=sys.stderr)
+            return dl_hist
+        print("[SC] DefiLlama fallback also failed — using partial CoinGecko data", file=sys.stderr)
     
     if not all_series:
         print("[SC] WARNING: No stablecoin data fetched, using fallback estimates", file=sys.stderr)

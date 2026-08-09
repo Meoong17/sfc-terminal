@@ -34,11 +34,20 @@ CACHE_TTL = 21600  # 6 hours
 
 # ── Stablecoin IDs for per-coin tracking ──
 STABLECOIN_IDS = ["tether", "usd-coin", "dai", "first-digital-usd"]
+# CoinGecko ID → DefiLlama symbol (fallback source, free/no rate limit)
+DEFILLAMA_SYMBOLS = {"tether": "USDT", "usd-coin": "USDC", "dai": "DAI", "first-digital-usd": "FDUSD"}
 CG_BASE = "https://api.coingecko.com/api/v3"
 # Audit 2026-08-03: demo key was hardcoded in source (committed secret).
 # Now read from env; empty => CoinGecko 401 => _fetch_cg() degrades to neutral.
 # Add to your .env:  COINGECKO_API_KEY=CG-xxxx (see .env)
 CG_API_PARAM = "x_cg_demo_api_key=" + os.getenv("COINGECKO_API_KEY", "")
+
+def _cg_headers():
+    h = {"Accept": "application/json"}
+    if os.getenv("COINGECKO_API_KEY", ""):
+        h["x-cg-demo-api-key"] = os.getenv("COINGECKO_API_KEY")
+        h["x-cg-pro-api-key"] = os.getenv("COINGECKO_API_KEY")
+    return h
 
 
 def _load_cache():
@@ -56,7 +65,7 @@ def _save_cache(cache):
 
 def _fetch_cg(url):
     try:
-        r = requests.get(url, timeout=15)
+        r = requests.get(url, headers=_cg_headers(), timeout=15)
         if r.status_code == 200:
             return r.json()
         return None
@@ -82,14 +91,53 @@ def _fetch_per_coin_data():
                 return coin_id, (latest, week_ago, month_ago)
         return coin_id, None
 
-    with ThreadPoolExecutor(max_workers=len(STABLECOIN_IDS)) as ex:
+    with ThreadPoolExecutor(max_workers=2) as ex:
         futures = {ex.submit(_fetch_one, sid): sid for sid in STABLECOIN_IDS}
         for f in as_completed(futures):
             sid, data = f.result()
             if data:
                 result[sid] = data
 
+    # DefiLlama fallback for any coin CoinGecko throttled (429). Without this
+    # a missing coin silently drops USDT/USDC growth-divergence from the SLI.
+    missing = [sid for sid in STABLECOIN_IDS if sid not in result]
+    if missing:
+        dl = _fetch_defillama_per_coin()
+        for sid in missing:
+            if sid in dl:
+                result[sid] = dl[sid]
+                print(f"[SLI] {sid}: filled from DefiLlama fallback", file=sys.stderr)
+
     return result
+
+
+def _fetch_defillama_per_coin():
+    """DefiLlama fallback for per-coin stablecoin supply (USDT/USDC/DAI/FDUSD).
+
+    Returns {coin_id: [latest_mcap, mcap_7d_ago, mcap_30d_ago]} from DefiLlama's
+    free /stablecoins snapshot (circulating / prevWeek / prevMonth). Always
+    complete for all 4 coins — no partial-sum poisoning when CoinGecko 429s.
+    """
+    try:
+        r = requests.get("https://stablecoins.llama.fi/stablecoins",
+                         headers={"Accept": "application/json"}, timeout=25)
+        if r.status_code != 200:
+            return {}
+        data = r.json()
+        by_sym = {a.get("symbol"): a for a in data.get("peggedAssets", [])}
+        out = {}
+        for cid, sym in DEFILLAMA_SYMBOLS.items():
+            a = by_sym.get(sym)
+            if not a:
+                continue
+            cur = (a.get("circulating") or {}).get("peggedUSD")
+            pw = (a.get("circulatingPrevWeek") or {}).get("peggedUSD")
+            pm = (a.get("circulatingPrevMonth") or {}).get("peggedUSD")
+            if cur and pm:
+                out[cid] = [cur, pw if pw else cur, pm]
+        return out
+    except Exception:
+        return {}
 
 
 def compute_stablecoin_liquidity_index(
