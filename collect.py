@@ -2300,12 +2300,16 @@ if _etf_m81_score != 0.5 or _etf_m82_score != 0.5:
     factors["Lt"] += max(-1.5, min(1.5, etf_lt_adj))
     print(f"[ETF] Factor adj: Rt={etf_rt_adj:+.3f} Lt={etf_lt_adj:+.3f}", file=sys.stderr)
 
-# ── FISCAL LIQUIDITY FACTOR ADJUSTMENT ──
+# ── FISCAL LIQUIDITY (M83-M84) — DISPLAY-ONLY (de-duplicated 2026-08-09) ──
+# TGA (WTREGEN) and RRP (RRPONTSYD) are ALREADY components inside GLF
+# (data_sources/global_liquidity_engine.py, weights 10% + 10%), which is itself
+# applied to Lt via glf_factor_adj below. Feeding M83/M84 into Lt AGAIN
+# double-counted the exact same FRED series (WTREGEN/RRPONTSYD — identical IDs).
+# Per the one-signal-to-one-component rule, TGA/RRP fiscal liquidity now lives
+# ONLY inside GLF; M83/M84/M85 remain computed & reported for display only.
+# (Audit 2026-08-09: FISCAL M83/M84 duplicated GLF's TGA/RRP → double-count into Lt.)
 if _m83_score != 0.5 or _m84_score != 0.5:
-    tga_adj = (0.5 - _m83_score) * 1.0
-    rrp_adj = (0.5 - _m84_score) * 1.0
-    factors["Lt"] += max(-1.0, min(1.0, tga_adj + rrp_adj))
-    print(f"[FISCAL] Factor adj: TGA={tga_adj:+.3f} RRP={rrp_adj:+.3f} Lt_total={tga_adj+rrp_adj:+.3f}", file=sys.stderr)
+    print(f"[FISCAL] M83(TGA)={_m83_score:.3f} M84(RRP)={_m84_score:.3f} display-only (already in GLF) — no Lt adjustment", file=sys.stderr)
 
 # ── REPO MARKET STRESS FACTOR ADJUSTMENT (M86) ──
 # Applied to Ft (Systemic/Funding), not Lt — repo stress measures whether
@@ -2917,10 +2921,14 @@ total_active_methods = (
 print(f"[SFC] Total active methods: {total_active_methods} (M1-M6+M7-M19+M20-M31+M32_Q+M33_GLO+M76-M80+M72-M75+M81-M85+DXY)", file=sys.stderr)
 
 # Compute effective SFC
+# liq_mod (direct m2_yoy adjustment) REMOVED 2026-08-09 (de-duplication):
+# m2_yoy (US M2 YoY, M2SL) is already a component of GLF (weight 15%), which
+# feeds sfc_pct via the Lt factor (glf_factor_adj). Adding a DIRECT m2_yoy term
+# (liq_mod) here double-counted the same M2SL growth into effective_sfc. Keep
+# the variable defined (=0) so data.json's liq_mod field still renders; M2's
+# influence now flows through GLF only. (Audit 2026-08-09: m2_yoy appears in
+# GLF + liq_mod + HMM feature → 2-3x same signal; this removes the direct term.)
 liq_mod = 0.0
-if m2_yoy is not None:
-    liq_mod = round((7.0 - m2_yoy) * 0.8, 1)
-    liq_mod = max(-5.0, min(10.0, liq_mod))
 effective_sfc = min(sfc_pct + liq_mod, 100.0) if sfc_pct is not None else None
 effective_sfc = max(effective_sfc, 0.0) if effective_sfc else None
 
