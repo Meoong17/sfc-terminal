@@ -18,8 +18,10 @@ collect.py              # orchestrator — run every pipeline cycle
 sse_server.py           # SSE push server for live dashboard updates
 inject_data.py          # inject data.json into index.html (offline-first serving)
 binance_ws.py           # Binance WebSocket price daemon
-sfc-pipeline.sh         # cron wrapper: retry, commit, push, index.html restore
-*.sh                    # training + watchdog cron entry points
+xai_explainer_q5.py     # XAI explainer (imported by collect.py)
+sfc-pipeline.sh         # cron wrapper (kept at root — cron runs it via workdir)
+ws-watchdog.sh          # daemon watchdog (kept at root — cron runs it via workdir)
+index.html  app.js  sw.js  data.json   # dashboard front-end + served data
 
 data_sources/           # live data providers (on-chain, stablecoin, ETF, news, ...)
 analysis/               # walk-forward validation, calibration, causal/regime analysis
@@ -29,8 +31,8 @@ risk/                   # systemic-risk GNN, XAI explainer
 trading/                # paper trading engine, DRL agent
 optimization/           # genetic algorithm optimizer
 data_augmentation/      # time-series augmentation (timeGAN)
-scripts/                # maintenance & audit utilities
-docs/                   # architecture, validation, status reports
+scripts/                # maintenance utilities + cron entry points (training, tunnel, deploy)
+docs/                   # architecture, validation, security, status reports
 worker/                 # Cloudflare Worker (dashboard proxy + auth)
 static/  fonts/         # static front-end assets
 data/                   # canonical Binance Vision historical data

@@ -18,7 +18,7 @@ TABLE_STYLE = "Light Grid Accent 1"
 
 def parse_args():
     lang = "id"
-    out = os.path.join(SFC_ROOT, "IMBS_L1L2_Validation_Report.docx")
+    out = os.path.join(SFC_ROOT, "docs", "IMBS_L1L2_Validation_Report.docx")
     argv = sys.argv[1:]
     for i, a in enumerate(argv):
         if a == "--lang" and i + 1 < len(argv):

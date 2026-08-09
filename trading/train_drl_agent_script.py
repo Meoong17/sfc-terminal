@@ -24,7 +24,7 @@ Usage:
     cd ~/sfc
     python3 train_drl_agent_script.py
     (run periodically, e.g. weekly alongside the other model retrains —
-     see weekly-model-train.sh for the pattern this should be added to)
+     see scripts/weekly-model-train.sh for the pattern this should be added to)
 """
 import json
 import os
