@@ -9,31 +9,41 @@ produces a single stress score, `sfc_pct`.
 ## Quick links
 
 - **[Architecture map](docs/ARCHITECTURE.md)** — what every module does and how they connect.
-- **[Project status](docs/PROJECT_STATUS.md)** — audit history, known limitations, why the repo isn't fully reorganized into subfolders.
+- **[Project status](docs/PROJECT_STATUS.md)** — audit history, known limitations, walk-forward validation verdicts.
 
-## Structure at a glance
+## Structure
 
 ```
 collect.py              # orchestrator — run every pipeline cycle
-sfc-pipeline.sh          # cron wrapper: retry, commit, push, index.html restore
-ml/  analysis/  data_sources/   # modules confirmed safe to relocate (see docs/PROJECT_STATUS.md)
-models/  risk/  trading/  optimization/  data_augmentation/   # pre-existing package folders
-worker/                  # Cloudflare Worker (dashboard proxy + auth)
+sse_server.py           # SSE push server for live dashboard updates
+inject_data.py          # inject data.json into index.html (offline-first serving)
+binance_ws.py           # Binance WebSocket price daemon
+sfc-pipeline.sh         # cron wrapper: retry, commit, push, index.html restore
+*.sh                    # training + watchdog cron entry points
+
+data_sources/           # live data providers (on-chain, stablecoin, ETF, news, ...)
+analysis/               # walk-forward validation, calibration, causal/regime analysis
+models/                 # ML models (mamba, qlstm, hmm, ensemble, online learning)
+ml/                     # feature engineering & dynamic feature weighting
+risk/                   # systemic-risk GNN, XAI explainer
+trading/                # paper trading engine, DRL agent
+optimization/           # genetic algorithm optimizer
+data_augmentation/      # time-series augmentation (timeGAN)
+scripts/                # maintenance & audit utilities
+docs/                   # architecture, validation, status reports
+worker/                 # Cloudflare Worker (dashboard proxy + auth)
+static/  fonts/         # static front-end assets
+data/                   # canonical Binance Vision historical data
 ```
 
-Most modules still live at repo root rather than in topic folders — the
-majority resolve their own cache/model/data file paths relative to their
-own location (`os.path.dirname(os.path.abspath(__file__))`), so moving
-them requires updating that path logic in each file individually, not
-just the import statement in `collect.py`. See
-[`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md) for the full
-verification and the 10 modules that were confirmed safe and relocated.
+`index.html` is the compiled single-file dashboard; `app.js`, `sw.js`,
+and `static/` are the front-end source and service worker.
 
 ## Running the pipeline
 
 ```bash
 cp .env.example .env   # fill in API keys
-pip install -r requirements.txt   # if present, or see individual module imports
+pip install -r requirements.txt
 python3 collect.py > data.json
 ```
 
@@ -45,7 +55,7 @@ review, but the version actually invoked by cron on the VPS lives at
 
 ## Deployment
 
-- **VPS**: runs `collect.py` on a schedule via `sfc-pipeline.sh`, plus background daemons (`binance_ws.py`, `qlstm_daemon.py`) kept alive by watchdog scripts (`ws-watchdog.sh`, `qlstm_watchdog.py`).
+- **VPS**: runs `collect.py` on a schedule via `sfc-pipeline.sh`, plus background daemons (`binance_ws.py`) kept alive by `ws-watchdog.sh`.
 - **Cloudflare Worker** (`worker/`): proxies the dashboard, handles multi-user session auth. Secrets (`BACKUP_URL`, `SESSION_SECRET`) are set via `wrangler secret put`, never committed — see `.env.example` for the full list of required environment variables.
 
 ## Status
