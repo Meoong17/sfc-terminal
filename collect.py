@@ -4149,7 +4149,10 @@ out = {
     "m31_altman": round(inst_results.get("m31_altman", 0), 3) if "m31_altman" in inst_results else None,
     "m31_detail": inst_details.get("m31_detail"),
     # Stablecoin liquidity (M76-M80) with details
-    "m76_supply_growth": None,  # redundant: r=-1.00 with m80, removed from output
+    # m76 restored 2026-08-10: r=-1.00 vs m80 claim NOT reproducible (m76 never
+    # numeric in 400 snapshots; growth-vs-level are different dimensions).
+    # SLI already consumes live m76 internally, so this only re-enables the card.
+    "m76_supply_growth": round(_sc_results.get("m76_supply_growth", 0), 3) if _sc_results and _sc_results.get("m76_supply_growth") is not None else None,
     "m76_detail": sc_details.get("m76_detail"),
     "m77_ssr": round(_sc_results.get("m77_ssr", 0), 3) if _sc_results else None,
     "m77_detail": sc_details.get("m77_detail"),
