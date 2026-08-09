@@ -278,14 +278,24 @@ def calculate_m76_supply_growth(supply_history):
     
     growth_30d = (latest_mcap - mcap_30d_ago) / mcap_30d_ago * 100
     
-    # Also compute 7d growth if possible
+    # Also compute 7d growth if possible. Use date-based lookup (nearest point
+    # >=7 days before latest) rather than dates[-7], so it works for BOTH full
+    # CoinGecko daily history AND the sparse 3-point DefiLlama fallback history.
     dates = sorted(supply_history.keys())
     growth_7d = None
-    if len(dates) >= 7:
-        d7 = dates[-7]
-        mcap_7d_ago = supply_history.get(d7)
-        if mcap_7d_ago and mcap_7d_ago > 0:
-            growth_7d = (latest_mcap - mcap_7d_ago) / mcap_7d_ago * 100
+    latest_date = dates[-1] if dates else None
+    mcap_7d_ago = None
+    if latest_date:
+        try:
+            latest_dt = datetime.strptime(latest_date, "%Y-%m-%d")
+            for d in reversed(dates):
+                if (latest_dt - datetime.strptime(d, "%Y-%m-%d")).days >= 7:
+                    mcap_7d_ago = supply_history.get(d)
+                    break
+        except ValueError:
+            mcap_7d_ago = None
+    if mcap_7d_ago and mcap_7d_ago > 0:
+        growth_7d = (latest_mcap - mcap_7d_ago) / mcap_7d_ago * 100
     
     # Score: sigmoid on growth rate
     # -2% monthly = score 0.1 (contracting)

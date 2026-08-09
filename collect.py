@@ -262,12 +262,16 @@ except ImportError as e:
 
 # ── NEW: Stablecoin Intelligence (enhanced composite index) ──
 try:
-    from data_sources.stablecoin_intelligence import compute_stablecoin_liquidity_index
+    from data_sources.stablecoin_intelligence import (
+        compute_stablecoin_liquidity_index,
+        compute_tokenized_treasury_metrics,
+    )
     STABLECOIN_INTEL_AVAILABLE = True
 except ImportError as e:
     STABLECOIN_INTEL_AVAILABLE = False
     print(f"[SFC] Stablecoin Intelligence unavailable: {e}", file=sys.stderr)
     def compute_stablecoin_liquidity_index(*a, **k): return 50.0, 0.5, {"error": "unavailable", "status": "fallback"}
+    def compute_tokenized_treasury_metrics(*a, **k): return {"available": False, "error": "unavailable"}
 
 # ── NEW: Dynamic Feature Weighting (regime-adaptive weights) ──
 try:
@@ -2192,6 +2196,27 @@ if STABLECOIN_INTEL_AVAILABLE:
     except Exception as _sli_e:
         print(f"[SLI] Error: {_sli_e}", file=sys.stderr)
         _sli_score, _sli_sfc_stress, _sli_details = 50.0, 0.5, {"error": str(_sli_e), "status": "fallback"}
+
+# ── NEW: Tokenized Treasury AUM (DISPLAY-ONLY observation) ──
+# From analysis.docx: SFC lacks a variable distinguishing CapitalExit from
+# CapitalReallocation (stablecoin -> tokenized treasuries). This adds the
+# "Tokenized Treasury AUM Growth" observation via DefiLlama. DISPLAY-ONLY —
+# NOT blended into any SFC score until empirically validated vs BTC forward
+# returns (per the doc's explicit recommendation).
+_treasury_details = {"available": False}
+if STABLECOIN_INTEL_AVAILABLE:
+    try:
+        _treasury_details = compute_tokenized_treasury_metrics()
+        if _treasury_details.get("available"):
+            print(f"[TREASURY] AUM=${_treasury_details['aum_usd']/1e9:.1f}B "
+                  f"30d={_treasury_details.get('growth_30d_pct')}% "
+                  f"assets={_treasury_details.get('n_assets',0)} "
+                  f"({_treasury_details.get('source','?')})", file=sys.stderr)
+        else:
+            print(f"[TREASURY] unavailable: {_treasury_details.get('error')}", file=sys.stderr)
+    except Exception as _tr_e:
+        print(f"[TREASURY] Error: {_tr_e}", file=sys.stderr)
+        _treasury_details = {"available": False, "error": str(_tr_e)}
 
 # ── ETF FLOW (M81-M82) ──
 _etf_results = None
@@ -4171,6 +4196,12 @@ out = {
     "sli_usdt_growth": _sli_details.get("usdt_growth_pct") if _sli_details else None,
     "sli_usdc_growth": _sli_details.get("usdc_growth_pct") if _sli_details else None,
     "sli_growth_divergence": _sli_details.get("growth_divergence_pct") if _sli_details else None,
+    # ── Tokenized Treasury AUM (DISPLAY-ONLY observation, DefiLlama) ──
+    "treasury_aum_usd": _treasury_details.get("aum_usd") if _treasury_details.get("available") else None,
+    "treasury_growth_30d_pct": _treasury_details.get("growth_30d_pct") if _treasury_details.get("available") else None,
+    "treasury_n_assets": _treasury_details.get("n_assets") if _treasury_details.get("available") else None,
+    "treasury_per_asset": _treasury_details.get("per_asset") if _treasury_details.get("available") else None,
+    "treasury_available": _treasury_details.get("available", False),
     # Microstructure change detection (M20-M23 cross-run deltas)
     "micro_change_flags": micro_change_flags,
     "micro_trend_score": round(micro_trend_score, 3) if micro_change_flags else None,

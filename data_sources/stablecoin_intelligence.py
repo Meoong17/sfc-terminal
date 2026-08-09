@@ -36,6 +36,14 @@ CACHE_TTL = 21600  # 6 hours
 STABLECOIN_IDS = ["tether", "usd-coin", "dai", "first-digital-usd"]
 # CoinGecko ID → DefiLlama symbol (fallback source, free/no rate limit)
 DEFILLAMA_SYMBOLS = {"tether": "USDT", "usd-coin": "USDC", "dai": "DAI", "first-digital-usd": "FDUSD"}
+# Tokenized US-Treasury assets tracked by DefiLlama's /stablecoins endpoint.
+# Whitelist is CONSERVATIVE — only clearly treasury/money-market-backed funds
+# (not plain stablecoins like PYUSD/USDe/RLUSD). USYC (Circle), BUIDL
+# (BlackRock USD Institutional Digital Liquidity), USDY (Ondo US Dollar Yield).
+# FOBXX/HUSL/OBT are NOT in this endpoint (RWA dashboard only, JS-rendered).
+# Display-only: feeds the "Tokenized Treasury AUM" observation variable, never
+# blended into SFC score until empirically validated (per analysis.docx verdict).
+TREASURY_SYMBOLS = ["USYC", "BUIDL", "USDY"]
 CG_BASE = "https://api.coingecko.com/api/v3"
 # Audit 2026-08-03: demo key was hardcoded in source (committed secret).
 # Now read from env; empty => CoinGecko 401 => _fetch_cg() degrades to neutral.
@@ -138,6 +146,56 @@ def _fetch_defillama_per_coin():
         return out
     except Exception:
         return {}
+
+
+def compute_tokenized_treasury_metrics():
+    """Compute Tokenized Treasury AUM + 30d growth (DISPLAY-ONLY).
+
+    Uses DefiLlama /stablecoins snapshot (free, no key) — the same source the
+    stablecoin fallback already uses. Sums circulating USD across the treasury
+    whitelist (USYC/BUIDL/USDY) and computes 30d % growth from
+    circulatingPrevMonth.
+
+    Returns dict with aum_usd, growth_30d_pct, per_asset, or {"available": False}
+    on failure. This is an OBSERVATION variable for the "stablecoin contraction
+    ≠ capital exit" thesis — explicitly NOT blended into any SFC score until it
+    is empirically validated against BTC forward returns.
+    """
+    try:
+        r = requests.get("https://stablecoins.llama.fi/stablecoins",
+                         headers={"Accept": "application/json"}, timeout=25)
+        if r.status_code != 200:
+            return {"available": False, "error": f"HTTP {r.status_code}"}
+        data = r.json()
+        by_sym = {a.get("symbol"): a for a in data.get("peggedAssets", [])}
+        aum = 0.0
+        aum_30d = 0.0
+        per = {}
+        for sym in TREASURY_SYMBOLS:
+            a = by_sym.get(sym)
+            if not a:
+                continue
+            cur = (a.get("circulating") or {}).get("peggedUSD")
+            pm = (a.get("circulatingPrevMonth") or {}).get("peggedUSD")
+            if not cur or not pm:
+                continue
+            aum += cur
+            aum_30d += pm
+            g = (cur - pm) / pm * 100 if pm > 0 else None
+            per[sym] = {"aum_usd": round(cur, 0), "growth_30d_pct": round(g, 2) if g is not None else None}
+        if aum <= 0:
+            return {"available": False, "error": "no whitelist assets returned"}
+        growth = (aum - aum_30d) / aum_30d * 100 if aum_30d > 0 else None
+        return {
+            "available": True,
+            "aum_usd": round(aum, 0),
+            "growth_30d_pct": round(growth, 2) if growth is not None else None,
+            "n_assets": len(per),
+            "per_asset": per,
+            "source": "defillama",
+        }
+    except Exception as e:
+        return {"available": False, "error": str(e)}
 
 
 def compute_stablecoin_liquidity_index(
