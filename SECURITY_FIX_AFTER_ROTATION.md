@@ -35,7 +35,7 @@ curl -s -o /dev/null -w 'origin HTTP %{http_code}\n' https://sfc-origin.altcoint
 ## 4) Set secret worker + deploy
 cd /home/ubuntu/sfc
 npx wrangler secret put SFC_ORIGIN --env production          # https://sfc-origin.altcointrendterminal.site
-npx wrangler secret put SFC_ORIGIN_TOKEN --env production     # BTAdNNMyHSlnKTw7Sm3orbZ6ekK5kDSRsJl_pwxa3Iw
+npx wrangler secret put SFC_ORIGIN_TOKEN --env production     # <REDACTED 2026-08-09 — token dirotasi, jangan commit nilai token di sini>
 npx wrangler secret delete TUNNEL_URL --env production        # buang URL trycloudflare yang mati
 npx wrangler deploy --env production
 
