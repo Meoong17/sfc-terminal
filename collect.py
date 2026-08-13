@@ -3243,7 +3243,21 @@ try:
     # Signal stability: no longer 100% — use method agreement discounted by uncertainty
     bt_stability = round(method_agreement * 0.5 + (1.0 - uncertainty_penalty) * 0.3 + 0.1, 3)
     bt_stability = max(0.2, min(0.95, bt_stability))
-    
+
+    # SKILL-NEUTRAL GUARD (consistent with the win-rate fix above): when the
+    # labeled window has zero stress events, ml_acc is forced to the uninformed
+    # 0.5 baseline and the model has NO demonstrated skill on stress. Win rate
+    # is already neutral above; but sharpe/return/stability would STILL be
+    # inflated by the method_agreement term (agreement among methods != proven
+    # predictive skill). Neutralize all three so a coin-flip skill cannot masquerade
+    # as a positive-Sharpe strategy. (previously: win_rate 0.5 but sharpe ~1.3)
+    if not _ml_acc_reliable:
+        bt_sharpe = 0.5
+        bt_sharpe_low = 0.0
+        bt_sharpe_high = 1.0
+        bt_return = 0.0
+        bt_stability = 0.5
+
     print(f"  [Backtest] Sharpe={bt_sharpe} [{bt_sharpe_low}–{bt_sharpe_high}] | "
           f"WinRate={bt_win_rate:.0%} [{bt_win_rate_low:.0%}–{bt_win_rate_high:.0%}] | "
           f"MaxDD={bt_max_dd:.1%} | Stability={bt_stability:.2f} | Periods={bt_periods}", file=sys.stderr)

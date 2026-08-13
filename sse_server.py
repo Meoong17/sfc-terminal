@@ -197,7 +197,6 @@ async def snapshot():
 # else returns 404. Keep this list minimal.
 _PUBLIC_FILES = {
     "index.html",   # SFC dashboard
-    "app.js",       # dashboard JS
     "sw.js",        # service worker
     "data.json",    # pipeline output (public dashboard data)
     "btc_ws.json",  # live BTC ws data (public dashboard data)
