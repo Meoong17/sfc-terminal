@@ -1,6 +1,6 @@
 # SFC Terminal — Project Status
 
-_Last updated: 2026-08-07_
+_Last updated: 2026-08-14_
 
 ## Model focus
 
@@ -254,4 +254,44 @@ purged_cv_momentum.py`) contradicts it: pooled mom_30 AUC only 0.520 at 7d (marg
 OOS edge** — the apparent edge is an overlapping-label artifact that inflates effective
 sample size n. → Do NOT add momentum to the signal/pipeline. Reinforces the
 purged-CV/embargo standard (non-purged IC over-estimates skill).
+
+## External-model gate (2026-08-14) — KRONOS REJECTED for BTC (docs: n/a, skill ref)
+Evaluated the financial foundation model **Kronos** (shiyu-coder/Kronos, AAAI 2026,
+MIT, ~37k stars) on the canonical Binance daily BTC (2017-2026) via walk-forward
+OOS. Kronos-mini (4.1M params, ctx 2048): lookback 256 → forecast 30d, stride 30,
+100 windows.
+- RMSE 5,533 vs naive-persistence 3,778 (Kronos ~146% worse); R² mean −10.0; only
+  4% of windows R²>0.
+- Sign-accuracy 46% vs the trivial "always-up" 51% baseline (BELOW base rate);
+  systemic bear bias (predicts up only 39% vs actual 51%).
+- Era-split: 2018-21 sign-acc 53.3% vs 48.9%; 2022-26 40.0% vs 52.7% → the only
+  edge was an early-bull artifact, gone in the latest era.
+- **Verdict: REJECT.** Foundation model ≠ edge on BTC; pre-trained on equities/
+  A-share does not transfer. Do NOT blend, do NOT fine-tune "to rescue" it.
+  Fine-tuning cannot manufacture edge absent from the data regime.
+
+## Early-era data (Kaggle Bitstamp) — baseline + causal + intraday (2026-08-14)
+Downloaded `mczielinski/bitcoin-historical-data` (Kaggle, CC BY-SA 4.0, 1-min
+Bitstamp OHLCV, 2012-01→present). Cross-checked vs canonical Binance daily
+(3,278 overlap days): mean rel. diff 0.190%, 95.8% days within 1% — consistent.
+Its only added value is the 2012-2016 window missing from Binance Vision (2017+).
+New scripts: `analysis/causal_glf_btc_early_era.py`, `analysis/causal_glf_btc_early_robust.py`,
+`analysis/intraday_2012_2017.py`. Results (`.causal_glf_btc_early_era.json`,
+`.intraday_2012_2017.json`):
+
+| Question | Result | Verdict |
+|---|---|---|
+| Trend/momentum baseline 2012-2017 | B&H 2,776x / CAGR 274.8% / maxDD −84.9% beats ALL timing strategies; timing only trims DD to −70% at big return cost | No timing edge in this one-way bull |
+| GLF→BTC causal, era 2012-2017 (71 mo) | Granger min_p 0.537; weekly OLS n.s.; OOS GLF HURTS (DM p≈0.01, wrong sign); posterior P(H1)=0.004 | NOT confirmed; matches full-sample GLF null |
+| VAR-Granger "significant" p=0.020 @ lag6 | Fails BH-FDR (gate 0.0083), first-half 0.079 n.s., second-half 0.805 n.s., drop-outlier p=0.68 | ARTIFACT — do not report as finding |
+| Intraday hourly profile (UTC) | Vol/volume peak ~13-15h, trough ~4-5h; amplitude only ~109 vs 86 index (mild) | Weak seasonality |
+| Realized vol clustering | Daily RV autocorr lag1 0.663 (strong); GARCH(1,1) α=0.222 β=0.771, persistence 0.993, half-life ~104d | STRONG volatility clustering |
+| Volume-price | corr(daily volume, \|cc return\|) = 0.503 | Modest positive |
+| Funding-proxy | NOT feasible from spot OHLCV (no perp funding, no tick direction, no futures basis) | N/A — need Binance Vision funding instead |
+
+Key lesson (echoes existing): a nominally-significant lag in a multi-lag causal
+search is USUALLY a multiple-comparison artifact — run the robustness battery
+(BH-FDR, sub-period, drop-outlier) before reporting it. The era-2012-2017
+GLF→BTC "p=0.020" is the same class as the earlier full-sample GLF result.
+
 
