@@ -209,6 +209,123 @@ LABEL_STRESS_DROP_PCT = -3.0       # BTC drop >= 3% in the window = stress event
 LABEL_CALM_RISE_PCT = 1.5          # BTC didn't fall this much = calm, even if flat/up
 
 
+# ──────────────────────────────────────────────────────
+# GIT-HISTORY BACKFILL (feature mapping + historical dataset)
+# ──────────────────────────────────────────────────────
+# The rolling 5-min collection (2000-obs cap) only retains ~10 days, so during
+# a calm regime the labeled set is all-calm and the RF degenerates to an
+# always-calm model with a meaningless ~100% accuracy (0 stress events ever
+# seen). This backfill reconstructs the SAME 30-dim feature vector the live
+# inference feeds (predict_with_ml <- all_method_scores in collect.py) from the
+# much longer data.json snapshot history in git, and labels it with the same
+# realized 6h BTC price outcome as resolve_pending_labels().
+#
+# FEATURE MAPPING (VERIFIED 2026-08-13): reconstructed the recorded
+# data_collection.json feature vectors to within 0.0005 (rounding only). The
+# live vector is 30 dims, all 0-1 scale:
+#   - m1-m4 stored in data.json as round(m1_klr*100,1)  -> divide by 100
+#   - m5_qreg, m6_regime_score divided /100 in the live feature vector
+#   - m7-m19 and m20-m31 stored 0-1 as-is
+# Column order must match collect.py's all_method_scores build (18 core incl.
+# m8 SKIPPED + 12 institutional, fixed INSTITUTIONAL_METHOD_ORDER).
+FEAT_SPEC = [
+    ("m1_klr", 1/100), ("m2_logit", 1/100), ("m3_bayes", 1/100), ("m4_ewc", 1/100),
+    ("m5_qreg", 1/100), ("m6_regime_score", 1/100),
+    ("m7_fisher", 1.0), ("m9_liquidity", 1.0), ("m10_garch", 1.0), ("m11_var", 1.0),
+    ("m12_jump", 1.0), ("m13_funding", 1.0), ("m14_skew", 1.0), ("m15_concentration", 1.0),
+    ("m16_regime_ml", 1.0), ("m17_granger", 1.0), ("m18_entropy", 1.0), ("m19_mutual_info", 1.0),
+    ("m20_obi", 1.0), ("m21_trade_flow", 1.0), ("m22_spread", 1.0), ("m23_liquidity", 1.0),
+    ("m24_cape", 1.0), ("m25_minsky", 1.0), ("m26_kahneman", 1.0), ("m27_taleb", 1.0),
+    ("m28_summers", 1.0), ("m29_debt", 1.0), ("m30_rajan", 1.0), ("m31_altman", 1.0),
+]
+
+
+def _extract_git_snapshots(limit=None):
+    """Extract data.json snapshots from git history, oldest first (bounded).
+
+    Returns (snapshots, errors). Only snapshots with a usable ts+btc are kept.
+    """
+    import subprocess
+    log_cmd = ["git", "log", "--oneline", "--all", "--diff-filter=M",
+               "--reverse", "--", "data.json"]
+    try:
+        out = subprocess.check_output(log_cmd, text=True, timeout=30,
+                                      cwd=os.path.dirname(os.path.dirname(__file__)))
+    except Exception:
+        return [], 0
+    rows = [r for r in out.strip().split("\n") if r.strip()]
+    if limit:
+        rows = rows[-limit:]
+    snapshots, errors = [], 0
+    for line in rows:
+        sha = line.split()[0]
+        try:
+            content = subprocess.check_output(
+                ["git", "show", f"{sha}:data.json"], text=True, timeout=10,
+                cwd=os.path.dirname(os.path.dirname(__file__)))
+            if content.strip().startswith("{"):
+                d = json.loads(content)
+                if d.get("ts") and d.get("btc") is not None:
+                    snapshots.append(d)
+        except Exception:
+            errors += 1
+    return snapshots, errors
+
+
+def build_git_historical_dataset(limit=None):
+    """Build a historical (X, y) training set from git data.json snapshots.
+
+    Same 30-dim feature mapping + same 6h realized-price labeling as the live
+    rolling collection, so the RF finally sees real stress events from history
+    (measured 86 stress rows over ~2 months vs 0 in the ~10-day rolling window).
+
+    Returns (X, y, meta) where meta has counts. X is (n,30) 0-1 scale.
+    """
+    snapshots, errors = _extract_git_snapshots(limit)
+    pts = []
+    for s in snapshots:
+        t = _parse_ts(s.get("ts"))
+        b = s.get("btc")
+        if t is not None and b is not None:
+            pts.append((t, b, s))
+    pts.sort(key=lambda x: x[0])
+
+    X_list, y_list = [], []
+    stress = calm = ambig = 0
+    for i, (t0, b0, snap) in enumerate(pts):
+        target = t0 + timedelta(minutes=LABEL_LOOKAHEAD_MINUTES)
+        best, best_diff = None, None
+        for j in range(i + 1, len(pts)):
+            tj, bj, _ = pts[j]
+            if tj < t0:
+                continue
+            diff = abs((tj - target).total_seconds()) / 60.0
+            if diff <= LABEL_LOOKAHEAD_TOLERANCE_MINUTES:
+                if best_diff is None or diff < best_diff:
+                    best_diff, best = diff, bj
+            if (tj - target).total_seconds() / 60.0 > LABEL_LOOKAHEAD_TOLERANCE_MINUTES:
+                break
+        if best is None:
+            continue
+        pct = (best - b0) / b0 * 100.0
+        if pct <= LABEL_STRESS_DROP_PCT:
+            y = 1.0; stress += 1
+        elif pct >= -LABEL_CALM_RISE_PCT:
+            y = 0.0; calm += 1
+        else:
+            y = None; ambig += 1
+        vec = [(v if v is not None else 0.5) * scale for field, scale in FEAT_SPEC
+               for v in [snap.get(field)]]
+        X_list.append(vec)
+        y_list.append(y)
+
+    X = [x for x, y in zip(X_list, y_list) if y is not None]
+    Y = [y for y in y_list if y is not None]
+    meta = {"stress": stress, "calm": calm, "ambig": ambig,
+            "total_pts": len(pts), "errors": errors, "snapshots": len(snapshots)}
+    return X, Y, meta
+
+
 def _parse_ts(ts_str):
     try:
         return datetime.fromisoformat(ts_str)
@@ -412,6 +529,91 @@ def train_model(force=False):
     return model, scaler, train_acc, val_acc
 
 
+def train_with_history(force=True, limit=None):
+    """Train the RF on git-history + rolling labeled data (backfill mode).
+
+    The rolling collection alone is ~10 days and can be all-calm (0 stress
+    events), which makes the RF degenerate to an always-calm model. This
+    merges the git-history dataset (long horizon, includes real stress events)
+    with the current rolling labeled set, trains the RF with a chronological
+    split, and saves the model + scaler so predict_with_ml() uses it.
+
+    Returns (model, scaler, summary) where summary has counts + train/val acc.
+    """
+    from sklearn.ensemble import RandomForestClassifier
+    from sklearn.preprocessing import StandardScaler
+    import numpy as np
+
+    # 1. Rolling collection labeled data
+    data = load_collection()
+    rolling = [(f, l) for f, l in zip(data["features"], data["labels"]) if l is not None]
+
+    # 2. Git-history backfill (long horizon with stress events)
+    hist_X, hist_y, meta = build_git_historical_dataset(limit=limit)
+    print(f"[ML] History backfill: {len(hist_y)} rows, stress={meta['stress']}, "
+          f"calm={meta['calm']}, snapshots={meta['snapshots']}", file=sys.stderr)
+
+    # 3. Merge (dedupe exact duplicate rows; history is authoritative)
+    X = list(hist_X)
+    Y = list(hist_y)
+    seen = set(tuple(row) for row in X)
+    added_rolling = 0
+    for f, l in rolling:
+        key = tuple(float(x) if x is not None else 0.5 for x in f)
+        if key not in seen:
+            seen.add(key)
+            X.append(list(f))
+            Y.append(float(l))
+            added_rolling += 1
+    print(f"[ML] Rolling labeled: {len(rolling)} rows, {added_rolling} new (not in history)",
+          file=sys.stderr)
+
+    if len(X) < 50:
+        print(f"[ML] Too few merged rows ({len(X)}), aborting backfill", file=sys.stderr)
+        return None, None, {"rows": len(X)}
+
+    Xa = np.array(X, dtype=float)
+    ya = np.array(Y, dtype=int)
+    Xa = np.nan_to_num(Xa, nan=0.5, posinf=1.0, neginf=0.0)
+
+    # Chronological-safe split (oldest 80% train, newest 20% val)
+    split = int(len(Xa) * 0.80)
+    X_train, X_val = Xa[:split], Xa[split:]
+    y_train, y_val = ya[:split], ya[split:]
+
+    scaler = StandardScaler()
+    X_train_s = scaler.fit_transform(X_train)
+    X_val_s = scaler.transform(X_val) if len(X_val) > 0 else None
+
+    model = RandomForestClassifier(
+        n_estimators=200, max_depth=15, min_samples_split=20,
+        min_samples_leaf=10, class_weight='balanced', n_jobs=-1, random_state=42,
+    )
+    model.fit(X_train_s, y_train)
+    train_acc = model.score(X_train_s, y_train)
+    val_acc = model.score(X_val_s, y_val) if X_val_s is not None and len(X_val) > 0 else None
+
+    stress_in_train = int(ya[:split].sum())
+    stress_in_val = int(ya[split:].sum())
+    print(f"[ML] Backfill train: {len(X_train)} rows ({stress_in_train} stress) "
+          f"train_acc={train_acc:.3f} | val: {len(X_val)} rows ({stress_in_val} stress) "
+          f"val_acc={val_acc if val_acc is not None else 'N/A':} ", file=sys.stderr)
+
+    with open(MODEL_FILE, "wb") as f:
+        pickle.dump(model, f)
+    with open(SCALER_FILE, "wb") as f:
+        pickle.dump(scaler, f)
+    print(f"[ML] Backfilled model saved to {MODEL_FILE}", file=sys.stderr)
+
+    summary = {
+        "rows": len(X), "stress": meta["stress"], "calm": meta["calm"],
+        "rolling": len(rolling), "added_rolling": added_rolling,
+        "train_acc": train_acc, "val_acc": val_acc,
+        "stress_train": stress_in_train, "stress_val": stress_in_val,
+    }
+    return model, scaler, summary
+
+
 def load_model():
     """Load a pre-trained model + scaler."""
     if not os.path.exists(MODEL_FILE) or not os.path.exists(SCALER_FILE):
@@ -613,11 +815,34 @@ if __name__ == "__main__":
             print(f"Retrained successfully.", file=sys.stderr)
         else:
             print(f"No retrain needed or not enough data.", file=sys.stderr)
-    
+
+    elif "--backfill" in sys.argv:
+        # Git-history backfill: train the RF on historical + rolling labeled
+        # data so it finally sees real stress events (rolling-only can be an
+        # all-calm 10-day window -> degenerate always-calm model).
+        import sys as _sys
+        limit = None
+        if "--limit" in _sys.argv:
+            try:
+                limit = int(_sys.argv[_sys.argv.index("--limit") + 1])
+            except (ValueError, IndexError):
+                limit = None
+        print("[ML] Running git-history backfill training...", file=sys.stderr)
+        _, _, summary = train_with_history(limit=limit)
+        print(json.dumps(summary, indent=2))
+        if summary.get("stress", 0) == 0:
+            print("[ML] WARNING: no stress events in backfill history — "
+                  "accuracy will remain a calm-majority artifact", file=sys.stderr)
+        else:
+            print(f"[ML] Backfill OK: {summary.get('rows')} rows, "
+                  f"{summary.get('stress')} stress events, "
+                  f"train_acc={summary.get('train_acc')} "
+                  f"val_acc={summary.get('val_acc')}", file=sys.stderr)
+
     else:
         # Test mode: use synthetic feature vector
         print("ML Ensemble — Test Mode", file=sys.stderr)
-        print("Usage: python3 ml_ensemble.py [--train|--evaluate|--retrain]", file=sys.stderr)
+        print("Usage: python3 ml_ensemble.py [--train|--evaluate|--retrain|--backfill [--limit N]]", file=sys.stderr)
         
         # Demo with random-like feature vector (31 methods)
         test_features = [0.5] * 31
