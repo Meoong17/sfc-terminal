@@ -106,13 +106,16 @@ elif git diff --staged --quiet && [ "$AHEAD" -eq 0 ]; then
     log "No changes — skipping push"
     GIT_RESULT="no-change"
 else
+    DATA_COMMITTED=0
     if ! git diff --staged --quiet -- data.json paper_trades.json paper_history.json; then
         # Commit ONLY the data pathspec (not the whole index). This prevents
         # sweeping code files that another process pre-staged with `git add`
         # into an "auto: SFC data" commit (same class of bug as 2e104fd8, which
         # only guarded against UNSTAGED code files — insufficient when a file
         # was already staged before this pipeline ran).
-        git commit -m "auto: SFC data $(date -u '+%Y-%m-%d %H:%M:%S')" -- data.json paper_trades.json paper_history.json
+        if git commit -m "auto: SFC data $(date -u '+%Y-%m-%d %H:%M:%S')" -- data.json paper_trades.json paper_history.json; then
+            DATA_COMMITTED=1
+        fi
     fi
     log "Syncing with remote..."
     if git pull --rebase --autostash -X theirs origin main 2>&1; then
@@ -135,7 +138,7 @@ else
             GIT_RESULT="sync-failed"
         fi
     fi
-    if [ "$GIT_RESULT" = "ok" ]; then
+    if [ "$DATA_COMMITTED" -eq 1 ] && [ "$GIT_RESULT" = "ok" ]; then
         date +%s > /tmp/sfc_last_data_push
     fi
 fi
