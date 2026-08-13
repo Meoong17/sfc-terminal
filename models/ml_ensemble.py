@@ -558,11 +558,25 @@ def evaluate_accuracy():
     calm_events = total - stress_events
     stress_correct = sum(1 for p, l in labeled if l == 1 and round(p) == l)
     calm_correct = sum(1 for p, l in labeled if l == 0 and round(p) == l)
-    
+
+    # Accuracy is only a meaningful "skill" measure if the model has actually
+    # seen BOTH classes. With zero stress events in the labeled window the
+    # set is all-calm, so an always-calm model trivially scores ~100% and the
+    # number is a class-imbalance artifact, not evidence of skill. Expose the
+    # class balance + a reliability flag so callers never read the raw
+    # accuracy as predictive ability.
+    accuracy_reliable = stress_events > 0
+    note = ""
+    if not accuracy_reliable:
+        note = (" — NO stress events in labeled window: accuracy reflects "
+                "calm-majority only, NOT skill")
+
     return {
         "accuracy": round(accuracy, 4),
         "total": total,
         "correct": correct,
+        "stress_events": stress_events,
+        "accuracy_reliable": accuracy_reliable,
         "by_class": {
             "stress": {"total": stress_events, "correct": stress_correct,
                        "acc": round(stress_correct / stress_events, 3) if stress_events else None},
@@ -570,7 +584,7 @@ def evaluate_accuracy():
                      "acc": round(calm_correct / calm_events, 3) if calm_events else None}
         },
         "message": f"Accuracy: {accuracy:.1%} ({correct}/{total}) "
-                   f"— STRATEGI 3: Online Learning Active" if total >= 10
+                   f"— STRATEGI 3: Online Learning Active{note}" if total >= 10
                    else f"Too few samples ({total})"
     }
 

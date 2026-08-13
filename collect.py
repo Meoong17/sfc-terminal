@@ -3171,12 +3171,19 @@ try:
     bt_calibration_note = "Limited stress events in training window — metrics are upper-bound estimates"
     
     # Realistic win rate: blend ML accuracy with signal quality and market uncertainty
-    # Base: ML accuracy (100% but biased due to no stress labels)
+    # Base: ML accuracy. BUT when the labeled window has zero stress events the
+    # reported ~100% accuracy is a class-imbalance artifact (all-calm set), so
+    # the model has no demonstrated skill on stress — feed the uninformed 0.5
+    # baseline instead, to stop the artifact from inflating bt_win_rate/sharpe.
     ml_acc_raw = ml_metrics.get("accuracy", 0.5)
-    if isinstance(ml_acc_raw, float):
+    _ml_acc_reliable = ml_metrics.get("accuracy_reliable", False)
+    if isinstance(ml_acc_raw, float) and _ml_acc_reliable:
         ml_acc = ml_acc_raw
     else:
         ml_acc = 0.5
+        if ml_metrics.get("stress_events", 0) == 0:
+            bt_calibration_note = ("No stress events in labeled window — ML accuracy is a "
+                                   "calm-majority artifact; win rate/sharpe held at neutral baseline")
     
     # Discount ML accuracy by uncertainty factors
     # - Low method agreement → less reliable
