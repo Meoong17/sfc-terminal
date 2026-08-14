@@ -223,6 +223,24 @@ already represented in the model (VIX via risk factors, M2 via liquidity). Dashb
 CPI YoY display was de-emphasized (removed the ">4% → red" direct-bearish heuristic)
 to match this.
 
+## WFV Stress-Gap era-stability (2026-08-14) — edge IS era-stable (unlike L8 subset)
+
+`analysis/walk_forward_validation.py` now writes per-era (era1/era2/era3) calm-vs-stress
+forward-return gaps + an `era_stable` flag (era2 AND era3 both significantly negative),
+surfaced to the dashboard cards (Weekly 7d / Monthly 30d Stress Gap). Regenerated
+`.walk_forward_summary.json` (n=4238, 2026-08-14):
+
+| Horizon | Full-sample | era1 (2014-17) | era2 (2018-21) | era3 (2022-26) | era_stable |
+|---|---|---|---|---|---|
+| 7d | −1.55pp sig | +4.4pp n.s. | −1.34pp sig | −0.84pp sig | TRUE |
+| 30d | −7.46pp sig | +10.8pp n.s. | −4.59pp sig | −5.15pp sig | TRUE |
+
+Unlike the L8 Tail-Risk subset (which era-flips in era3), the CORE stress->return edge
+HOLDS across era2 and era3 — both recent eras significantly negative, so the "green /
+Significant" dashboard label is era-defensible. Caveat: era1 (partial, small stress
+sample) is positive but not significant; the era2/era3 comparison is the regime-relevant
+one. Display now shows "Era2 / Era3 / era-stable ✓ or era-flip ⚠" on each card.
+
 
 ## XGBoost meta-ensemble audit (2026-08-07) — blend DISABLED
 

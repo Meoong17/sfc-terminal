@@ -106,6 +106,89 @@ SUMMARY_CACHE_FILE = os.path.join(
     ".walk_forward_summary.json",
 )
 
+# Era boundaries (SFC convention: era1 2014-17, era2 2018-21, era3 2022-26).
+# Used to report whether the validated stress->return edge is ERA-STABLE or
+# era-flips (a recurring failure mode across SFC signals). FRED CBBTCUSD only
+# starts 2014-09, so era1 is partial; the era2/era3 comparison is the one that
+# matters for whether the edge still holds in the current regime.
+ERAS = [
+    ("era1", "2014-01-01", "2018-01-01"),
+    ("era2", "2018-01-01", "2022-01-01"),
+    ("era3", "2022-01-01", "2099-01-01"),
+]
+
+
+def _gap_stats(series, horizon, lo_date=None, hi_date=None):
+    """Calm-vs-stress forward-return gap (bootstrap diff) for an optional
+    date-window subset. Returns (est, lo, hi, significant)."""
+    buckets = {label: [] for _, _, label in BUCKET_EDGES}
+    for point in series:
+        d = point.get("date", "")
+        if lo_date is not None and d < lo_date:
+            continue
+        if hi_date is not None and d >= hi_date:
+            continue
+        fwd = point.get(f"fwd_return_{horizon}d")
+        if fwd is None:
+            continue
+        buckets[bucket_label(point["sfc_pct"])].append(fwd)
+    calm_vals = buckets["CALM"]
+    stress_vals = buckets["STRESS"]
+    if len(calm_vals) < 2 or len(stress_vals) < 2:
+        return None, None, None, None
+    est, lo, hi = bootstrap_diff_ci(calm_vals, stress_vals)
+    significant = hi < 0 if hi is not None else None
+    return est, lo, hi, significant
+
+
+def write_summary_cache(series):
+    """Write a SMALL summary that collect.py can cheaply read every live
+    cycle, exposing key walk-forward validation stats as dashboard fields
+    — without collect.py needing to re-fetch 11 years of FRED history or
+    re-run bootstrap resampling on every 5-minute cycle. Re-run this
+    script manually/periodically (e.g. monthly) to refresh this cache.
+
+    Includes per-era (era1/era2/era3) gaps so the dashboard can show whether
+    the stress->return edge is ERA-STABLE rather than era-flipping — the
+    recurring failure mode across SFC signals."""
+    summary = {
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "n_periods": len(series),
+    }
+    for horizon in FORWARD_HORIZONS_DAYS:
+        est, lo, hi, sig = _gap_stats(series, horizon)
+        summary[f"gap_{horizon}d"] = round(est, 2) if est is not None else None
+        summary[f"gap_{horizon}d_ci_lo"] = round(lo, 2) if lo is not None else None
+        summary[f"gap_{horizon}d_ci_hi"] = round(hi, 2) if hi is not None else None
+        summary[f"gap_{horizon}d_significant"] = sig
+        # Per-era
+        for label, lo_date, hi_date in ERAS:
+            e_est, e_lo, e_hi, e_sig = _gap_stats(series, horizon, lo_date, hi_date)
+            p = f"gap_{horizon}d_{label}"
+            summary[p] = round(e_est, 2) if e_est is not None else None
+            summary[f"{p}_significant"] = e_sig
+        # Era-stability across the two recent, well-populated eras (era2+era3):
+        # edge is "stable" only if both era2 and era3 are significantly NEGATIVE
+        # (the working direction). If era3 is positive or insignificant, the
+        # edge has faded/inverted in the current regime.
+        s2 = summary.get(f"gap_{horizon}d_era2_significant")
+        s3 = summary.get(f"gap_{horizon}d_era3_significant")
+        g2 = summary.get(f"gap_{horizon}d_era2")
+        g3 = summary.get(f"gap_{horizon}d_era3")
+        summary[f"gap_{horizon}d_era_stable"] = bool(
+            s2 and s3 and g2 is not None and g3 is not None and g2 < 0 and g3 < 0
+        )
+    total_with_signal = sum(
+        1 for p in series
+        if p.get(f"fwd_return_{FORWARD_HORIZONS_DAYS[0]}d") is not None
+    )
+    n_stress_total = sum(1 for p in series if bucket_label(p["sfc_pct"]) == "STRESS")
+    summary["n_stress_pct"] = round(n_stress_total / len(series) * 100, 1) if series else None
+    with open(SUMMARY_CACHE_FILE, "w") as f:
+        json.dump(summary, f, indent=2)
+    print(f"[WalkForward] Summary cache written to {SUMMARY_CACHE_FILE}")
+    return summary
+
 
 def compute_sfc_time_series():
     """Reproduces historical_backtest_m1m6.py's core computation loop,
@@ -225,44 +308,6 @@ def bootstrap_diff_ci(group_a, group_b, n_bootstrap=N_BOOTSTRAP, ci=0.90):
     hi_idx = int((1 + ci) / 2 * n_bootstrap) - 1
     point_estimate = sum(group_b) / n_b - sum(group_a) / n_a
     return point_estimate, diffs[lo_idx], diffs[hi_idx]
-
-
-def write_summary_cache(series):
-    """Write a SMALL summary that collect.py can cheaply read every live
-    cycle, exposing key walk-forward validation stats as dashboard fields
-    — without collect.py needing to re-fetch 11 years of FRED history or
-    re-run bootstrap resampling on every 5-minute cycle. Re-run this
-    script manually/periodically (e.g. monthly) to refresh this cache."""
-    summary = {
-        "generated_at": datetime.now(timezone.utc).isoformat(),
-        "n_periods": len(series),
-    }
-    for horizon in FORWARD_HORIZONS_DAYS:
-        buckets = {label: [] for _, _, label in BUCKET_EDGES}
-        for point in series:
-            fwd = point.get(f"fwd_return_{horizon}d")
-            if fwd is None:
-                continue
-            buckets[bucket_label(point["sfc_pct"])].append(fwd)
-        calm_vals = buckets["CALM"]
-        stress_vals = buckets["STRESS"]
-        diff_est, diff_lo, diff_hi = bootstrap_diff_ci(calm_vals, stress_vals)
-        summary[f"gap_{horizon}d"] = round(diff_est, 2) if diff_est is not None else None
-        summary[f"gap_{horizon}d_ci_lo"] = round(diff_lo, 2) if diff_lo is not None else None
-        summary[f"gap_{horizon}d_ci_hi"] = round(diff_hi, 2) if diff_hi is not None else None
-        summary[f"gap_{horizon}d_significant"] = (diff_hi < 0) if diff_hi is not None else None
-        summary[f"n_calm_{horizon}d"] = len(calm_vals)
-        summary[f"n_stress_{horizon}d"] = len(stress_vals)
-    total_with_signal = sum(
-        1 for p in series
-        if p.get(f"fwd_return_{FORWARD_HORIZONS_DAYS[0]}d") is not None
-    )
-    n_stress_total = sum(1 for p in series if bucket_label(p["sfc_pct"]) == "STRESS")
-    summary["n_stress_pct"] = round(n_stress_total / len(series) * 100, 1) if series else None
-    with open(SUMMARY_CACHE_FILE, "w") as f:
-        json.dump(summary, f, indent=2)
-    print(f"[WalkForward] Summary cache written to {SUMMARY_CACHE_FILE}")
-    return summary
 
 
 def _text_bar(val, min_val, max_val, width=20):
