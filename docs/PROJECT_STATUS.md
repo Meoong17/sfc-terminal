@@ -181,6 +181,49 @@ improvements (China M2 live data vs frozen 2019 FRED).
 - No cron/scheduler for `update_etf_cache.py` exists in this repo — ETF
   flow data (M81/M82) is manually maintained via Farside CSV entry.
 
+## Inflation-transmission adjudication (2026-08-14) — inflation is NOT a direct BTC driver
+
+Adjudication of the "BTC = inflation hedge" hypothesis (see ~/B/1.docx, Model A-D)
+via `analysis/inflation_transmission_models.py` (monthly panel 2017-09..2026-06,
+n=105, Binance Vision BTC + FRED CPI/PPI/PCE/DFII10/DTWEXBGS/M2SL/VIXCLS, HC1 robust SE).
+
+**Surprise definition (honest limitation):** analyst-consensus series are NOT
+obtainable on this host — ForexFactory & Investing.com both return HTTP 403
+(Cloudflare), Bloomberg is paid. Surprise is therefore a MODEL-BASED proxy
+(MoM vs trailing-12m mean, standardized), labeled explicitly as not-analyst-consensus.
+Monthly frequency; the intraday event-study layer (release timestamps) is a
+documented follow-up, not run here.
+
+| Model | Regressors | AdjR² | AIC | BIC | Sig vars (p<0.05) |
+|---|---|---|---|---|---|
+| A (inflation-only) | CPI_s, PPI_s, PCE_s | −0.017 | 938 | 949 | none |
+| B (+monetary) | + RealYield, DXY | −0.020 | 940 | 956 | none |
+| C (+liquidity) | + M2 YoY | −0.010 | 940 | 959 | none |
+| D (FULL) | + VIX | +0.036 | 936 | 958 | VIX (−0.94, p=0.004) |
+
+- **Key test (1.docx §10):** inflation surprise is NOT significant even in Model A
+  (CPI p=0.46, PPI p=0.54, PCE p=0.48) and stays insignificant after controls in D
+  → inflation is an upstream shock, not a direct driver. Consistent with the
+  transmission framing (surprise → real rates/liquidity/risk → BTC).
+- **Channels that add explanatory power:** incremental AdjR² A→B (monetary) −0.003,
+  B→C (liquidity) +0.010, C→D (risk) +0.046. Risk appetite (VIX, robustly negative)
+  and liquidity (M2, positive) are the operative channels; real yield & DXY are weak
+  at monthly frequency.
+- **Predictive check (1-month lag, no lookahead):** inflation surprise has zero
+  predictive power; VIX (−) and M2 (+) remain significant (D-lag AdjR² 0.049).
+- **Era-split:** era3 (2022-26) shows CPI_surp (+) vs PCE_surp (−) significant with
+  OPPOSITE signs in the same model — incoherent, not a robust inflation driver
+  (small n, no multiplicity correction). Do not over-read.
+- **Inflation LEVEL (YoY)** also insignificant (AdjR² 0.028) — level is not a useful
+  direct BTC indicator either.
+
+**Verdict:** BTC = direct inflation hedge → NOT ESTABLISHED. Do NOT blend inflation
+as a BTC driver. Risk appetite (VIX) and liquidity (M2) are the stronger channels and
+already represented in the model (VIX via risk factors, M2 via liquidity). Dashboard
+CPI YoY display was de-emphasized (removed the ">4% → red" direct-bearish heuristic)
+to match this.
+
+
 ## XGBoost meta-ensemble audit (2026-08-07) — blend DISABLED
 
 The XGBoost meta-ensemble (`models/ensemble_meta.py`) was blended into
