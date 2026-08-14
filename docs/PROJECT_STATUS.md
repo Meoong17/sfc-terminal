@@ -223,6 +223,40 @@ already represented in the model (VIX via risk factors, M2 via liquidity). Dashb
 CPI YoY display was de-emphasized (removed the ">4% → red" direct-bearish heuristic)
 to match this.
 
+## Inflation — uji statistik lengkap (2026-08-14) — KONFIRMASI: bukan driver
+`analysis/inflation_assumptions_tests.py` (new) — tiga lapis pengujian pada Model A-D
+(surprise proxy model-based MoM-vs-12bln, n=105, 2017-09..2026-06). Menambah uji
+instrumen (ADF+Granger), uji asumsi klasik, dan uji hipotesis pada script adjudikasi existing.
+
+**UJI INSTRUMEN:** BTC, CPI/PPI/PCE surprise, VIX = STATIONARY (ADF p<0.001).
+RealYield/DXY/M2yoy I(1) level (caveat spurious mild; surprise & VIX stationary).
+Granger (monthly) surprise→BTC: PPI l1 p=0.033 & PCE l1 p=0.026 NOMINAL, tapi keduanya
+**ARTIFACT** — gagal BH-FDR (0 dari 21 sel q<0.10), gagal sub-period (half2 p=0.20/0.42),
+gagal drop-outlier (p=0.99/0.76). VIX→BTC Granger p=0.68 (VIX = barometer coincident,
+bukan lead lagged). Tidak ada hubungan lagged surprise yang sahih.
+
+**UJI ASUMSI KLASIK (Model A vs D):** normalitas residual A TOLAK (Shapiro p=0.017) tapi
+D lolos (p=0.42) — model penuh lebih baik-spesifikasi. Homoskedastisitas OK (BP/White p>0.1),
+HC1 tepat. Autokorelasi: DW≈1.62, Ljung-Box lag1 marginal (p=0.055-0.072) → autocorelasi
+positif ringan lag-1 pada return bulanan BTC (Newey-West lebih tepat daripada HC1; caveat).
+Multikolinearitas: CPI-PCE berkorelasi (VIF 6.8-7.6) tapi <10, tak parah. Spesifikasi RESET
+p=0.24/0.47 → linieritas cukup.
+
+**UJI HIPOTESIS:** F-joint blok inflation surprise = 0 TIDAK signifikan di SEMUA model
+(A p=0.78 ... D p=0.56). TES KUNCI: surprise TIDAK pernah signifikan bahkan di Model A
+sendiri (CPI p=0.46/PPI 0.54/PCE 0.48) — bukan "hilang setelah kontrol", memang sejak awal
+tak ada. Partial-F nested: satu-satunya kanal yang signifikan menaikkan model adalah
+**C→D (+VIX risk appetite) p=0.0195**; monetary (+RealYield,DXY) p=0.43 & liquidity (+M2)
+p=0.16 TIDAK signifikan. Koefisien VIX di D b=-0.94 p=0.004***; M2 b=+0.98 p=0.07 (marginal).
+
+**VERDICT:** Bitcoin TIDAK merespons inflation surprise secara sahih (kontemporer & lagged,
+joint & individual, semua null atau artifact). Respons DOMINAN ke RISK APPETITE (VIX):
+negatif, signifikan, satu-satunya penambah model yang signifikan, bertahan di era2. Likuiditas
+(M2) lemah/positif-marginal; real yield & DXY tak signifikan pada frekuensi bulanan. Konfirmasi
+tesis 1.docx: inflasi = shock hulu yang ditransmisikan lewat kondisi finansial (risk/liquidity),
+BUKAN driver langsung. Era3 tetap incoherent (CPI_surp(+) vs PCE_surp(−) lawan tanda). JANGAN
+blend inflasi sebagai driver BTC.
+
 ## WFV Stress-Gap era-stability (2026-08-14) — edge IS era-stable (unlike L8 subset)
 
 `analysis/walk_forward_validation.py` now writes per-era (era1/era2/era3) calm-vs-stress
@@ -330,6 +364,59 @@ OOS. Kronos-mini (4.1M params, ctx 2048): lookback 256 → forecast 30d, stride 
 - **Verdict: REJECT.** Foundation model ≠ edge on BTC; pre-trained on equities/
   A-share does not transfer. Do NOT blend, do NOT fine-tune "to rescue" it.
   Fine-tuning cannot manufacture edge absent from the data regime.
+
+## Funding / premium purged-CV (2026-08-14) — REJECTED as predictive drivers
+`analysis/purged_cv_funding.py` (new) — the definitive gate for the funding/leverage dim
+(1 of 5 L8 dims), which is currently DEAD in live (`m13_funding=None`,
+`funding_imbalance=0.0`). Uses the 6+ year Binance Vision funding + premium (canonical,
+2020+ full + 2017+ premium via `data_sources/binance_features.py`), López de Prado
+purged-CV + embargo=h, 5 folds, logistic on the single feature, pooled OOS AUC + era-split
+(era1 2017-21 / era2 2022-26). n=3278 daily, 2017-08-17..2026-08-07.
+
+| Feature | Horiz | Pooled AUC | era1 AUC | era2 AUC | Verdict |
+|---|---|---|---|---|---|
+| funding | 7d | 0.442 | 0.462 | 0.466 | below chance |
+| funding | 30d | 0.392 | 0.373 | 0.450 | below chance |
+| funding | 90d | 0.345 | 0.393 | 0.325 | below chance |
+| premium | 7d | 0.443 | 0.478 | 0.465 | below chance |
+| premium | 30d | 0.396 | 0.424 | 0.444 | below chance |
+| premium | 90d | 0.334 | 0.469 | 0.302 | below chance |
+
+**Every pooled AUC is BELOW 0.5, in both eras** — WORSE than chance, i.e. noise (inverted).
+The IC-screen "candidate" flag at funding 7d/30d (`validate_features_purged.py`) was an
+overlapping-label artifact; purged-CV collapses it exactly as it did momentum (0.413@30d).
+**Verdict: REJECT.** Funding/premium carry no genuine OOS predictive information for BTC
+up/down. Do NOT wire funding as a scoring driver and do NOT populate the dead
+`funding_imbalance` into `sfc_effective`. Keep the live funding dim out of scoring
+(`m13_funding=None` is the honest state, not a gap to fill). Summary: `.purged_cv_funding.json`.
+
+## Trend-continuation probabilities — era-split (2026-08-14) — headline overstates today
+`analysis/era_split_trend_continuation.py` (new) era-splits the LIVE-displayed
+continuation probabilities (cont_prob_30d/90d/180d = P(forward return > 0) per signal
+bucket) by reusing the cached `.walk_forward_trend_continuation.json` series (4227 daily,
+2014-12→2026-08; era1=1093/era2=1460/era3=1674) — NO FRED re-fetch. Writes
+`.trend_continuation_era.json`; `data_sources/trend_continuation.py` now loads it and
+surfaces `era3_probability` + `era_stable` per horizon (additive, display-only, no scoring).
+
+Key finding — the full-sample bucket probabilities are INFLATED BY era1's one-way bull run
+(2014-17), the classic time-period confound. P(cont) drops sharply after era1:
+
+| Horizon | Full-sample (displayed) | era3 CALM (today) | era_stable |
+|---|---|---|---|
+| 30d | 0.587 | **0.518** (≈ coin flip) | **FALSE** (era3 dips below baseline) |
+| 90d | 0.629 | 0.560 | TRUE (marginal) |
+| 180d | 0.694 | 0.669 | FALSE |
+
+Unconditional P(cont) by era confirms the confound: 30d era1 0.701 → era2 0.522 → era3 0.533;
+90d 0.79 → 0.531 → 0.521; 180d 0.91 → 0.515 → 0.614. era1 was a $300→$20k bull; era2/era3
+are ~coin-flip.
+
+**Verdict: the headline cont_prob_30d=0.587 (and 0.629/0.694) OVERSTATE today's trend
+continuation.** Honest today values (era3 CALM) are 0.518/0.560/0.669, and 30d/180d are
+era-UNSTABLE. Do NOT present the full-sample number as today's probability without the
+era3 value + era_stable flag. Display recommendation: show "Era3 0.518 · era-stable ⚠"
+alongside any headline P(cont), mirroring the stress-gap card discipline. No scoring change
+(these were already display-only research estimates; this just makes the display honest).
 
 ## Early-era data (Kaggle Bitstamp) — baseline + causal + intraday (2026-08-14)
 Downloaded `mczielinski/bitcoin-historical-data` (Kaggle, CC BY-SA 4.0, 1-min

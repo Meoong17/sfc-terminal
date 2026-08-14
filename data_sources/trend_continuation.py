@@ -22,6 +22,7 @@ import os, json, time
 
 SFC_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SUMMARY_CACHE_FILE = os.path.join(SFC_DIR, ".trend_continuation_summary.json")
+ERA_CACHE_FILE = os.path.join(SFC_DIR, ".trend_continuation_era.json")
 _CACHE_FILE = os.path.join(SFC_DIR, ".trend_continuation_cache.json")
 CACHE_TTL = 900  # 15 min
 
@@ -40,6 +41,17 @@ def _bucket_label(sfc):
 def _load_summary():
     try:
         with open(SUMMARY_CACHE_FILE) as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
+
+
+def _load_era_summary():
+    """Load era-split continuation probabilities (.trend_continuation_era.json).
+    Adds honest per-era (latest-era) values + era_stable flag so a display can
+    surface the TODAY probability, not just the era1-inflated full-sample one."""
+    try:
+        with open(ERA_CACHE_FILE) as f:
             return json.load(f)
     except (FileNotFoundError, json.JSONDecodeError):
         return {}
@@ -87,6 +99,8 @@ def compute_trend_continuation(sfc_effective=None, sfc_zone=None):
         _save_cache({"probs": {}, "details": details, "ts": now, "key": _key})
         return {}, details
 
+    era_summary = _load_era_summary()  # honest per-era + era_stable (may be empty)
+
     # Map live signal to flat bucket. sfc_zone may be a live zone label
     # (NORMAL/ELEVATED/HIGH/CRITICAL); treat NORMAL as CALM, HIGH/CRITICAL as
     # STRESS, ELEVATED as ELEVATED. If no zone, derive from sfc_effective.
@@ -113,12 +127,20 @@ def compute_trend_continuation(sfc_effective=None, sfc_zone=None):
         ci = summary.get(f"{bucket.lower()}_p_cont_{h}d_ci")
         n = summary.get(f"{bucket.lower()}_n_{h}d")
         base = summary.get(f"baseline_p_cont_{h}d")
+        # honest latest-era value + era-stability flag from the era-split cache
+        era_bucket = (era_summary.get(f"{bucket.lower()}_p_cont_{h}d") or {}).get("era3", {}) \
+            if era_summary else {}
+        era_stable = era_summary.get(f"{bucket.lower()}_p_cont_{h}d_era_stable") \
+            if era_summary else None
         probs[h] = {
             "probability": p,
             "ci": ci,
             "n": n,
             "baseline": base,
             "relative": (round(p - base, 3) if (p is not None and base is not None) else None),
+            "era3_probability": era_bucket.get("p") if isinstance(era_bucket, dict) else None,
+            "era3_n": era_bucket.get("n") if isinstance(era_bucket, dict) else None,
+            "era_stable": era_stable,
         }
 
     details = {

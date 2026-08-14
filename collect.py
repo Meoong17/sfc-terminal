@@ -4576,6 +4576,16 @@ out = {
     "cont_prob_180d": (_trend_cont_probs.get(180, {}) or {}).get("probability"),
     "cont_rel_90d": (_trend_cont_probs.get(90, {}) or {}).get("relative"),
     "cont_caveat": _trend_cont_details.get("caveat"),
+    # ── P3 era-split (honest today probability) — era3 = latest era, era_stable flag ──
+    #   The full-sample cont_prob_* are inflated by the 2014-17 bull run (era1).
+    #   cont_*_era3 is the latest-era probability; era_stable = era2 & era3 both
+    #   on the same side of baseline. Display these alongside the full-sample.
+    "cont_era3_30d": (_trend_cont_probs.get(30, {}) or {}).get("era3_probability"),
+    "cont_era3_90d": (_trend_cont_probs.get(90, {}) or {}).get("era3_probability"),
+    "cont_era3_180d": (_trend_cont_probs.get(180, {}) or {}).get("era3_probability"),
+    "cont_era_stable_30d": (_trend_cont_probs.get(30, {}) or {}).get("era_stable"),
+    "cont_era_stable_90d": (_trend_cont_probs.get(90, {}) or {}).get("era_stable"),
+    "cont_era_stable_180d": (_trend_cont_probs.get(180, {}) or {}).get("era_stable"),
 }
 
 # ── Circuit Breaker: validate output before writing ──
