@@ -257,6 +257,68 @@ tesis 1.docx: inflasi = shock hulu yang ditransmisikan lewat kondisi finansial (
 BUKAN driver langsung. Era3 tetap incoherent (CPI_surp(+) vs PCE_surp(−) lawan tanda). JANGAN
 blend inflasi sebagai driver BTC.
 
+## Institutional (ETF) flow — incremental power vs VIX+M2 (2026-08-14)
+`analysis/institutional_flow_incremental.py` (new) — apakah ETF flow punya incremental
+explanatory power atas return BTC setelah VIX (risk) + M2yoy (likuiditas) dikontrol.
+ETF flow = sum(etfs) harian dari `.etf_cache.json` (661 obs, 2024-01-11..2026-08). Panel
+bulanan (n=32) + harian (n=661), Newey-West HAC, classical partial-F + HAC t-test. 
+
+**KONTEMPORER (flow_t & ret_t period sama):** ETF flow SANGAT signifikan — bulanan partial-F
+p<0.0001 (AdjR2 0.039→0.590, b=+0.0035), harian p<0.0001 (0.002→0.148). VIX & M2 jadi
+insignifikan. **Ini ENDOGENITAS / reverse causality** (flow mengikuti & ikut menggerakkan
+harga di periode sama; R2=0.59 bulanan tak realistis untuk model "driver"). Bukan bukti arah.
+
+**LAGGED (flow_t → return_{t+1}), tes jujur untuk prediksi:**
+| Panel | partial-F | HAC-t | Verdict |
+|---|---|---|---|
+| Bulanan lagged (n=31) | p=0.883 | p=0.833 | TIDAK ada power incremental |
+| Harian lagged (n=659) | p=0.863 | p=0.878 | TIDAK ada power incremental |
+
+Di panel harian lagged, VIX (p=0.000) & M2 (p=0.006) TETAP signifikan — baseline channels
+memang prediktif; flow lagged menambah nol.
+
+**VERDICT:** Institutional (ETF) flow TIDAK punya incremental PREDICTIVE power setelah VIX +
+likuiditas dikontrol (lagged p>0.83 di dua frekuensi). Signifikansi kontemporer besar = 
+endogenitas (flow cermin & mekanisme transmisi harga sejalan), bukan driver independen.
+Flow = indikator searah (refleksi momentum), bukan leading signal. Konsisten: JANGAN jadikan
+ETF flow sebagai driver prediktif; M81/M82 tetap indikator kontemporer/display. Caveat:
+hanya spot ETF (2024+), n bulanan kecil, tidak mencakup seluruh institutional flow
+(derivatif/OTC/futures basis).
+
+## Model D' (ΔRealYield/ΔDXY/ΔM2) + expanding OOS (2026-08-14) — VIX TIDAK survive
+`analysis/model_Dprime_oos.py` (new) — tes wajib terakhir sebelum mengunci Model D sbg
+baseline: Model D' = BTC ~ const + CPI/PPI/PCE_surp + ΔRealYield + ΔDXY + ΔM2 + VIX
+(Newey-West HAC maxlags=3; Δ = first-difference utk buang unit-root RealYield/DXY/M2yoy).
+Full-sample n=104 (2017-10..2026-06) + expanding OOS (min train 60, 44 OOS bulan).
+
+**FULL-SAMPLE Model D':** AdjR2=0.0497. CPI p=0.33/PPI 0.81/PCE 0.58 (inflation NULL ✓);
+**ΔM2 b=+3.44 p=0.002*** (likuiditas signifikan); ΔRealYield p=0.083* (marginal-neg);
+ΔDXY p=0.54 (null); **VIX p=0.381 GAGAL survive**. → Saat likuiditas di-first-difference
+(perlakuan yang benar pasca-ADF unit-root), dominasi VIX dari Model D (p=0.004) HILANG,
+digantikan ΔM2. Dominasi VIX sebelumnya sebagian artefak kolinearitas dgn level M2 I(1).
+
+**EXPANDING OOS (44 bulan):**
+| model | OOS R² | sign_acc |
+|---|---|---|
+| D' | −0.185 | 0.545 |
+| VIX-only | −0.042 | 0.591 |
+| inflation-only | −0.066 | 0.545 |
+| naive (mean) | −0.019 | 0.591 |
+
+Semua OOS R² ≤ 0 → **TIDAK ada model bulanan (makro) yang punya skill OOS; semua kalah
+naive (prediksi mean)**. VIX sig OOS: 0/44 = 0% (tanda 100% negatif tapi tak pernah sig).
+Inflation sig OOS: 0/44 = 0% (NULL ✓). Base rate 0.591; D' & inflation-only sign_acc 0.545
+= DI BAWAH base rate.
+
+**VERDICT:** Model D' TIDAK lolos kriteria "VIX survive". VIX tidak bertahan di D' (full-sample
+p=0.38, 0% OOS sig); yang dominan justru ΔM2 (likuiditas-change). Lebih jauh, SELURUH model
+bulanan makro tak punya skill OOS (R²≤0) — return BTC bulanan praktis tak terprediksi dari
+variabel makro secara OOS. **Kesimpulan yang kokoh:** (1) inflation BUKAN driver (bulletproof,
+semua spesifikasi + 0% OOS), (2) makro bulanan tak punya edge OOS, (3) "kanal dominan" (VIX vs
+M2) spesification-dependent → JANGAN overclaim salah satu sbg driver dominan. **Model D TIDAK
+dikunci sbg baseline resmi dgn VIX sbg driver dominan.** Basline defensif SFC tetap stress-gap
+era-stable (bukan VIX/M2 sebagai driver arah).
+
 ## WFV Stress-Gap era-stability (2026-08-14) — edge IS era-stable (unlike L8 subset)
 
 `analysis/walk_forward_validation.py` now writes per-era (era1/era2/era3) calm-vs-stress
