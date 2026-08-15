@@ -174,7 +174,7 @@ def parse_zip(path, kind):
 
 def main():
     start_year, start_month = 2017, 8
-    end = last_complete_month()
+    end = os.environ.get("SFC_END_MONTH") or last_complete_month()
     tasks = []
     for ds in DATASETS:
         dsname, _, start, _ = ds
