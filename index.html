@@ -696,16 +696,13 @@ html { scrollbar-color: rgba(120,100,255,0.45) transparent; scrollbar-width: thi
 .kpi-hero .kpi-spark { right: 16px; bottom: 16px; opacity: 0.7; }
 .kpi-hero .kpi-spark .sparkline { width: 90px; height: 32px; }
 
-/* Sparkline interactivity: fade-in on load + hover lift */
-.kpi-spark .spark-line { opacity: 0; animation: sparkFade 0.5s ease forwards; }
+/* Sparkline interactivity: fade-in on load + neon hover */
+.kpi-spark .spark-line { opacity: 0; animation: sparkFade 0.6s ease forwards; }
 @keyframes sparkFade { to { opacity: 1; } }
-.kpi-spark .spark-line:nth-child(2) { animation-delay: 0.05s; }
-.kpi-spark .spark-line:nth-child(3) { animation-delay: 0.1s; }
-.kpi-spark .spark-line:nth-child(4) { animation-delay: 0.15s; }
-.kpi-spark .spark-line:nth-child(5) { animation-delay: 0.2s; }
-.kpi:hover .kpi-spark .seg { stroke-width: 2; }
+.kpi:hover .kpi-spark .spark-glow { opacity: 0.45; }
+.kpi:hover .kpi-spark .spark-line { filter: drop-shadow(0 0 4px currentColor); }
 .kpi:hover .kpi-spark .spark-halo { animation: sparkHalo 1.6s ease-in-out infinite; }
-@keyframes sparkHalo { 0%,100% { opacity: 0.12; } 50% { opacity: 0.3; } }
+@keyframes sparkHalo { 0%,100% { opacity: 0.18; } 50% { opacity: 0.45; } }
 
 .chg-p { color: var(--green); }
 .chg-n { color: var(--red); }
@@ -2172,8 +2169,7 @@ function pushHistory(btc, floor, extra) {
 function sparklineSVG(values, opts) {
   opts = opts || {};
   const w = opts.width || 100, h = opts.height || 28;
-  const color = opts.color || '#00d4ff';
-  const up = opts.up || '#00ff9d', down = opts.down || '#ff4060';
+  const color = opts.color || '#f7931a';
   const vals = (values || []).filter(v => typeof v === 'number' && !isNaN(v));
   if (vals.length < 2) return '';
   const min = Math.min(...vals), max = Math.max(...vals);
@@ -2185,26 +2181,42 @@ function sparklineSVG(values, opts) {
     const y = pad + (1 - (v - min) / range) * (h - pad * 2);
     return [x, y];
   });
-  const gid = 'sg' + Math.random().toString(36).slice(2,8);
-  const gridY = Math.round(h * 0.5).toFixed(1);
-  // Build per-segment colored paths (green=up, red=down) + matching thin area tiles
-  let segPaths = '', areaTiles = '';
-  for (let i = 0; i < pts.length - 1; i++) {
-    const a = pts[i], b = pts[i+1];
-    const rising = b[1] < a[1]; // y smaller => value higher
-    const c = rising ? up : down;
-    segPaths += `<path class="spark-line seg ${rising?'seg-up':'seg-down'}" d="M${a[0].toFixed(1)},${a[1].toFixed(1)} L${b[0].toFixed(1)},${b[1].toFixed(1)}" fill="none" stroke="${c}" stroke-width="1.7" stroke-linecap="round" vector-effect="non-scaling-stroke"/>`;
-    areaTiles += `<path d="M${a[0].toFixed(1)},${a[1].toFixed(1)} L${b[0].toFixed(1)},${b[1].toFixed(1)} L${b[0].toFixed(1)},${h-pad} L${a[0].toFixed(1)},${h-pad} Z" fill="${c}" opacity="0.08"/>`;
+  // Smooth Catmull-Rom -> cubic bezier path
+  function smoothPath(p) {
+    if (p.length < 2) return '';
+    let d = `M${p[0][0].toFixed(1)},${p[0][1].toFixed(1)}`;
+    for (let i = 0; i < p.length - 1; i++) {
+      const p0 = p[i - 1] || p[i], p1 = p[i], p2 = p[i + 1], p3 = p[i + 2] || p2;
+      d += ` C${(p1[0]+(p2[0]-p0[0])/6).toFixed(1)},${(p1[1]+(p2[1]-p0[1])/6).toFixed(1)} ${(p2[0]-(p3[0]-p1[0])/6).toFixed(1)},${(p2[1]-(p3[1]-p1[1])/6).toFixed(1)} ${p2[0].toFixed(1)},${p2[1].toFixed(1)}`;
+    }
+    return d;
   }
+  const linePath = smoothPath(pts);
+  const areaPath = linePath + ` L${pts[pts.length-1][0].toFixed(1)},${h-pad} L${pts[0][0].toFixed(1)},${h-pad} Z`;
   const lastPt = pts[pts.length - 1];
-  const lastRise = pts.length > 1 && pts[pts.length-1][1] < pts[pts.length-2][1];
-  const endColor = lastRise ? up : down;
+  const gid = 'sg' + Math.random().toString(36).slice(2,8);
+  const gidF = gid + 'f';
   return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" class="sparkline" preserveAspectRatio="none" role="img" aria-label="sparkline">
-    <path d="M${pad},${gridY} L${w-pad},${gridY}" stroke="rgba(255,255,255,0.05)" stroke-width="1" stroke-dasharray="2 3" fill="none"/>
-    ${areaTiles}
-    ${segPaths}
-    <circle class="spark-halo" cx="${lastPt[0].toFixed(1)}" cy="${lastPt[1].toFixed(1)}" r="3.6" fill="${endColor}" opacity="0.18"/>
-    <circle class="spark-dot" cx="${lastPt[0].toFixed(1)}" cy="${lastPt[1].toFixed(1)}" r="1.9" fill="${endColor}" stroke="#0b0d15" stroke-width="1" vector-effect="non-scaling-stroke"/>
+    <defs>
+      <linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="${color}" stop-opacity="0.40"/>
+        <stop offset="60%" stop-color="${color}" stop-opacity="0.10"/>
+        <stop offset="100%" stop-color="${color}" stop-opacity="0"/>
+      </linearGradient>
+      <linearGradient id="${gidF}" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0%" stop-color="${color}" stop-opacity="0.55"/>
+        <stop offset="100%" stop-color="${color}" stop-opacity="1"/>
+      </linearGradient>
+      <filter id="${gid}gl" x="-60%" y="-60%" width="220%" height="220%">
+        <feGaussianBlur stdDeviation="2.2" result="b"/>
+        <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+    </defs>
+    <path class="spark-area" d="${areaPath}" fill="url(#${gid})" stroke="none"/>
+    <path class="spark-glow" d="${linePath}" fill="none" stroke="${color}" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" opacity="0.25" filter="url(#${gid}gl)" vector-effect="non-scaling-stroke"/>
+    <path class="spark-line" d="${linePath}" fill="none" stroke="url(#${gidF})" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>
+    <circle class="spark-halo" cx="${lastPt[0].toFixed(1)}" cy="${lastPt[1].toFixed(1)}" r="4" fill="${color}" opacity="0.30" filter="url(#${gid}gl)"/>
+    <circle class="spark-dot" cx="${lastPt[0].toFixed(1)}" cy="${lastPt[1].toFixed(1)}" r="1.9" fill="${color}" stroke="#0b0d15" stroke-width="1.2" vector-effect="non-scaling-stroke"/>
   </svg>`;
 }
 
