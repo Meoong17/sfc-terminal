@@ -3959,12 +3959,18 @@ function render(d) {
         <div class="news-feed">
           ${headlines.length > 0
             ? headlines.map((h,i) => {
-                const tag = (h.match(/^\[([A-Za-z]+)\]/) || [])[1] || '';
-                const body = h.replace(/^\[[^\]]*\]\s*/,'').trim();
-                const neg = /(crash|sell|drop|tumble|plunge|warning|crisis|fear|loss|downgrade|recession|selloff|pressure)/i.test(body);
-                const pos = /(surge|rally|gain|jump|rise|bull|record|high|adoption|inflow|breakout|upgrade)/i.test(body);
+                // Format: [emoji][Rt][Source] headline  (e.g. 🔴[Rt][Bitcoin.com] ...)
+                const m = h.match(/^([\u{1F534}\u{1F7E2}\u26AA\u2B50]?)\[[^\]]*\]\[([^\]]*)\]\s*(.*)$/u)
+                        || h.match(/^([\u{1F534}\u{1F7E2}\u26AA\u2B50]?)\[(rt)\]\s*(.*)$/i)
+                        || [null,'',(h.match(/^\[([^\]]*)\]/)||[])[1]||'', h.replace(/^\[[^\]]*\]\s*/,'')];
+                const tone = m[1] || '';
+                const src  = m[2] || '';
+                const body = (m[3] || h).trim();
+                const neg = tone==='🔴' || /(crash|sell|drop|tumble|plunge|warning|crisis|fear|loss|downgrade|recession|selloff|pressure|shutdown|loss|impossible|dead)/i.test(body);
+                const pos = tone==='🟢' || tone==='⭐' || /(surge|rally|gain|jump|rise|bull|record|high|adoption|inflow|breakout|upgrade|4x|double)/i.test(body);
+                const label = src || (neg?'Neg':pos?'Pos':'Neu');
                 return `<div class="news-card">
-                  <div class="news-card-tag ${neg?'nc-neg':pos?'nc-pos':'nc-neu'}">${tag||(neg?'Neg':pos?'Pos':'Neu')}</div>
+                  <div class="news-card-tag ${neg?'nc-neg':pos?'nc-pos':'nc-neu'}" title="${src||''}">${label}</div>
                   <div class="news-card-body">${body}</div>
                 </div>`;
               }).join('')
