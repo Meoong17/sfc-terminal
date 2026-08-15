@@ -696,6 +696,17 @@ html { scrollbar-color: rgba(120,100,255,0.45) transparent; scrollbar-width: thi
 .kpi-hero .kpi-spark { right: 16px; bottom: 16px; opacity: 0.7; }
 .kpi-hero .kpi-spark .sparkline { width: 90px; height: 32px; }
 
+/* Sparkline interactivity: draw-on-load + hover lift */
+.kpi-spark .spark-line {
+  stroke-dasharray: 400;
+  stroke-dashoffset: 400;
+  animation: sparkDraw 1.2s cubic-bezier(0.4,0,0.2,1) forwards;
+}
+@keyframes sparkDraw { to { stroke-dashoffset: 0; } }
+.kpi:hover .kpi-spark .spark-line { filter: drop-shadow(0 0 3px rgba(255,255,255,0.18)); }
+.kpi:hover .kpi-spark .spark-halo { animation: sparkHalo 1.6s ease-in-out infinite; }
+@keyframes sparkHalo { 0%,100% { opacity: 0.12; } 50% { opacity: 0.3; } }
+
 .chg-p { color: var(--green); }
 .chg-n { color: var(--red); }
 .chg-z { color: var(--text-2); }
@@ -2166,25 +2177,52 @@ function sparklineSVG(values, opts) {
   if (vals.length < 2) return '';
   const min = Math.min(...vals), max = Math.max(...vals);
   const range = (max - min) || 1;
-  const pad = 2;
+  const pad = 2.5;
   const stepX = (w - pad * 2) / (vals.length - 1);
   const pts = vals.map((v, i) => {
     const x = pad + i * stepX;
     const y = pad + (1 - (v - min) / range) * (h - pad * 2);
     return [x, y];
   });
-  const linePath = pts.map((p, i) => (i === 0 ? 'M' : 'L') + p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ');
+  // Smooth Catmull-Rom -> cubic bezier path (clean, professional, no sharp corners)
+  function smoothPath(p) {
+    if (p.length < 2) return '';
+    let d = `M${p[0][0].toFixed(1)},${p[0][1].toFixed(1)}`;
+    for (let i = 0; i < p.length - 1; i++) {
+      const p0 = p[i - 1] || p[i];
+      const p1 = p[i];
+      const p2 = p[i + 1];
+      const p3 = p[i + 2] || p2;
+      const c1x = p1[0] + (p2[0] - p0[0]) / 6;
+      const c1y = p1[1] + (p2[1] - p0[1]) / 6;
+      const c2x = p2[0] - (p3[0] - p1[0]) / 6;
+      const c2y = p2[1] - (p3[1] - p1[1]) / 6;
+      d += ` C${c1x.toFixed(1)},${c1y.toFixed(1)} ${c2x.toFixed(1)},${c2y.toFixed(1)} ${p2[0].toFixed(1)},${p2[1].toFixed(1)}`;
+    }
+    return d;
+  }
+  const linePath = smoothPath(pts);
   const areaPath = linePath + ` L${pts[pts.length-1][0].toFixed(1)},${h-pad} L${pts[0][0].toFixed(1)},${h-pad} Z`;
   const lastPt = pts[pts.length - 1];
   const gid = 'sg' + Math.random().toString(36).slice(2,8);
-  return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" class="sparkline" preserveAspectRatio="none">
-    <defs><linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="${color}" stop-opacity="0.35"/>
-      <stop offset="100%" stop-color="${color}" stop-opacity="0"/>
-    </linearGradient></defs>
-    <path d="${areaPath}" fill="url(#${gid})" stroke="none"/>
-    <path d="${linePath}" fill="none" stroke="${color}" stroke-width="1.4" stroke-linejoin="round" stroke-linecap="round"/>
-    <circle cx="${lastPt[0].toFixed(1)}" cy="${lastPt[1].toFixed(1)}" r="2" fill="${color}"/>
+  // Subtle horizontal gridline (dashed, very faint) for a clean analytical feel
+  const gridY = Math.round(h * 0.5).toFixed(1);
+  return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" class="sparkline" preserveAspectRatio="none" role="img" aria-label="sparkline">
+    <defs>
+      <linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="${color}" stop-opacity="0.22"/>
+        <stop offset="100%" stop-color="${color}" stop-opacity="0"/>
+      </linearGradient>
+      <linearGradient id="${gid}l" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0%" stop-color="${color}" stop-opacity="0.45"/>
+        <stop offset="100%" stop-color="${color}" stop-opacity="1"/>
+      </linearGradient>
+    </defs>
+    <path d="M${pad},${gridY} L${w-pad},${gridY}" stroke="rgba(255,255,255,0.05)" stroke-width="1" stroke-dasharray="2 3" fill="none"/>
+    <path class="spark-area" d="${areaPath}" fill="url(#${gid})" stroke="none"/>
+    <path class="spark-line" d="${linePath}" fill="none" stroke="url(#${gid}l)" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
+    <circle class="spark-halo" cx="${lastPt[0].toFixed(1)}" cy="${lastPt[1].toFixed(1)}" r="3.6" fill="${color}" opacity="0.18"/>
+    <circle class="spark-dot" cx="${lastPt[0].toFixed(1)}" cy="${lastPt[1].toFixed(1)}" r="1.9" fill="${color}" stroke="#0b0d15" stroke-width="1" vector-effect="non-scaling-stroke"/>
   </svg>`;
 }
 
@@ -2479,7 +2517,7 @@ function render(d) {
   // Build sparkline SVGs from recent history (last 30 points) for each KPI
   const sparkSlice = historyPoints.slice(-30);
   const sfcSparkColor = sfcEff >= 50 ? '#ff4060' : sfcEff >= 25 ? '#f0b429' : '#00ff9d';
-  const sparkBtc  = sparklineSVG(sparkSlice.map(p => p.btc),  { color: '#00d4ff', width: 90, height: 32 });
+  const sparkBtc  = sparklineSVG(sparkSlice.map(p => p.btc),  { color: '#f7931a', width: 90, height: 32 });
   const sparkSfc  = sparklineSVG(sparkSlice.map(p => p.sfc),  { color: sfcSparkColor, width: 56, height: 22 });
   const sparkDvol = sparklineSVG(sparkSlice.map(p => p.dvol), { color: '#f0b429', width: 56, height: 22 });
   const sparkFng  = sparklineSVG(sparkSlice.map(p => p.fng),  { color: '#f0b429', width: 56, height: 22 });
