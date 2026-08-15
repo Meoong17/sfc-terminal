@@ -4049,10 +4049,41 @@ except Exception as _tc_e:
     print(f"[P3 Continuation] Error: {_tc_e}", file=sys.stderr)
     _trend_cont_probs, _trend_cont_details = {}, {"error": str(_tc_e), "status": "fallback", "available": False}
 
+# ── BTC price history seed for the dashboard line chart ──
+# The front-end BTC/USD price chart used to be fed ONLY by ephemeral live ticks
+# collected in the tab's sessionStorage, so it auto-scaled to a handful of points
+# and looked different on every refresh. Anchor it with the last N canonical
+# daily closes (Binance Vision klines) so the curve is stable across reloads and
+# only the right edge extends with live ticks. DISPLAY-ONLY — not a scoring input.
+_BV_DAILY_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "binance_vision_daily.json")
+
+def _btc_price_history(n=60):
+    """Return last `n` daily closes as [{t: <ms epoch at day UTC midnight>, btc: close}], oldest→newest."""
+    try:
+        with open(_BV_DAILY_PATH) as _f:
+            _daily = json.load(_f)
+        _days = sorted(_daily.keys())
+        if not _days:
+            return []
+        from datetime import datetime as _dt
+        _pts = []
+        for _k in _days[-n:]:
+            _c = _daily[_k].get("close")
+            if _c is None:
+                continue
+            _ts_ms = int(_dt.strptime(_k, "%Y-%m-%d").replace(tzinfo=timezone.utc).timestamp() * 1000)
+            _pts.append({"t": _ts_ms, "btc": round(_c, 2)})
+        return _pts
+    except Exception as _e:
+        print(f"[PriceHistory] Error loading daily closes: {_e}", file=sys.stderr)
+        return []
+
+
 out = {
     "ts": datetime.now(timezone.utc).isoformat(),
     "model_version": MODEL_VERSION,
     "btc": btc,
+    "btc_price_history": _btc_price_history(60),
     "btc_24h": chg,
     "btc_mcap": mcap,
     "fng": fng,
