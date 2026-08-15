@@ -2114,9 +2114,13 @@ function updatePriceChart() {
   const ctx = canvas.getContext('2d');
 
   const btcGrad = ctx.createLinearGradient(0, 0, 0, 240);
-  btcGrad.addColorStop(0, 'rgba(247,147,26,0.16)');
-  btcGrad.addColorStop(0.55, 'rgba(247,147,26,0.03)');
-  btcGrad.addColorStop(1, 'rgba(247,147,26,0.0)');
+  // Delta band color reflects current regime: BTC above realized floor = healthy
+  // (green tint), below floor = accumulation zone (slate/grey tint).
+  const aboveFloor = (btcP[btcP.length-1] || 0) >= (flrP[flrP.length-1] || 0);
+  const bandBase = aboveFloor ? '22,163,74' : '120,148,180';
+  btcGrad.addColorStop(0, 'rgba(' + bandBase + ',0.18)');
+  btcGrad.addColorStop(0.55, 'rgba(' + bandBase + ',0.05)');
+  btcGrad.addColorStop(1, 'rgba(' + bandBase + ',0.0)');
 
   const minVal = Math.min(...btcP, ...flrP);
   const maxVal = Math.max(...btcP, ...flrP);
@@ -2137,10 +2141,10 @@ function updatePriceChart() {
           pointHoverBackgroundColor: '#f7931a',
           pointHoverBorderColor: '#ffffff',
           pointHoverBorderWidth: 2,
-          fill: true,
-          backgroundColor: btcGrad,
+          fill: false,
           tension: 0.4,
-          spanGaps: true
+          spanGaps: true,
+          order: 1
         },
         {
           label: 'Realized Price (on-chain floor)',
@@ -2153,9 +2157,11 @@ function updatePriceChart() {
           pointHoverBackgroundColor: '#8892a8',
           pointHoverBorderColor: '#ffffff',
           pointHoverBorderWidth: 1.5,
-          fill: false,
+          fill: '-1',
+          backgroundColor: btcGrad,
           tension: 0.4,
-          spanGaps: true
+          spanGaps: true,
+          order: 2
         }
       ]
     },
