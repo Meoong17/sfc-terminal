@@ -58,6 +58,15 @@ SERIES = {
     "ECBASSETSW":("ECB total assets", "weekly", "usd_mil"),
     "JPNASSETS": ("BOJ total assets", "monthly", "usd_mil"),
     # CORE GAP: Gold (GOLDAMGBD228NLBM retired di FRED → gap, diisi nanti)
+    # ── Seri tambahan dari proposal (rates lanjutan, equity, credit, copper) ──
+    "NASDAQCOM": ("Nasdaq Composite", "daily", "index"),
+    "DFII10":    ("10Y real yield (TIPS)", "daily", "pct"),
+    "DGS5":      ("US 5Y constant-maturity yield", "daily", "pct"),
+    "BAMLH0A0HYM2": ("US High-Yield OAS", "daily", "pct"),
+    "BAMLC0A0CM":   ("US Investment-Grade OAS", "daily", "pct"),
+    "PCOPPUSDM": ("Copper (global price, US$)", "monthly", "usd_mt"),
+    # Catatan: 5s30s dihitung = DGS30 - DGS5 di merge; RUT (Russell 2000) & 
+    # DCOPPERTUSD tidak ada di FRED (HTTP 400) → gap dicatat.
 }
 
 

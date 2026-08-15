@@ -2,8 +2,10 @@
   "btc_start": "2017-08-17",
   "btc_end": "2026-08-14",
   "btc_days": 3285,
-  "n_series": 16,
+  "n_series": 22,
   "gold_gap": "GOLD retired di FRED (HTTP 400) \u2014 perlu sumber lain",
+  "rut_gap": "RUT (Russell 2000) tidak ada di FRED (HTTP 400)",
+  "copper_daily_gap": "DCOPPERTUSD tidak ada di FRED; pakai PCOPPUSDM (monthly)",
   "columns": {
     "BTC_close": {
       "n": 3285,
@@ -110,6 +112,48 @@
     "BOJ_BS": {
       "n": 3270,
       "coverage_pct": 99.5,
+      "last_date": "2026-08-14",
+      "freq": "daily"
+    },
+    "NDX": {
+      "n": 3285,
+      "coverage_pct": 100.0,
+      "last_date": "2026-08-14",
+      "freq": "daily"
+    },
+    "REAL_Y10": {
+      "n": 3285,
+      "coverage_pct": 100.0,
+      "last_date": "2026-08-14",
+      "freq": "daily"
+    },
+    "US5Y": {
+      "n": 3285,
+      "coverage_pct": 100.0,
+      "last_date": "2026-08-14",
+      "freq": "daily"
+    },
+    "HY_OAS": {
+      "n": 1096,
+      "coverage_pct": 33.4,
+      "last_date": "2026-08-14",
+      "freq": "daily"
+    },
+    "IG_OAS": {
+      "n": 1096,
+      "coverage_pct": 33.4,
+      "last_date": "2026-08-14",
+      "freq": "daily"
+    },
+    "COPPER": {
+      "n": 3270,
+      "coverage_pct": 99.5,
+      "last_date": "2026-08-14",
+      "freq": "daily"
+    },
+    "SPREAD_5_30": {
+      "n": 3285,
+      "coverage_pct": 100.0,
       "last_date": "2026-08-14",
       "freq": "daily"
     }

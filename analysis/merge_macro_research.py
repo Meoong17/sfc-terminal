@@ -39,6 +39,8 @@ FREQ = {
     "RRPONTSYD": "daily",
     "WALCL": "weekly", "WTREGEN": "weekly", "ECBASSETSW": "weekly",
     "M2SL": "monthly", "JPNASSETS": "monthly",
+    "NASDAQCOM": "daily", "DFII10": "daily", "DGS5": "daily",
+    "BAMLH0A0HYM2": "daily", "BAMLC0A0CM": "daily", "PCOPPUSDM": "monthly",
 }
 
 # Seri yang disertakan di dataset gabungan + label
@@ -50,6 +52,9 @@ INCLUDE = {
     "RRPONTSYD": "RRP",
     "WALCL": "FED_BS", "WTREGEN": "TGA", "ECBASSETSW": "ECB_BS",
     "M2SL": "M2_US", "JPNASSETS": "BOJ_BS",
+    "NASDAQCOM": "NDX", "DFII10": "REAL_Y10", "DGS5": "US5Y",
+    "BAMLH0A0HYM2": "HY_OAS", "BAMLC0A0CM": "IG_OAS",
+    "PCOPPUSDM": "COPPER",
 }
 
 
@@ -138,6 +143,11 @@ def main():
         for alias in macro_cols:
             if alias in filled_cols and rec.get(alias) is None:
                 rec[alias] = filled_cols[alias].get(d)
+        # Kolom turunan: 5s30s = US30Y - US5Y (nilai harian, tanpa ff palsu)
+        if rec.get("US30Y") is not None and rec.get("US5Y") is not None:
+            rec["SPREAD_5_30"] = round(rec["US30Y"] - rec["US5Y"], 4)
+
+    derived_cols = ["SPREAD_5_30"]
 
     # ── Audit ──
     audit = {
@@ -145,9 +155,12 @@ def main():
         "btc_days": len(grid_dates),
         "n_series": len(INCLUDE),
         "gold_gap": "GOLD retired di FRED (HTTP 400) — perlu sumber lain",
+        "rut_gap": "RUT (Russell 2000) tidak ada di FRED (HTTP 400)",
+        "copper_daily_gap": "DCOPPERTUSD tidak ada di FRED; pakai PCOPPUSDM (monthly)",
         "columns": {},
     }
-    for alias in ["BTC_close", "BTC_volume"] + macro_cols:
+    all_cols = ["BTC_close", "BTC_volume"] + macro_cols + derived_cols
+    for alias in all_cols:
         last_d = None
         for r in reversed(daily):
             if r.get(alias) is not None:
@@ -168,6 +181,8 @@ def main():
         for alias in macro_cols:
             if alias in filled_cols:
                 row[alias] = filled_cols[alias].get(d)
+        if row.get("US30Y") is not None and row.get("US5Y") is not None:
+            row["SPREAD_5_30"] = round(row["US30Y"] - row["US5Y"], 4)
         cleaned_macro.append(row)
     with open(os.path.join(CLEAN_DIR, "macro_daily_clean.json"), "w") as f:
         json.dump(cleaned_macro, f, indent=1)
@@ -184,7 +199,7 @@ def main():
     print(f"=== SFC Research Dataset ===  {btc_start} → {btc_end}  ({len(daily)} hari)")
     print(f"{'kolom':14s} {'freq':8s} {'n':>7s} {'cov%':>6s}  last")
     print("-" * 55)
-    for alias in ["BTC_close", "BTC_volume"] + macro_cols:
+    for alias in all_cols:
         a = audit["columns"][alias]
         print(f"{alias:14s} {a['freq']:8s} {a['n']:>7d} {a['coverage_pct']:>5.1f}%  {a['last_date']}")
     print(f"\nSaved: {MERGED_DIR}/sfc_research_daily.json")
