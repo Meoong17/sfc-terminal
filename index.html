@@ -1123,6 +1123,26 @@ html { scrollbar-color: rgba(120,100,255,0.45) transparent; scrollbar-width: thi
 }
 .news-dot.active { background: var(--purple); width: 18px; }
 
+/* ── NEWS FEED (full panel, News tab) ── */
+.news-feed { display: flex; flex-direction: column; gap: 8px; }
+.news-card {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 9px 12px; border-radius: 8px;
+  background: var(--bg-raise); border: 1px solid var(--border-1);
+  transition: background 0.2s, border-color 0.2s, transform 0.2s;
+}
+.news-card:hover { background: var(--bg-hover); border-color: var(--border-2); transform: translateX(2px); }
+.news-card-tag {
+  flex-shrink: 0; min-width: 34px; text-align: center;
+  padding: 2px 6px; border-radius: 5px;
+  font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 8px;
+  letter-spacing: 0.05em; text-transform: uppercase; margin-top: 1px;
+}
+.news-card-tag.nc-neg { background: var(--red-dim); color: var(--red); border: 1px solid rgba(255,64,96,0.3); }
+.news-card-tag.nc-pos { background: var(--green-dim); color: var(--green); border: 1px solid rgba(0,245,160,0.3); }
+.news-card-tag.nc-neu { background: rgba(255,255,255,0.04); color: var(--text-2); border: 1px solid var(--border-2); }
+.news-card-body { font-size: 11px; line-height: 1.5; color: var(--text-2); }
+
 /* ══════════════════════════════════════════
    KELLY / BACKTEST PANELS
 ══════════════════════════════════════════ */
@@ -2566,7 +2586,7 @@ function render(d) {
     <div class="snav-item" data-tab="onchain" onclick="switchTab('onchain')"><span class="snav-ic"><svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg"><rect stroke="currentColor" stroke-width="1.3" x="1.5" y="1.5" width="5" height="5" rx="1.2"/><rect stroke="currentColor" stroke-width="1.3" x="8.5" y="8.5" width="5" height="5" rx="1.2"/><path stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" d="M6.5 4h2a2 2 0 0 1 2 2v.5M8.5 11h-2a2 2 0 0 1-2-2v-.5"/></svg></span>On-Chain</div>
     <div class="snav-item" data-tab="stress" onclick="switchTab('stress')"><span class="snav-ic"><svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg"><path stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" d="M1.5 8h2.5l1.5-4 2 8 1.5-4H13.5"/></svg></span>Stress Monitor</div>
     <div class="snav-item" data-tab="forecast" onclick="switchTab('forecast')"><span class="snav-ic"><svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg"><path stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" d="M1.5 11L5.5 6.5L8.5 9L13.5 3"/><path stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" d="M10 3h3.5v3.5"/></svg></span>Forecast</div>
-    <div class="snav-item" data-tab="research" onclick="switchTab('research')"><span class="snav-ic"><svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg"><circle stroke="currentColor" stroke-width="1.3" cx="6.3" cy="6.3" r="4.3"/><path stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" d="M9.5 9.5L13 13"/></svg></span>Research</div>
+    <div class="snav-item" data-tab="news" onclick="switchTab('news')"><span class="snav-ic"><svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg"><path stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" d="M2 3.5h8v9H2zM10 6h3v6.5h-3"/><path stroke="currentColor" stroke-width="1.3" stroke-linecap="round" d="M4 6h4M4 8h4M4 10h2"/></svg></span>News</div>
     <div class="snav-signal">
       <div class="snav-signal-label">SIGNAL</div>
       <span class="snav-signal-pill ${topPillClass}">${topPillText}</span>
@@ -2595,7 +2615,7 @@ function render(d) {
       <div class="nav-tab" data-tab="onchain" onclick="switchTab('onchain')">On-Chain</div>
       <div class="nav-tab" data-tab="stress" onclick="switchTab('stress')">Stress Monitor</div>
       <div class="nav-tab" data-tab="forecast" onclick="switchTab('forecast')">Forecast</div>
-      <div class="nav-tab" data-tab="research" onclick="switchTab('research')">Research</div>
+      <div class="nav-tab" data-tab="news" onclick="switchTab('news')">News</div>
     </div>
     <div class="nav-right">
       <div class="nav-meta">
@@ -2640,9 +2660,9 @@ function render(d) {
         <svg width="19" height="19" viewBox="0 0 19 19" fill="none"><path stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" d="M2 14l5-6 3.5 3L17 4"/><path stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" d="M13 4h4v4"/></svg>
         <span class="bnav-item-label">Forecast</span>
       </div>
-      <div class="bnav-item" data-bnav="research" onclick="switchTab('research')">
-        <svg width="19" height="19" viewBox="0 0 19 19" fill="none"><circle stroke="currentColor" stroke-width="1.4" cx="8" cy="8" r="5.5"/><path stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" d="M12 12l5 5"/></svg>
-        <span class="bnav-item-label">Research</span>
+      <div class="bnav-item" data-bnav="news" onclick="switchTab('news')">
+        <svg width="19" height="19" viewBox="0 0 19 19" fill="none"><path stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" d="M2.5 4.5h10v11h-10zM12.5 7.5h4v8h-4"/><path stroke="currentColor" stroke-width="1.4" stroke-linecap="round" d="M5 7.5h5M5 10h5M5 12.5h3"/></svg>
+        <span class="bnav-item-label">News</span>
       </div>
     </div>
   </div>
@@ -2659,7 +2679,7 @@ function render(d) {
     <div class="s-chip" style="margin-left:auto;cursor:pointer;color:var(--text-2)" onclick="toggleChartVisibility()">
       ${chartVisible?'Hide':'Show'} Chart
     </div>
-    <div class="s-chip" style="cursor:pointer;color:var(--text-2)" onclick="switchTab('research')">Help</div>
+    <div class="s-chip" style="cursor:pointer;color:var(--text-2)" onclick="switchTab('news')">News</div>
   </div>
 
   <!-- MAIN -->
@@ -3923,8 +3943,38 @@ function render(d) {
       </div>
     </div>` : ''}
     </div><!-- /tab-panel forecast -->
-    <div class="tab-panel" data-tab="research">
-    <!-- TAB: RESEARCH ================= -->
+    <div class="tab-panel" data-tab="news">
+    <!-- TAB: NEWS ================= -->
+    <div class="section-head"><div class="section-head-label">Market News &amp; Sentiment</div><div class="section-head-line"></div><div class="section-head-meta">${headlines.length} headlines · stress ${fmtNum(d.news_stress,1)}</div></div>
+    <div class="card span-full mb-16">
+      <div class="card-head">
+        <div class="card-title">
+          <div class="card-icon"><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" d="M1.5 2.5h6v7h-6zM7.5 4h3v5.5h-3"/><path stroke="currentColor" stroke-width="1.4" stroke-linecap="round" d="M3 4.5h3M3 6.5h3M3 8h2"/></svg></div>
+          Live News Feed
+          <span class="title-tip" tabindex="0" data-tip="Real-time crypto and macro headlines feeding the news-stress component of the SFC signal. Negative headlines (red) raise stress; positive/neutral lower it. Sentiment shown is the latest cycle's aggregate."><span class="info-tip-icon">i</span></span>
+        </div>
+        <div class="card-badge">News stress ${fmtNum(d.news_stress,1)} · sentiment ${fmtNum((d.news_sentiment||0),3)}</div>
+      </div>
+      <div class="card-body">
+        <div class="news-feed">
+          ${headlines.length > 0
+            ? headlines.map((h,i) => {
+                const tag = (h.match(/^\[([A-Za-z]+)\]/) || [])[1] || '';
+                const body = h.replace(/^\[[^\]]*\]\s*/,'').trim();
+                const neg = /(crash|sell|drop|tumble|plunge|warning|crisis|fear|loss|downgrade|recession|selloff|pressure)/i.test(body);
+                const pos = /(surge|rally|gain|jump|rise|bull|record|high|adoption|inflow|breakout|upgrade)/i.test(body);
+                return `<div class="news-card">
+                  <div class="news-card-tag ${neg?'nc-neg':pos?'nc-pos':'nc-neu'}">${tag||(neg?'Neg':pos?'Pos':'Neu')}</div>
+                  <div class="news-card-body">${body}</div>
+                </div>`;
+              }).join('')
+            : '<div style="color:var(--text-3);font-size:11px">No news available this cycle — feed sources may be temporarily unreachable.</div>'}
+        </div>
+      </div>
+    </div>
+    </div><!-- /tab-panel news -->
+    <div class="tab-panel" data-tab="help">
+    <!-- TAB: HELP ================= -->
     >
     <div class="help-panel">
         <div style="font-size:13px;font-weight:700;margin-bottom:4px">How to Read SFC Terminal</div>
@@ -4060,7 +4110,8 @@ function render(d) {
   <footer class="footer">
     <span>SFC Terminal v.4 &nbsp;·&nbsp; Quantitative Stress Intelligence &nbsp;·&nbsp; Bitcoin Asset Platform</span>
     <div class="footer-links">
-      <span class="footer-link" onclick="switchTab('research')">Help</span>
+      <span class="footer-link" onclick="switchTab('news')">News</span>
+      <span class="footer-link" onclick="switchTab('help')">Help</span>
       <span class="footer-link" onclick="fetchLiveData()">Refresh</span>
     </div>
   </footer>
@@ -4167,7 +4218,7 @@ function toggleChartVisibility() {
 
 /* ── HELP TOGGLE (legacy alias — help is now a tab) ── */
 function toggleHelp() {
-  switchTab('research');
+  switchTab('news');
 }
 
 /* ── PARTIAL UPDATE (BTC ticker — smooth, no DOM rebuild) ── */
