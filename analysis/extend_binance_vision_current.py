@@ -63,13 +63,16 @@ def main():
     daily = json.load(open(DAILY_OUT))
     today = dt.datetime.now(dt.timezone.utc)
     y, m = today.year, today.month
-    # try days 1..today (backoff from today downward; Binance lags 2-3d)
-    added, failed = [], []
+    # Backoff: find the newest current-month day already in daily (Binance
+    # publishes daily zips with ~2-3 day lag). Start scanning from today
+    # downward and only fetch the gap.
+    last_have = None
     for d in range(today.day, 0, -1):
-        date_str = f"{y:04d}-{m:02d}-{d:02d}"
-        if date_str in daily:
-            break  # already have this and everything before it
-    start_d = max(1, today.day - 10)
+        if f"{y:04d}-{m:02d}-{d:02d}" in daily:
+            last_have = d
+            break
+    start_d = (last_have + 1) if last_have else max(1, today.day - 10)
+    added, failed = [], []
     for d in range(start_d, today.day + 1):
         date_str = f"{y:04d}-{m:02d}-{d:02d}"
         if date_str in daily:
