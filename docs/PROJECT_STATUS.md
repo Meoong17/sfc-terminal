@@ -1,6 +1,6 @@
 # SFC Terminal — Project Status
 
-_Last updated: 2026-08-14_
+_Last updated: 2026-08-15_
 
 ## Model focus
 
@@ -503,5 +503,84 @@ Key lesson (echoes existing): a nominally-significant lag in a multi-lag causal
 search is USUALLY a multiple-comparison artifact — run the robustness battery
 (BH-FDR, sub-period, drop-outlier) before reporting it. The era-2012-2017
 GLF→BTC "p=0.020" is the same class as the earlier full-sample GLF result.
+
+
+## Order-flow microstructure data — Binance Vision aggTrades (2026-08-14)
+
+First step of the microstructure tesis (positioning / liquidity-timing / order
+flow as a possible driver): acquire a real long-history order-flow series
+instead of building on the ~44 live days only.
+
+Source: Binance Vision public S3 `data/spot/monthly/aggTrades/BTCUSDT/` (2017-08+),
+free, no key. Each row: `aggTradeId, price, qty, firstId, lastId, ts, isBuyerMaker,
+isBestMatch`. Direction semantics: `isBuyerMaker=True` ⇒ taker is the SELLER
+(taker-sell); `False` ⇒ taker-buy.
+
+Fetcher: `analysis/fetch_orderflow.py` → `data/binance_orderflow_daily.json`
+(date → taker buy/sell qty+quote, taker_imbalance_qty/_quote, taker_buy_ratio,
+n_trades, whale $1M/$10M & qty≥10/100 BTC, med/p99 notional, total_qty/quote).
+Same S3 base, per-dataset zip cache + SHA256 verify, incremental write per month.
+
+Acquired: **2018-01-01 → 2020-12-31, 1096 days** (36 months, ~400M trades,
+5.9GB zips cached in `data/binance_vision_cache/spot_aggTrades/`). Validated with
+`analysis/validate_orderflow.py`:
+
+| Check | Result |
+|---|---|
+| Coverage / gaps | 1096/1096 days, 0 gaps |
+| total_qty vs kline volume | max rel diff 0.018%, mean 4e-7 (essentially exact) |
+| price_close vs kline close | max rel diff 0.29% (aggTrade boundary effect) |
+| taker_buy_ratio | mean 0.506 (balanced, sane) |
+| whale ≥10 BTC | mean 130/day (spikes at 2018-01 crash: 65-82; 2020-03 COVID) |
+| Volume growth | $262M/d (2018) → $333M (2019) → $783M (2020); Dec-2020 $1.8B/d |
+
+Engineering lessons (3.6GB / 2-core host):
+- Naive per-line Python parse of 2020 months (150M+ trades, 585MB zip) = OOM
+  (exit 137) AND >300s. Fix: **pandas chunked read** (4M-row chunks, C parsing,
+  vectorised per-day groupby) → 2020-12 in ~106s, peak RSS 1.3GB; percentile via
+  stride-downsampled array, not full retention.
+- `last_price` bug: a single chunk-max-ts row only stamped 2 days/month. Fixed to
+  per-day max-ts within each chunk, compared across chunks (true EOD price).
+
+Status: DATA ACQUIRED + VALIDATED for 2018-2020. NOT yet tested for predictive
+edge. Extendable to 2017-08+ (full backfill) or 2021-2026 (for a complete
+2017-2026 era-split panel) before any walk-forward/purged-CV test. Do NOT blend
+into scoring until purged-CV validated (same discipline as funding/momentum).
+
+## Alphractal API integration + predictive validation (2026-08-15) — NO metric ready to blend
+
+New data source wired up (DATA COLLECTION only, nothing blended into scoring).
+
+- `data_sources/alphractal.py` — API client (env `ALPHRACTAL_API_KEY`, header
+  `X-Api-Key`, cache TTL 6h, backoff on 429).
+- `analysis/fetch_alphractal.py` — CLI fetch → `data/alphractal_daily.json`
+  (2009-01-03 .. 2026-08-15, 6,434 days, 12 metrics). Cross-check PriceUSD vs
+  canonical `binance_vision_daily.json`: 3,285-day overlap, median deviation
+  0.060% — consistent.
+- `analysis/walk_forward_alphractal.py` — 2-stage predictive validation
+  (stage 1: rank-IC + BH-FDR + era-split; stage 2: purged-CV/embargo) →
+  `.walk_forward_alphractal.json`.
+
+**Key finding: this `ak-...` API key is tier-limited.** Many premium on-chain
+endpoints (MVRV z-score, realized price, SOPR, reserve risk, exchange netflow,
+Puell multiple, active supply, smart-money flow, vANV, ADCI, spot/risk) return
+**403 Forbidden** on this plan and are deliberately not fetched (they only burn
+rate-limit slots). Rate limit is bursty (~429, resets ~20-25s).
+
+Validation verdicts (gate: purged-CV pooled AUC > 0.5 AND CI_lower > 0.5):
+
+| Metric | Verdict | Note |
+|---|---|---|
+| SplyCur, TxCnt, AdrActCnt, HashRate, DiffLast | **REJECTED** | large rank-IC (q=0) but pure time-trend artifact (series rise monotonically since 2009); purged-CV AUC ≤ 0.40-0.49 → no OOS skill |
+| supply_in_profit_pct | **NOT_BLEND** (weak) | only one passing purged-CV 90d (AUC 0.572), but thin margin (7d/30d CI_lower < 0.5), steep era-decay (IC 0.47 → 0.03), and IC (+) vs tail-gap (−) polarity contradiction = price confound |
+| Funding_Rate, Open_Interest, Long_short_ratio, Taker_long_short, Liquidations | **DATA_TOO_SHORT** | series start 2019-2021+, cannot era-split across a bull AND a bear yet — not "rejected", not validated |
+
+Common cause mirrors the China-M2 / JPY-carry / HY / momentum pattern: apparent
+full-sample edge is era- or trend-dominated; purged-CV overturns the IC screen.
+**Do NOT blend any Alphractal metric into sfc_effective.** The data-source layer
+stands as a validated acquisition module; derivatives metrics are hypotheses to
+re-test once >1 full cycle of history accumulates.
+
+
 
 
