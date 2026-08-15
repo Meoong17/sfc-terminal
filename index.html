@@ -1060,69 +1060,6 @@ html { scrollbar-color: rgba(120,100,255,0.45) transparent; scrollbar-width: thi
 .sp-cash  { background: var(--red-dim);   color: var(--red);   border: 1px solid rgba(255,64,96,0.2); }
 
 
-/* ── NEWS TICKER ── */
-.news-wrap {
-  margin-bottom: 14px;
-  position: relative;
-}
-.news-viewport {
-  height: 52px;
-  overflow: hidden;
-  background: var(--bg-card);
-  border: 1px solid var(--border-1);
-  border-radius: var(--r-lg);
-  position: relative;
-}
-.news-viewport::after {
-  content: '';
-  position: absolute;
-  right: 0; top: 0; bottom: 0;
-  width: 60px;
-  background: linear-gradient(90deg, transparent 0%, var(--bg-card) 100%);
-  pointer-events: none;
-  z-index: 1;
-}
-.news-track { position: relative; height: 100%; }
-.news-item {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  padding: 0 16px;
-  font-size: 10px;
-  color: var(--text-2);
-  opacity: 0;
-  transform: translateY(100%);
-  transition: transform 0.4s cubic-bezier(0.4,0,0.2,1), opacity 0.4s ease;
-  will-change: transform, opacity;
-  line-height: 1.5;
-}
-.news-item::before {
-  content: '';
-  width: 3px; height: 3px;
-  border-radius: 50%;
-  background: var(--purple);
-  flex-shrink: 0;
-  margin-right: 8px;
-}
-.news-item.active  { opacity: 1; transform: translateY(0); }
-.news-item.exit    { opacity: 0; transform: translateY(-100%); }
-.news-dots {
-  display: flex;
-  justify-content: center;
-  gap: 3px;
-  margin-top: 4px;
-}
-.news-dot {
-  height: 2px;
-  width: 10px;
-  border-radius: 2px;
-  background: var(--text-4);
-  cursor: pointer;
-  transition: background 0.2s, width 0.2s;
-}
-.news-dot.active { background: var(--purple); width: 18px; }
-
 /* ── NEWS FEED (full panel, News tab) ── */
 .news-feed { display: flex; flex-direction: column; gap: 8px; }
 .news-card {
@@ -2251,28 +2188,6 @@ function sparklineSVG(values, opts) {
   </svg>`;
 }
 
-/* ── NEWS SLIDESHOW ── */
-let newsSlideIndex = 0;
-let newsSlideTimer = null;
-function startNewsSlide() {
-  clearInterval(newsSlideTimer);
-  const items = document.querySelectorAll('.news-item');
-  const dots  = document.querySelectorAll('.news-dot');
-  if (!items.length) return;
-  function showSlide(i) {
-    items.forEach((el, idx) => {
-      el.classList.remove('active','exit');
-      if (idx === i) el.classList.add('active');
-      else if (idx === (i - 1 + items.length) % items.length) el.classList.add('exit');
-    });
-    dots.forEach((d, idx) => d.classList.toggle('active', idx === i));
-    newsSlideIndex = i;
-  }
-  showSlide(0);
-  newsSlideTimer = setInterval(() => showSlide((newsSlideIndex + 1) % items.length), 5000);
-  dots.forEach((d, i) => d.addEventListener('click', () => { clearInterval(newsSlideTimer); showSlide(i); newsSlideTimer = setInterval(() => showSlide((newsSlideIndex + 1) % items.length), 5000); }));
-}
-
 /* ── TAB NAVIGATION ── */
 let activeTab = 'overview';
 
@@ -2551,7 +2466,6 @@ function render(d) {
   function _fillClass(v) { return v >= 50 * _arcMult ? 'pf-red' : v >= 25 * _arcMult ? 'pf-amber' : 'pf-green'; }
 
   const headlines = d.news_headlines || [];
-  newsSlideIndex = 0;
 
   if (d.btc && d.floor_total) {
     var flr = floorRealized(d);
@@ -4278,7 +4192,6 @@ function startSSE() {
           }
           currentData = data;
           render(data);
-          startNewsSlide();
         }
       } catch (err) {
         console.log('[SSE] sfc_update parse error:', err);
@@ -4328,7 +4241,6 @@ async function fetchLiveData() {
     render(data);
     // Restore exact scroll position (not activeTab section)
     window.scrollTo({ top: savedScrollY, behavior: 'instant' });
-    startNewsSlide();
     return true;
   } catch (e) {
     console.log('Fetch failed:', e);
@@ -4369,7 +4281,6 @@ async function bootSFC() {
     }
   }
 
-  setTimeout(startNewsSlide, 100);
   setTimeout(restoreScrollPos, 200);
   // Start SSE only if server was detected (/snapshot responded)
   if (_sseAvailable) {
