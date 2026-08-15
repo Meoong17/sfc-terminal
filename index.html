@@ -2734,20 +2734,6 @@ function render(d) {
       </div>
     </div>
 
-    <!-- NEWS -->
-    <div class="news-wrap">
-      <div class="news-viewport">
-        <div class="news-track">
-          ${headlines.length > 0
-            ? headlines.map((h,i) => `<div class="news-item${i===0?' active':''}">${h.replace(/^[🔴⚪⚠]+/,'').trim()}</div>`).join('')
-            : `<div class="news-item active" style="color:var(--text-3)">No news available this cycle — feed sources may be temporarily unreachable</div>`}
-        </div>
-      </div>
-      <div class="news-dots">
-        ${headlines.map((_,i) => `<div class="news-dot${i===0?' active':''}" data-i="${i}"></div>`).join('')}
-      </div>
-    </div>
-
             <!-- ═══ TAB: OVERVIEW ═══ -->
         <div class="tab-panel active" data-tab="overview">
     <!-- TAB: OVERVIEW ================= -->
