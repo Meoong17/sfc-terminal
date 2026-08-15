@@ -1,6 +1,6 @@
 # SFC Terminal — Project Status
 
-_Last updated: 2026-08-15_
+_Last updated: 2026-08-16_
 
 ## Model focus
 
@@ -542,10 +542,40 @@ Engineering lessons (3.6GB / 2-core host):
 - `last_price` bug: a single chunk-max-ts row only stamped 2 days/month. Fixed to
   per-day max-ts within each chunk, compared across chunks (true EOD price).
 
-Status: DATA ACQUIRED + VALIDATED for 2018-2020. NOT yet tested for predictive
-edge. Extendable to 2017-08+ (full backfill) or 2021-2026 (for a complete
-2017-2026 era-split panel) before any walk-forward/purged-CV test. Do NOT blend
-into scoring until purged-CV validated (same discipline as funding/momentum).
+Status: DATA ACQUIRED + VALIDATED (2017-08-17 .. 2020-12-31, 1233 days) AND
+PREDICTIVE TESTED — **ALL signals NOT_BLEND.** Battery
+`analysis/validate_orderflow_predictive.py` (2026-08-16): quantile top/bottom-20%
+forward-return gap + bootstrap P(sign) + Spearman IC + era-split (3 contiguous
+blocks) + purged-CV/embargo (single-feature LogReg OOS AUC). Deterministic
+(bootstrap seeded; only generated_at differs across runs).
+
+**Every order-flow signal fails the gate on the same pattern** — the full-sample
+negative gap (esp. 30d, −8 to −18pp) is driven ENTIRELY by era1 (2017-08..2018-10,
+the 2018 bear), and the LATEST era (2019-11..2020-12, COVID + 2020 bull) FLIPS
+sign for all five:
+
+| Signal | era1 gap | era2 gap | era3 gap | purged-CV pooled AUC | Verdict |
+|---|---|---|---|---|---|
+| taker_imbalance_qty | 7d +0.7 / 30d −29.8 | 7d +4.7 / 30d +14.2 | 7d −3.1 / 30d −4.5 | 0.43 / 0.32 | NOT_BLEND |
+| taker_buy_ratio | (same as imbalance) | | | 0.43 / 0.32 | NOT_BLEND |
+| whale≥10BTC count | 7d −6.1 / 30d −35.4 | 7d −1.3 / 30d −2.5 | 7d +1.2 / 30d +3.6 | 0.48 / 0.55 (SE fails) | NOT_BLEND |
+| total_quote (notional) | 7d −5.5 / 30d −42.7 | 7d −2.0 / 30d −5.3 | 7d +4.5 / 30d +2.2 | 0.47 / 0.54 (SE fails) | NOT_BLEND |
+| n_trades | 7d −5.0 / 30d −40.4 | 7d −1.1 / 30d +1.9 | 7d +4.1 / 30d +4.2 | 0.47 / 0.45 | NOT_BLEND |
+
+era2 shows a mix (imbalance momentum-positive, volume/whale negative), era3 the
+opposite polarity; no signal has a sign consistent across eras, and purged-CV
+pooled AUC ≤ 0.55 with mean−1.96·SE < 0.5 everywhere → no out-of-sample skill.
+
+**Caveats (per era-split skill, do not over-read):** this is a REDUCED-WINDOW
+replay (2017-2020 only) — it cannot speak to whether order-flow predicts in the
+live 2022-2026 regime. It establishes that the sign is NOT stable within the
+available panel (i.e. no defensible directional claim), so order-flow is at most
+a HYPOTHESIS to re-test if the series is backfilled/extended to a full 2017-2026
+era-split panel. Do NOT blend into scoring. Same failure class as momentum /
+funding / Alphractal supply / WWI / MVRV: full-sample edge is era- or
+trend-dominated; purged-CV overturns the optimistic look. Data + fetch remain
+valuable as a validated acquisition module (derivatives/positioning hypotheses
+to re-test once a complete 2017-2026 panel accumulates).
 
 ## Alphractal API integration + predictive validation (2026-08-15) — NO metric ready to blend
 
@@ -580,6 +610,43 @@ full-sample edge is era- or trend-dominated; purged-CV overturns the IC screen.
 **Do NOT blend any Alphractal metric into sfc_effective.** The data-source layer
 stands as a validated acquisition module; derivatives metrics are hypotheses to
 re-test once >1 full cycle of history accumulates.
+
+## Wolfy Wave Index (WWI, external github.com/wolfyxbt/wolfy-wave-index) — REJECTED as predictive driver (2026-08-16)
+
+External deterministic block-height cycle-position indicator (WWI, 0=theoretical
+bear bottom, 1=theoretical bull top). WWI is a **pure function of block height**
+(halving ± 78,750 blocks = bull, rest = bear; no price/volume/on-chain feedback,
+fully reproducible). Evaluated on canonical Binance Vision daily BTC 2017-08 →
+2026-08 (3,285 days) with height mapping from the repo's `btc-heights.json`
+(per-144-block real block-header timestamps).
+
+**Fit (structural) is strong:** WWI at actual cycle tops/bottoms 2013-2025 lands at
+0.90/0.98/0.995/0.994 (tops) and 0.05/0.02/0.02 (bottoms) — the "halving = bull
+midpoint, bull 3/4" assumption is well calibrated to real cycle extremes. As a
+descriptive cycle clock it is excellent and honestly labeled (no overclaim).
+
+**Predictive: REJECTED.** Rank-IC screen only (90d IC −0.110) is over-optimistic
+on overlapping forward-return labels. Leakage-free purged-CV/embargo gate:
+
+| Horizon | Pooled OOS AUC | Per-fold | Verdict |
+|---|---|---|---|
+| 7d | 0.479 (below chance) | .584 .466 .431 .416 .472 .507 | REJECTED |
+| 30d | 0.531 | .386 .420 .676 .629 .516 .561 | n.s. (lower-95% ≈ 0.33 < 0.5) |
+| 90d | 0.579 | .402 .482 .780 .856 .464 .490 | one-fold luck (SE 0.173; mean−1.96·SE ≈ 0.24) |
+
+The 90d mean is driven by a single 2022-23 bull-leg fold (0.856); all other folds
+≈ 0.40-0.49. Same failure class as momentum / Alphractal supply: monotone
+deterministic time signal → IC screen fools → purged-CV overturns.
+
+**Correlation is redundant, not additive:** WWI Spearman vs existing SFC cycle
+signals (2017-26): supply_in_profit_pct +0.62 (already NOT_BLEND), PriceUSD +0.49,
+Funding_Rate +0.19, Long_short_ratio +0.18, TxCnt +0.015. Highest corr is with a
+metric we already rejected — WWI adds no unique cycle information beyond existing
+cycle proxies.
+
+**Do NOT blend WWI into sfc_effective or use as a driver — display-only / context.**
+Engineering quality and methodological honesty are high; only predictive value is
+nil. Scripts (standalone, under /tmp): `wwi_test.py`, `wwi_wf.py`.
 
 
 
