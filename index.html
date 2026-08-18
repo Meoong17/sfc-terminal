@@ -1568,7 +1568,14 @@ html { scrollbar-color: rgba(120,100,255,0.45) transparent; scrollbar-width: thi
   flex-wrap: wrap;
   gap: 6px;
 }
+.footer-links { display: flex; gap: 12px; }
 .footer-copy { font-size: 9px; color: var(--text-3); white-space: nowrap; }
+.footer-link {
+  cursor: pointer;
+  transition: color 0.2s;
+  font-weight: 500;
+}
+.footer-link:hover { color: var(--text-2); }
 
 /* ══════════════════════════════════════════
    CALIBRATION NOTE
@@ -1828,6 +1835,21 @@ html { scrollbar-color: rgba(120,100,255,0.45) transparent; scrollbar-width: thi
     transition: opacity 0.4s;
   }
   .footer:hover::before { opacity: 1; }
+  .footer-link {
+    position: relative;
+    transition: color 0.25s var(--ease-out), transform 0.25s var(--ease-out);
+  }
+  .footer-link::after {
+    content: '';
+    position: absolute; left: 0; bottom: -2px;
+    height: 1.5px; width: 100%;
+    background: linear-gradient(90deg, var(--orange), var(--orange2));
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.3s var(--ease-out);
+  }
+  .footer-link:hover { color: var(--orange); transform: translateY(-1px); }
+  .footer-link:hover::after { transform: scaleX(1); }
 
   /* Soft entrance for panels (futuristic motion) */
   .tab-panel { animation: panelFloatIn 0.5s var(--ease-out); }
@@ -2543,6 +2565,7 @@ function render(d) {
     <div class="snav-item" data-tab="stress" onclick="switchTab('stress')"><span class="snav-ic"><svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg"><path stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" d="M1.5 8h2.5l1.5-4 2 8 1.5-4H13.5"/></svg></span>Stress Monitor</div>
     <div class="snav-item" data-tab="forecast" onclick="switchTab('forecast')"><span class="snav-ic"><svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg"><path stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" d="M1.5 11L5.5 6.5L8.5 9L13.5 3"/><path stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" d="M10 3h3.5v3.5"/></svg></span>Forecast</div>
     <div class="snav-item" data-tab="news" onclick="switchTab('news')"><span class="snav-ic"><svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg"><path stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" d="M2 3.5h8v9H2zM10 6h3v6.5h-3"/><path stroke="currentColor" stroke-width="1.3" stroke-linecap="round" d="M4 6h4M4 8h4M4 10h2"/></svg></span>News</div>
+    <div class="snav-item" data-tab="help" onclick="switchTab('help')"><span class="snav-ic"><svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg"><circle stroke="currentColor" stroke-width="1.3" cx="7.5" cy="7.5" r="6"/><path stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" d="M6 5.8a1.5 1.5 0 1 1 2.6 1.1c-.7.6-1.1 1-1.1 1.8M7.5 11h.01"/></svg></span>How to Read</div>
     <div class="snav-signal">
       <div class="snav-signal-label">SIGNAL</div>
       <span class="snav-signal-pill ${topPillClass}">${topPillText}</span>
@@ -4058,6 +4081,9 @@ function render(d) {
   <footer class="footer">
     <span>SFC Terminal v.4 &nbsp;·&nbsp; Quantitative Stress Intelligence &nbsp;·&nbsp; Bitcoin Asset Platform</span>
     <span class="footer-copy">© 2026 Meong</span>
+    <div class="footer-links">
+      <span class="footer-link" onclick="switchTab('help')">How to Read</span>
+    </div>
   </footer>
 
   </div><!-- /shell-main -->
