@@ -68,6 +68,8 @@ RSS_FEEDS = [
     {"url": "https://www.investing.com/rss/news_14.rss", "name": "Investing.com", "weight": 2.0, "factor": "Lt"},
     {"url": "https://www.ft.com/rss/home/uk", "name": "FT", "weight": 3.0, "factor": "Ft"},
     {"url": "https://feeds.marketwatch.com/marketwatch/topstories/", "name": "MarketWatch", "weight": 2.5, "factor": "Ft"},
+    {"url": "https://www.cnbc.com/id/100003114/device/rss/rss.html", "name": "CNBC", "weight": 3.0, "factor": "Ft"},
+    {"url": "https://www.federalreserve.gov/feeds/press_all.xml", "name": "Fed", "weight": 3.0, "factor": "Lt"},
     # === REDDIT (social sentiment) ===
     {"url": "https://www.reddit.com/r/Bitcoin/hot.rss?limit=10", "name": "r/Bitcoin", "weight": 1.5, "factor": "Rt"},
     {"url": "https://www.reddit.com/r/economics/hot.rss?limit=10", "name": "r/Economics", "weight": 2.0, "factor": "Lt"},
@@ -78,6 +80,8 @@ RSS_FEEDS = [
     {"url": "https://news.google.com/rss/search?q=federal+reserve+interest+rate&hl=en-US&gl=US&ceid=US:en", "name": "Google:Fed", "weight": 2.5, "factor": "Lt"},
     {"url": "https://news.google.com/rss/search?q=global+financial+crisis+bank+stress&hl=en-US&gl=US&ceid=US:en", "name": "Google:Crisis", "weight": 3.0, "factor": "Ft"},
     {"url": "https://news.google.com/rss/search?q=crypto+regulation+sec+etf&hl=en-US&gl=US&ceid=US:en", "name": "Google:Reg", "weight": 2.0, "factor": "Sc"},
+    {"url": "https://news.google.com/rss/search?q=US+Treasury+announcement&hl=en-US&gl=US&ceid=US:en", "name": "Google:UST", "weight": 2.5, "factor": "Lt"},
+    {"url": "https://news.google.com/rss/search?q=treasury+bond+market+liquidity&hl=en-US&gl=US&ceid=US:en", "name": "Google:Bond", "weight": 2.5, "factor": "Ft"},
 ]
 
 HEADERS = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 SFC-Terminal/7"}
