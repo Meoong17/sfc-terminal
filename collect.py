@@ -1733,9 +1733,12 @@ _MACRO_CACHE = {"score": None, "details": {}, "ts": 0}
 
 def calculate_m72_m2_growth(m2_yoy_input=None):
     """M72: Global M2 Growth — YoY % change in US M2 money supply.
-    
+
     Uses existing m2_yoy_input if provided, else fetches from FRED.
-    Higher M2 growth = more liquidity = bullish.
+    SCORE POLARITY: HIGH = MORE STRESS (0-1), consistent with M74/M75 and the
+    M1-M80 convention ("high composite = high macro stress = bearish"). So low
+    M2 growth / contraction (tight liquidity) maps HIGH; strong M2 growth
+    (accommodative) maps LOW.
     """
     # Prefer pre-fetched m2_yoy from get_m2_data() to avoid duplicate API call
     if m2_yoy_input is not None:
@@ -1747,8 +1750,9 @@ def calculate_m72_m2_growth(m2_yoy_input=None):
         m2_yoy_val = (m2[0] - m2[12]) / m2[12] * 100 if len(m2) >= 13 else None
         if m2_yoy_val is None and len(m2) >= 2:
             m2_yoy_val = (m2[0] - m2[-1]) / m2[-1] * 100
-    
-    # Score: M2 growth 2-7% = normal, <0% = contraction (bearish), >10% = overheating
+
+    # Raw liquidity score (HIGH = more liquidity = bullish), then invert.
+    # M2 growth 2-7% = normal, <0% = contraction (bearish), >10% = overheating
     if m2_yoy_val < 0:
         score = max(0.05, 0.3 + m2_yoy_val * 0.03)
     elif m2_yoy_val < 5:
@@ -1757,7 +1761,8 @@ def calculate_m72_m2_growth(m2_yoy_input=None):
         score = 0.7 + min(0.2, (m2_yoy_val - 5) * 0.04)
     else:
         score = 0.9  # overheating — potential tightening
-    
+    score = 1.0 - score  # invert to STRESS polarity: high growth = low stress
+
     detail = {
         "m2_yoy_pct": round(m2_yoy_val, 2),
         "m2_latest": round(m2[0], 0) if m2 else None,
@@ -1768,23 +1773,27 @@ def calculate_m72_m2_growth(m2_yoy_input=None):
 
 def calculate_m73_m2_momentum():
     """M73: M2 Momentum — 3-month growth minus 12-month growth.
-    
-    Positive = accelerating liquidity (bullish). Negative = decelerating (bearish).
+
+    SCORE POLARITY: HIGH = MORE STRESS (0-1), consistent with M74/M75 and the
+    M1-M80 convention. So accelerating liquidity (positive momentum) maps LOW;
+    decelerating / contracting liquidity maps HIGH.
     """
     m2 = _fred("M2SL", 13)
     if not m2 or len(m2) < 13:
         return None, {"m2_momentum": None, "status": "unavailable"}
-    
+
     growth_3m = (m2[0] - m2[3]) / m2[3] * 100
     growth_12m = (m2[0] - m2[12]) / m2[12] * 100
     momentum = growth_3m - growth_12m  # acceleration
-    
-    # Score: momentum > +1% = accelerating (bullish)
+
+    # Raw bullish score: momentum > +1% = accelerating (bullish), < 0 = bearish.
+    # Then invert to STRESS polarity: accelerating = low stress.
     # momentum 0 to +1% = steady
     # momentum < 0 = decelerating (bearish)
-    score = 1.0 / (1.0 + math.exp(-1.5 * (momentum - 0.3)))
+    raw = 1.0 / (1.0 + math.exp(-1.5 * (momentum - 0.3)))
+    score = 1.0 - raw  # invert: HIGH momentum = LOW stress
     score = max(0.05, min(0.95, score))
-    
+
     if momentum > 1:
         label = "ACCELERATING"
     elif momentum > 0:
@@ -1793,7 +1802,7 @@ def calculate_m73_m2_momentum():
         label = "DECELERATING"
     else:
         label = "CONTRACTING"
-    
+
     detail = {
         "m2_momentum": round(momentum, 3),
         "m2_growth_3m": round(growth_3m, 2),
