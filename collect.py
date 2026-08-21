@@ -246,6 +246,16 @@ except ImportError as e:
     def compute_trend_continuation(*a, **k): return {}, {"status": "unavailable", "available": False}
 
 
+# ── P4: Regime-Gated Momentum Overlay (institutional output) ──
+try:
+    from data_sources.momentum_overlay import compute_momentum_overlay
+    MOMENTUM_OVERLAY_AVAILABLE = True
+except ImportError as e:
+    MOMENTUM_OVERLAY_AVAILABLE = False
+    print(f"[SFC] Momentum overlay unavailable: {e}", file=sys.stderr)
+    def compute_momentum_overlay(*a, **k): return 50.0, {"status": "unavailable", "available": False}
+
+
 # Early init: M86 score starts at neutral (updated later by execution block if available)
 _m86_score = 0.5
 
@@ -4058,6 +4068,24 @@ except Exception as _tc_e:
     print(f"[P3 Continuation] Error: {_tc_e}", file=sys.stderr)
     _trend_cont_probs, _trend_cont_details = {}, {"error": str(_tc_e), "status": "fallback", "available": False}
 
+# ── P4: Regime-Gated Momentum Overlay — gate trend-strength momentum on the
+#       continuation regime bucket (display-only, not blended into scoring).
+_mo_score, _mo_details = 50.0, {"status": "unavailable", "available": False}
+try:
+    _mo_mom = (_trend_details.get("domain_values") or {}).get("momentum")
+    _mo_bucket = _trend_cont_details.get("bucket")
+    _mo_score, _mo_details = compute_momentum_overlay(
+        momentum_strength=_mo_mom,
+        bucket=_mo_bucket,
+        cont_probs=_trend_cont_probs,
+    )
+    print(f"[P4 MomentumOverlay] bucket={_mo_details.get('bucket')} "
+          f"action={_mo_details.get('regime_action')} score={_mo_score} "
+          f"bias={_mo_details.get('gated_bias')}", file=sys.stderr)
+except Exception as _mo_e:
+    print(f"[P4 MomentumOverlay] Error: {_mo_e}", file=sys.stderr)
+    _mo_score, _mo_details = 50.0, {"error": str(_mo_e), "status": "fallback", "available": False}
+
 # ── BTC price history seed for the dashboard line chart ──
 # The front-end BTC/USD price chart used to be fed ONLY by ephemeral live ticks
 # collected in the tab's sessionStorage, so it auto-scaled to a handful of points
@@ -4626,6 +4654,15 @@ out = {
     "cont_era_stable_30d": (_trend_cont_probs.get(30, {}) or {}).get("era_stable"),
     "cont_era_stable_90d": (_trend_cont_probs.get(90, {}) or {}).get("era_stable"),
     "cont_era_stable_180d": (_trend_cont_probs.get(180, {}) or {}).get("era_stable"),
+    # ── P4: Regime-Gated Momentum Overlay (display-only) ──
+    "mo_available": bool(_mo_details.get("available")),
+    "mo_score": _mo_score,
+    "mo_bias": _mo_details.get("gated_bias"),
+    "mo_regime_action": _mo_details.get("regime_action"),
+    "mo_bucket": _mo_details.get("bucket"),
+    "mo_confidence": _mo_details.get("confidence"),
+    "mo_action_reason": _mo_details.get("action_reason"),
+    "mo_caveat": _mo_details.get("caveat"),
 }
 
 # ── Circuit Breaker: validate output before writing ──

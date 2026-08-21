@@ -93,6 +93,18 @@ Each module is listed under the layer it conceptually belongs to. The
 | `onchain_fetch.py` | Whale/exchange flow aggregation. |
 | `check_cards.py` | Diagnostic script — reads `data.json`/`btc_ws.json` via hardcoded absolute path. |
 
+## 6.5 Display-only research outputs (institutional, NOT blended into scoring)
+
+These are cautious-rollout, display-only reads — they re-combine signals that already
+feed scoring (or read research caches) and are deliberately NOT folded back into
+`sfc_effective` / signal / `kelly_fraction`, to avoid double-counting the same signal.
+
+| File | data.json field(s) | Role |
+|---|---|---|
+| `data_sources/trend_strength.py` | `trend_strength_score`/`_label`/`_domains` | 0-100 Trend Strength Score = weighted blend of momentum (RSI/MACD/OBV), multi-TF alignment, and HMM structure. Default weights 0.40/0.35/0.25, missing domains redistributed. |
+| `data_sources/trend_continuation.py` | `cont_prob_*`, `cont_bucket`, `cont_era3_*`, `cont_era_stable_*` | Walk-forward-calibrated P(forward return>0) per signal bucket (CALM/ELEVATED/STRESS), with honest latest-era (era3) values + era-stability flags (avoids era1-inflated full-sample overclaim). |
+| `data_sources/momentum_overlay.py` (P4) | `mo_score`/`_bias`/`_regime_action`/`_bucket`/`_confidence` | **Regime-Gated Momentum Overlay.** Raw momentum has no reliable OOS edge (purged-CV rejected it, docs/feature_validation.md), but it is regime-CONDITIONAL. This re-combines `trend_strength.momentum` + `trend_continuation` buckets: it FOLLOWS momentum in regimes where era3 continuation holds (ELEVATED) and FADES it (contrarian) where era3 continuation fails/reverses (STRESS; CALM eroded at 30/90d). Action = margin-weighted vote of `(era3 p_cont - baseline)` across 30/90/180d, era-stability down-weights uncertain horizons. |
+
 ## 7. Trading
 
 | File | Role |
