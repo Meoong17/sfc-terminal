@@ -649,5 +649,114 @@ Engineering quality and methodological honesty are high; only predictive value i
 nil. Scripts (standalone, under /tmp): `wwi_test.py`, `wwi_wf.py`.
 
 
+## Behavioral Divergence (analysis/behavioral_divergence.py) — empirical validation (2026-08-21)
+
+**Status: PARTIALLY VALIDATED — a sign bug inverts the ETF-flow leg; SLI leg and
+full composite are NOT validatable with current data.** Scripts:
+`analysis/validate_behavioral_divergence.py` → `analysis/.validate_behavioral_divergence.json`.
+
+**Data-availability findings (investigated first, honest):**
+- The full 3-component composite (M81 ETF flow + Q10 whale pressure + SLI) has **no**
+  multi-month point-in-time history. `.behavioral_divergence_history.json` holds only **3
+  calendar days** (2026-08-19..21) — far too short for any 7d/30d forward-return check.
+- **SLI is NOT reconstructable** point-in-time (`.stablecoin_intel_cache.json` is a single
+  snapshot; `.stablecoin_cache.json` has only 3 sparse supply_history points).
+- **M81 and Q10 legs ARE reconstructable** and were validated on 670 daily rows
+  (2024-01-11 → 2026-08-20): M81 rebuilt from the 670-day `.etf_cache.json` net-flow
+  series via the exact `etf_flow.py` bucket logic; Q10 whale_pressure rebuilt from the
+  ~1357-day `.onchain_cache.json` series via the exact trailing-365d percentile scoring.
+- Therefore: **the SLI leg and the full composite remain UNVALIDATED.** Only the
+  M81 and M81+Q10 legs could be tested. Do not treat the composite as validated.
+
+**Critical sign bug (found during validation).** `behavioral_divergence.py` maps the ETF
+component as `etf_flow = (m81_etf_flow - 0.5) * 2`. But a HIGH m81 score means ETF
+**outflows / stress** (`etf_flow.py`: "0-1 where high = high stress (large outflows)").
+So the module-as-written **adds ETF outflows as if bullish**, inverting the ETF leg's
+polarity. Results below are therefore shown under BOTH mappings. As written, the module
+counts ETF outflows as bullish → the HIDDEN_ACCUMULATION / HIDDEN_DISTRIBUTION labels on
+the ETF leg are *opposite* to their economic meaning.
+
+**Forward-return results (M81+Q10 legs, threshold 0.15):**
+
+| Mapping | Regime | n | 7d mean | 7d med | 30d mean | 30d med |
+|---|---|---|---|---|---|---|
+| module-as-written | HIDDEN_ACCUMULATION | 10 | +0.19% | +2.80% | −2.88% | −3.39% |
+| module-as-written | HIDDEN_DISTRIBUTION | 139 | +0.73% | +0.28% | +4.46% | +1.51% |
+| economically-corrected | HIDDEN_ACCUMULATION | 43 | +0.07% | +1.68% | +2.41% | −2.06% |
+| economically-corrected | HIDDEN_DISTRIBUTION | 48 | −0.58% | +0.02% | −3.99% | −2.58% |
+| baseline (all days) | — | 661/644 | +0.48% | +0.40% | +2.34% | +1.39% |
+
+Interpretation:
+- **Module-as-written is inverted on the ETF leg**: its "HIDDEN_ACCUMULATION" (which the
+  code computes when price is down + m81 high = *outflows*) precedes **lower** 30d returns
+  (−2.88%) than baseline (+2.34%), and its "HIDDEN_DISTRIBUTION" precedes **higher** 30d
+  returns (+4.46%). This is the *opposite* of the intended regime semantics and consistent
+  with the sign inversion.
+- **Economically-corrected sign** (inflows = bullish): HIDDEN_DISTRIBUTION shows a real
+  **downside** 30d edge (−3.99% mean / −2.58% median vs baseline +2.34%/+1.39%), and 7d
+  mean (−0.58%) below baseline (+0.48%). HIDDEN_ACCUMULATION shows essentially **no
+  upside edge** (30d mean +2.41% ≈ baseline; 30d median −2.06% is *below* baseline).
+
+**Threshold sensitivity (economically-corrected, M81+Q10 legs):** raising the threshold
+0.05→0.20 reduces ACC n 107→15 and DIS n 128→32 while the DIS downside edge strengthens
+(30d mean −0.08% at 0.10 → −5.03% at 0.20); ACC stays near baseline/no edge throughout.
+There is **no threshold in 0.05–0.30 that gives HIDDEN_ACCUMULATION a robust positive
+edge**, so the hard-coded `0.15` is not validated as producing a profitable accumulation
+call. The distribution leg does separate better at higher thresholds but sample sizes
+shrink quickly.
+
+**Verdict:** the `0.15` threshold is **not validated**. The sign bug should be fixed
+(`etf_flow` should be `(0.5 - m81) * 2` to make inflows bullish) before any use. Even
+corrected, only the *distribution* leg shows forward edge; *accumulation* does not. And
+because SLI history does not exist, the true 3-component composite has never been tested.
+
+**FIX APPLIED (2026-08-21).** The sign bug above has been corrected in
+`analysis/behavioral_divergence.py`: the ETF component now maps `(0.5 - m81) * 2`
+(inflow = +bullish), with a note in the code, the arg docstring, and the HONEST CAVEATS.
+Self-tests updated to the corrected polarity and passing. The module remains DISPLAY-ONLY
+(not blended into scoring). Operational caveat that stands regardless of the fix: the
+distribution leg has a real 30d downside edge but the accumulation leg has no robust
+upside edge, and the full 3-component composite is still UNVALIDATED (no SLI history).
+Recommend: (1) fix the sign; (2) accumulate `.behavioral_divergence_history.json` for
+≥90 days as the tracker docstring already intends; (3) treat the module strictly as
+display-only until a full-composite forward-return backtest is possible.
+
+
+## Liquidity Momentum (analysis/liquidity_momentum.py) — empirical validation (2026-08-21)
+
+**Status: NOT VALIDATED — GLF history is too short for any robust test; if anything the
+tiny sample hints the OPPOSITE sign.** Script:
+`analysis/validate_liquidity_momentum.py` → `analysis/.validate_liquidity_momentum.json`.
+
+**Data-availability findings (honest):**
+- GLF daily history is only **55 days** (2026-06-28 → 2026-08-21, `.liq_momentum_cache.json`).
+- LM (30-day GLF change) is therefore computable for only **21 days**; **forward 30d BTC
+  returns are available for ZERO of them** (history too recent), and forward 7d returns for
+  only **18**.
+- A longer GLF series was NOT fabricated: reconstructing GLF from the raw macro components
+  in `data/merged/sfc_research_daily.json` was attempted and **REJECTED** (correlation only
+  ~0.29 vs the real 55-day GLF, variance ~6× too small — it omits live DXY / China M2 that
+  the real engine fetches). Using it would have fabricated a series.
+- **This sample is far too small for any statistically meaningful conclusion.**
+
+**Indicative (NOT significant) numbers, forward 7d only:**
+- LM vs 7d forward-return Pearson = **−0.434** (n=18) — the *opposite* sign of the hypothesis.
+- LM positive (n=4): 7d mean +0.32%. LM negative (n=14): 7d mean +2.08%. So **negative LM
+  was associated with HIGHER subsequent 7d returns** in this window, not lower.
+- Bucket means (7d): `1<lm≤3`(adj −0.02) +0.32% (n=4); `−3<lm≤−1`(adj +0.03) −0.19% (n=8);
+  `−10<lm≤−3`(adj +0.08) **+5.10%** (n=6). The most-stressed bucket had the *highest* returns.
+- `lm>3` and `lm≤−10` buckets had **zero** observations; the neutral `−1<lm≤1` bucket also
+  had zero — i.e. the middle of the cutoff ladder is never hit in this 55-day window.
+
+**Verdict:** the LM sign hypothesis and the hard-coded bucket cutoffs are **not supported
+by the available data**, and with n=18/7d and n=0/30d no statistical claim can be made in
+either direction. The cutoffs (3/1/−1/−3/−10) are arbitrary and, in the only window we can
+look at, mis-order realized returns (most-stressed bucket → highest forward return). Do not
+treat LM stress adjustments as predictive. To validate properly: accumulate ≥6 months of
+GLF daily history (≥180d) so that both LM (30d change) and 30d forward BTC returns exist
+for a meaningful set of days, then re-run `analysis/validate_liquidity_momentum.py`.
+
+
+
 
 

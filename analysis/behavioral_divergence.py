@@ -34,6 +34,14 @@ HONEST CAVEATS:
       guess, NOT validated against historical outcomes — same caveat as
       every other new threshold introduced in this project without a
       dedicated backtest. Treat the exact cutoff as provisional.
+    - Empirical validation (2026-08-21, analysis/validate_behavioral_divergence.py,
+      see docs/PROJECT_STATUS.md): the ETF-flow leg was INVERTED (outflows
+      counted as bullish) until a sign-fix; after the correction, HIDDEN_
+      DISTRIBUTION shows a real 30d downside edge but HIDDEN_ACCUMULATION shows
+      NO robust upside edge, and no threshold in 0.05-0.30 yields a profitable
+      accumulation call. The full 3-component composite is not yet validatable
+      (no multi-month point-in-time SLI history). Treat the regime labels as
+      exploratory/display-only, not tradeable signals.
     - When M81 (ETF flow) is in its fallback/unavailable state (score
       exactly 0.5, m81_detail is null), it is EXCLUDED from the
       weighted average rather than contributing a fake "neutral 0"
@@ -53,7 +61,10 @@ def compute_behavioral_divergence(m81_etf_flow=None, m81_available=False,
     """
     Args:
         m81_etf_flow: 0-1 scale ETF flow score from data.json's
-            m81_etf_flow field (0.5 = neutral/fallback)
+            m81_etf_flow field (0.5 = neutral/fallback). NOTE: m81 is a
+            STRESS-oriented score — HIGH (0.85) = heavy ETF OUTFLOWS, LOW
+            (0.15) = heavy INFLOWS. This module inverts it so inflow = +bullish
+            (see the sign-fix note in compute_behavioral_divergence).
         m81_available: whether M81 has REAL data this cycle (not the
             0.5 fallback) — pass (m81_detail is not None) from collect.py
         q10_whale_pressure: 0-100 scale from data.json's q10_whale_pressure
@@ -69,8 +80,19 @@ def compute_behavioral_divergence(m81_etf_flow=None, m81_available=False,
     """
     components = {}
 
+    # etf_flow component polarity (SIGN-FIX 2026-08-21, found via
+    # analysis/validate_behavioral_divergence.py):
+    #   m81_etf_flow is a STRESS-oriented score: HIGH (0.85) = heavy ETF
+    #   OUTFLOWS, LOW (0.15) = heavy INFLOWS (see etf_flow.py compute_etf_metrics,
+    #   "0-1 where high = high stress (large outflows)"). So the bullish/bearish
+    #   flow component must INVERT it: inflow (low m81) -> +bullish, outflow
+    #   (high m81) -> -bearish. The previous `(m81 - 0.5)*2` had it backwards,
+    #   counting ETF OUTFLOWS as bullish — which empirically made the HIDDEN_
+    #   ACCUMULATION/DISTRIBUTION labels economically inverted (see PROJECT_STATUS
+    #   'Behavioral Divergence — empirical validation'). The correction uses
+    #   `(0.5 - m81) * 2`.
     if m81_available and m81_etf_flow is not None:
-        components["etf_flow"] = (m81_etf_flow - 0.5) * 2  # -> [-1, +1]
+        components["etf_flow"] = (0.5 - m81_etf_flow) * 2  # -> [-1, +1], inflow=+bullish
 
     if q10_whale_pressure is not None:
         components["whale_pressure"] = (q10_whale_pressure - 50) / 50  # -> [-1, +1]
@@ -120,7 +142,7 @@ if __name__ == "__main__":
 
     print("--- Test 1: HIDDEN_ACCUMULATION (price down, flow bullish) ---")
     score, detail = compute_behavioral_divergence(
-        m81_etf_flow=0.8, m81_available=True,
+        m81_etf_flow=0.2, m81_available=True,  # 0.2 = ETF INFLOW = bullish (post sign-fix)
         q10_whale_pressure=75, sli_score=70,
         btc_24h=-3.5,
     )
@@ -131,7 +153,7 @@ if __name__ == "__main__":
 
     print("--- Test 2: HIDDEN_DISTRIBUTION (price up, flow bearish) ---")
     score, detail = compute_behavioral_divergence(
-        m81_etf_flow=0.2, m81_available=True,
+        m81_etf_flow=0.8, m81_available=True,  # 0.8 = ETF OUTFLOW = bearish (post sign-fix)
         q10_whale_pressure=25, sli_score=30,
         btc_24h=2.8,
     )
