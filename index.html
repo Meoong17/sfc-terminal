@@ -684,6 +684,21 @@ html { scrollbar-color: rgba(120,100,255,0.45) transparent; scrollbar-width: thi
   margin-top: 6px;
   text-align: center;
 }
+.adv-toggle {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--border-1);
+  border-radius: 6px;
+  color: var(--text-2);
+  font-size: 9px;
+  font-weight: 600;
+  padding: 4px 10px;
+  cursor: pointer;
+  width: 100%;
+  margin: 4px 0;
+  text-align: center;
+}
+.adv-toggle:hover { color: var(--text-1); border-color: var(--text-3); }
+.adv-collapse { border-top: 1px solid var(--border-1); margin-top: 8px; padding-top: 6px; }
 .kpi-badge {
   display: inline-block;
   padding: 2px 7px;
@@ -1974,6 +1989,16 @@ function verdictConf(c){
   if (c >= 0.6) return 'High conviction \u2014 signal can be trusted.';
   if (c >= 0.3) return 'Moderate \u2014 treat the signal with some caution.';
   return 'Low \u2014 treat the signal with extra caution.';
+}
+// Progressive disclosure for the Advanced ML card (2026-08, display-only).
+// State persisted in sessionStorage so an SSE re-render doesn't reset it.
+let advMlOpen = sessionStorage.getItem('sfc_adv_ml') === '1';
+function toggleAdv(btn){
+  advMlOpen = !advMlOpen;
+  sessionStorage.setItem('sfc_adv_ml', advMlOpen ? '1' : '0');
+  const body = document.getElementById('advMlBody');
+  if(body) body.style.display = advMlOpen ? 'block' : 'none';
+  btn.textContent = advMlOpen ? 'Hide advanced details \u25B4' : 'Show advanced details \u25BE';
 }
 let currentData = null;
 let factorChart = null;
@@ -3309,6 +3334,7 @@ function render(d) {
           <div class="info-row"><span class="info-k">ES 95%</span><span class="info-v" style="color:var(--red)">${d.m11_detail?.es_95!=null?(d.m11_detail.es_95*100).toFixed(2)+'%':'—'}</span></div>
           <div class="info-row"><span class="info-k">Jump Risk</span><span class="info-v">${d.m12_detail?.jump_risk!=null?(d.m12_detail.jump_risk*100).toFixed(2)+'%':'—'}</span></div>
           <div class="info-row"><span class="info-k">OBI</span><span class="info-v" style="color:${(d.m20_detail?.obi||0)<-0.3?'var(--red)':(d.m20_detail?.obi||0)>0.3?'var(--green)':'var(--text-1)'}">${d.m20_detail?.obi!=null?fmtNum(d.m20_detail.obi,4):'—'}</span></div>
+          <div style="font-size:8px;color:var(--text-4);margin-top:6px;line-height:1.5">VaR 95% = worst expected loss (95% confidence). ES 95% = average loss beyond that (tail risk). OBI &lt;0 = sell pressure, &gt;0 = buy pressure. Jump Risk = chance of a sudden price gap. GARCH = statistical volatility model.</div>
         </div>
       </div>
 
@@ -3324,6 +3350,7 @@ function render(d) {
           <div class="info-row"><span class="info-k">Debt/GDP</span><span class="info-v" style="color:${(d.m29_detail?.debt_gdp_ratio||0)>1.2?'var(--red)':'var(--text-1)'}">${d.m29_detail?.debt_gdp_ratio!=null?fmtNum(d.m29_detail.debt_gdp_ratio,3):'—'}</span></div>
           <div class="info-row"><span class="info-k">Altman-Z</span><span class="info-v" style="color:${(d.m31_detail?.z_score||0)>4?'var(--green)':'var(--amber)'}">${d.m31_detail?.z_score!=null?fmtNum(d.m31_detail.z_score,2):'—'}</span></div>
           <div class="info-row"><span class="info-k">Reddit</span><span class="info-v">${d.adv_reddit_label||'NEUTRAL'}</span></div>
+          <div style="font-size:8px;color:var(--text-4);margin-top:6px;line-height:1.5">Minsky Stage = where the market sits in the leverage cycle. Loss Aversion = how reluctant holders are to sell at a loss. Altman-Z &gt;4 = financially safe. Debt/GDP &gt;1.2 = high government debt.</div>
         </div>
       </div>
 
@@ -3348,6 +3375,8 @@ function render(d) {
               ${d.shock_event?`<div class="sec-event-text">${d.shock_event}</div>`:''}
             </div>
           ` : ''}
+          <button type="button" class="adv-toggle" onclick="toggleAdv(this)">${advMlOpen?'Hide advanced details \u25B4':'Show advanced details \u25BE'}</button>
+          <div id="advMlBody" class="adv-collapse" style="display:${advMlOpen?'block':'none'}">
           <!-- HMM Regime -->
           <div class="info-row"><span class="info-k">HMM Regime</span><span class="info-v" style="color:${d.hmm_regime==='CRISIS'?'var(--red)':d.hmm_regime==='BEAR'?'var(--amber)':d.hmm_regime==='BULL'?'var(--green)':'var(--text-1)'}">${d.hmm_regime||'—'} ${d.hmm_crisis_prob!=null?'('+fmtNum(d.hmm_crisis_prob*100,0)+'%)':''}</span></div>
           <!-- XGBoost Meta -->
@@ -3362,6 +3391,7 @@ function render(d) {
           <div class="info-row"><span class="info-k">Mamba SSM</span><span class="info-v" style="color:var(--text-3)">DISABLED</span></div>
           <!-- EWMA -->
           <div class="info-row"><span class="info-k">EWMA Online</span><span class="info-v" style="color:${d.ewma_corrected?'var(--green)':'var(--text-3)'}">${d.ewma_corrected?'✓ Active':'—'}</span></div>
+          </div><!-- /advMlBody -->
           <div style="border-top:1px solid var(--border-1);margin:8px 0;padding-top:6px"></div>
           <div class="info-row"><span class="info-k info-tip" tabindex="0" data-tip="Estimated probability of a leveraged liquidation cascade &mdash; a chain reaction where forced selling triggers more forced selling. Above 50% signals elevated systemic risk.">Cascade Risk<span class="info-tip-icon">i</span></span><span class="info-v" style="color:${(d.cascade_risk||0)>0.5?'var(--red)':(d.cascade_risk||0)>0.25?'var(--amber)':'var(--green)'}">${fmtNum((d.cascade_risk||0)*100,0)}%</span></div>
           <div class="info-row"><span class="info-k">Transition Risk</span><span class="info-v" style="color:${(d.transition_risk||0)>0.5?'var(--red)':(d.transition_risk||0)>0.25?'var(--amber)':'var(--green)'}">${fmtNum((d.transition_risk||0)*100,0)}%</span></div>
