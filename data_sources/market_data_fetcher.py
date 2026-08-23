@@ -8,7 +8,8 @@ conditions instead of the hardcoded _default_simulated_data() fallback.
 
 Sources:
     ETH  — Binance REST API (no key required, same exchange as binance_ws.py)
-    Gold — GoldAPI.io (key required: GOLDAPI_KEY)
+    Gold — Binance PAXGUSDT daily klines (no key required; PAX Gold tracks
+           spot XAU 1:1), falls back to Twelve Data XAU/USD (TWELVEDATA_KEY)
     SPX  — Twelve Data (key required: TWELVEDATA_KEY), falls back to
            Alpha Vantage (key required: ALPHAVANTAGE_KEY) if Twelve Data
            fails or is rate-limited
@@ -111,39 +112,60 @@ def fetch_eth_data():
 
 def fetch_gold_data():
     """
-    Gold spot price history from GoldAPI.io.
-    Requires GOLDAPI_KEY env var. Free tier typically only exposes the
-    current spot price (not historical series), so this builds a rolling
-    window from repeated calls over time via an on-disk cache rather than
-    one historical API call — see _rolling_gold_cache below.
+    Gold spot price history, no key required.
+
+    Primary: Binance PAXGUSDT daily klines (PAX Gold is a 1:1 gold-backed
+    token, so its price tracks spot XAU closely; public endpoint, same
+    pattern as fetch_eth_data). Fallback: Twelve Data XAU/USD spot when a
+    TWELVEDATA_KEY is present. The historical free tier only exposes the
+    current spot price, so this builds a rolling window from repeated calls
+    over time via an on-disk cache rather than one historical API call —
+    see _rolling_gold_cache below.
     """
     cached = _cached("gold")
     if cached is not None:
         return cached
 
-    key = os.getenv("GOLDAPI_KEY", "")
-    if not key:
-        return None
-
+    # Primary: Binance PAXGUSDT daily klines (no key).
     try:
         r = requests.get(
-            "https://www.goldapi.io/api/XAU/USD",
-            headers={"x-access-token": key, "Content-Type": "application/json"},
+            "https://api.binance.com/api/v3/klines",
+            params={"symbol": "PAXGUSDT", "interval": "1d", "limit": 10},
             timeout=10,
         )
         r.raise_for_status()
-        data = r.json()
-        price = data.get("price")
-        if price is None:
-            return None
-
-        closes = _update_rolling_series("gold", price)
+        klines = r.json()
+        closes = [float(k[4]) for k in klines]
         result = _compute_rvm(closes)
-        _set_cache("gold", result)
-        return result
+        if result is not None:
+            _set_cache("gold", result)
+            return result
+    except (requests.RequestException, ValueError, KeyError, IndexError) as e:
+        print(f"[MarketData] Gold PAXG fetch failed: {e}", file=__import__("sys").stderr)
+
+    # Fallback: Twelve Data XAU/USD spot (if key present).
+    try:
+        td_key = os.getenv("TWELVEDATA_KEY", "")
+        if td_key:
+            r = requests.get(
+                "https://api.twelvedata.com/price",
+                params={"symbol": "XAU/USD", "apikey": td_key},
+                timeout=10,
+            )
+            r.raise_for_status()
+            data = r.json()
+            price = data.get("price")
+            if price is not None:
+                closes = _update_rolling_series("gold", float(price))
+                result = _compute_rvm(closes)
+                if result is not None:
+                    _set_cache("gold", result)
+                    return result
     except (requests.RequestException, ValueError, KeyError) as e:
-        print(f"[MarketData] Gold fetch failed: {e}", file=__import__("sys").stderr)
-        return None
+        print(f"[MarketData] Gold TwelveData fetch failed: {e}", file=__import__("sys").stderr)
+
+    return None
+
 
 
 def fetch_spx_data():

@@ -32,7 +32,6 @@ ENV_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__
 # yang sudah terisi di .env TIDAK akan tertimpa. (Key yang pernah ter-expose
 # tetap idealnya di-rotate — lihat README/security docs.)
 NEW_KEYS = {
-    "GOLDAPI_KEY": "",
     "TWELVEDATA_KEY": "",
     "ALPHAVANTAGE_KEY": "",
 }
@@ -90,7 +89,7 @@ def main():
     for k in missing_keys:
         print(f"   {k}")
 
-    # Kalau key sudah ADA sebagai baris kosong (mis. "GOLDAPI_KEY="), isi
+    # Kalau key sudah ADA sebagai baris kosong (mis. "TWELVEDATA_KEY="), isi
     # nilainya di tempat itu juga, jangan duplikat baris baru.
     new_lines = []
     handled = set()
@@ -114,10 +113,9 @@ def main():
         # its own comment line, rather than filtering the full template
         # (filtering left orphaned comment lines for keys handled in-place
         # above — confirmed by test: "# GoldAPI.io..." comment appeared
-        # with no GOLDAPI_KEY line under it when that key was already
+        # with no GOLD key line under it when that key was already
         # filled in-place higher up in the file).
         comments = {
-            "GOLDAPI_KEY": "# GoldAPI.io — spot gold price (XAU/USD)",
             "TWELVEDATA_KEY": "# Twelve Data — SPX (S&P 500) daily time series (primary source)",
             "ALPHAVANTAGE_KEY": "# Alpha Vantage — SPX/SPY fallback if Twelve Data fails or hits rate limit",
         }
