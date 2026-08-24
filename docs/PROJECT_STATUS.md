@@ -285,6 +285,32 @@ ETF flow sebagai driver prediktif; M81/M82 tetap indikator kontemporer/display. 
 hanya spot ETF (2024+), n bulanan kecil, tidak mencakup seluruh institutional flow
 (derivatif/OTC/futures basis).
 
+## ETF Demand-Quality / "Same Price Different Flow" (2026-08-24) — DQS & komposit DITOLAK blend
+`analysis/validate_etf_demand_quality.py` (new) — menguji klaim artikel Behavioral Flow Engine:
+ETF spot demand + spot-CVD (Demand Quality, "same price different flow") punya informasi OOS
+ttg forward return BTC. Data: `.etf_cache.json` 671 flow 2024-01-11..2026-08-21, harga
+`binance_vision_daily.json`, spot-CVD `binance_orderflow_daily.json`. Battery = quantile
+top/bottom-20% gap + bootstrap P(sign) + IC + era-split(3 blok) + purged-CV/embargo (LogReg
+single-feature, 5-fold). Sinyal: etf_flow_1d, etf_net_5d, etf_net_10d, dq_comp_5d = z(etf5)+z(taker_imb).
+
+**FULL-sample optimistis (MENYESATKAN, pola lama):** etf_net_5d@7d gap +2.87pp P=0.999, IC=0.095;
+etf_net_10d@7d gap +4.17pp P=1.0 IC=0.122 — terlihat kuat.
+
+**ERA-SPLIT membalikkan:** era2 (2024-11..2025-09) selalu negatif (etf_net_5d@7d −1.17pp P=0.14);
+di 30d era2 & era3 NEGATIF (etf_net_10d@30d era3 −8.33pp P=0.001 IC=−0.208; dq_comp_5d@30d
+era3 −8.32pp P=0.003 IC=−0.127) — TANDA TOTAL BALIK di era terbaru.
+
+**PURGED-CV GAGAL di semua kasus:** pooled AUC ≤0.56, mean−1.96SE <0.5 semuanya (best 0.502
+etf_flow_1d@30d; dq_comp_5d@30d 0.462; etf_net_5d@7d 0.444). IC-screen optimistis → purged-CV
+membalikkan → TIDAK ada skill OOS.
+
+**VERDICT:** ETF demand-quality DITOLAK blend (NOT_BLEND) — mengonfirmasi dari arah berbeda
+temuan 2026-08-14 (institutional_flow_incremental.py: TIDAK ada power incremental pasca VIX+M2).
+Full-sample di-drive era1 (bull 2024), FLIP di era2/era3, purged-CV overturn. ETF flow tetap
+indikator kontemporer/display (M81/M82) BUKAN driver prediktif. Skor PPS/FFS/RS berbasis
+magnitude-liquidation TIDAK bisa divalidasi historis (OKX liq tanpa history API, OI ~2021+) —
+laporkan data-too-short, jangan paksa verdict.
+
 ## Model D' (ΔRealYield/ΔDXY/ΔM2) + expanding OOS (2026-08-14) — VIX TIDAK survive
 `analysis/model_Dprime_oos.py` (new) — tes wajib terakhir sebelum mengunci Model D sbg
 baseline: Model D' = BTC ~ const + CPI/PPI/PCE_surp + ΔRealYield + ΔDXY + ΔM2 + VIX
