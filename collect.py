@@ -726,7 +726,55 @@ def get_dom():
     except:
         return None
 
+def _get_dvol_okx():
+    """Fallback BTC implied-vol: ATM IV from OKX BTC-USD options (free, no key).
+    Picks the expiry nearest 30 days and averages near-the-money (|distance|<=0.05)
+    mid implied vol. Returns percent-scale number (≈ DVOL) or None."""
+    try:
+        r = requests.get(
+            "https://www.okx.com/api/v5/public/opt-summary?instFamily=BTC-USD",
+            timeout=10, headers={"User-Agent": "Mozilla/5.0"},
+        )
+        recs = r.json().get("data", [])
+        now = datetime.now(timezone.utc)
+        rows = []
+        for it in recs:
+            parts = it.get("instId", "").split("-")
+            if len(parts) < 5:
+                continue
+            try:
+                exp = datetime.strptime("20" + parts[2], "%Y%m%d").replace(tzinfo=timezone.utc)
+            except Exception:
+                continue
+            days = (exp - now).days
+            if days < 0:
+                continue
+            try:
+                distance = float(it.get("distance", 9))
+                mid = (float(it.get("askVol")) + float(it.get("bidVol"))) / 2
+            except (TypeError, ValueError):
+                continue
+            rows.append((days, distance, mid))
+        if not rows:
+            return None
+        target = min({x[0] for x in rows}, key=lambda d: abs(d - 30))
+        atm = [x[2] for x in rows if x[0] == target and abs(x[1]) <= 0.05]
+        if not atm:
+            atm = [x[2] for x in rows if x[0] == target]
+        if not atm:
+            return None
+        iv = float(np.mean(atm)) * 100.0
+        print(f"[SFC] DVOL via OKX fallback (ATM IV, {target}d): {iv:.2f}%", file=sys.stderr)
+        return round(iv, 2)
+    except Exception as e:
+        print(f"[SFC] WARNING: get_dvol OKX fallback failed ({type(e).__name__}: {e}).",
+              file=sys.stderr)
+        return None
+
+
 def get_dvol():
+    """BTC implied-vol (DVOL). Primary: Deribit index; fallback: OKX ATM IV.
+    Returns None only if BOTH sources fail (then _factors_dvol rolling avg applies)."""
     try:
         r = requests.get("https://www.deribit.com/api/v2/public/get_index_price?index_name=btcdvol_usdc", timeout=10)
         data = r.json()
@@ -734,15 +782,16 @@ def get_dvol():
         if dvol is not None:
             return round(dvol, 2)
         print(f"[SFC] WARNING: Deribit DVOL response had no index_price "
-              f"(response: {str(data)[:200]}). Dashboard will fall back to "
-              f"30-day rolling average via _factors_dvol.", file=sys.stderr)
-        return None
+              f"(response: {str(data)[:200]}). Trying OKX fallback...", file=sys.stderr)
     except Exception as e:
         print(f"[SFC] WARNING: get_dvol() failed ({type(e).__name__}: {e}). "
-              f"Dashboard will fall back to 30-day rolling average via "
-              f"_factors_dvol — check Deribit API status / network egress "
-              f"if this persists.", file=sys.stderr)
-        return None
+              f"Trying OKX fallback...", file=sys.stderr)
+    okx = _get_dvol_okx()
+    if okx is not None:
+        return okx
+    print("[SFC] WARNING: DVOL fallback sources exhausted (Deribit + OKX). "
+          "Dashboard will use 30-day rolling average via _factors_dvol.", file=sys.stderr)
+    return None
 
 def get_m2_data():
     key = os.getenv("FRED_API_KEY", "")
