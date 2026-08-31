@@ -361,6 +361,8 @@ export default {
         zone: data.zone ?? null,
         dvol: data.dvol ?? null,
         fng: data.fng ?? null,
+        behavior_state: data.behavior_state ?? null,
+        behavior_state_available: data.behavior_state_available ?? false,
       };
       return new Response(JSON.stringify(out), { status: 200, headers });
     }
