@@ -336,6 +336,35 @@ export default {
       return response;
     }
 
+    // /live.json — lightweight public endpoint for TradingView request.http().
+    // Returns ONLY the SFC composite values (not the full data.json), built
+    // from the origin's /data.json so no origin change is needed. Public
+    // read-only, so we set Access-Control-Allow-Origin: * unconditionally —
+    // TradingView's request.http() rejects endpoints without it.
+    if (path === '/live.json') {
+      const headers = {
+        'Content-Type': 'application/json; charset=utf-8',
+        'Cache-Control': 'no-cache',
+        'Access-Control-Allow-Origin': '*',
+      };
+      const resp = await fetchAny(env, '/data.json', 'application/json');
+      if (!resp) {
+        return new Response(JSON.stringify({ error: 'unreachable' }), { status: 200, headers });
+      }
+      let data = {};
+      try { data = await resp.json(); } catch (_) {}
+      const out = {
+        ts: data.ts ?? null,
+        sfc_effective: data.sfc_effective ?? null,
+        sfc_base: data.sfc_base ?? null,
+        news_stress: data.news_stress ?? null,
+        zone: data.zone ?? null,
+        dvol: data.dvol ?? null,
+        fng: data.fng ?? null,
+      };
+      return new Response(JSON.stringify(out), { status: 200, headers });
+    }
+
     // /data.json — SFC live data (passthrough, no gzip — saves Worker CPU)
     if (path === '/data.json') {
       const resp = await fetchAny(env, '/data.json', 'application/json');
