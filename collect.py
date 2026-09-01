@@ -4135,6 +4135,37 @@ except Exception as _mo_e:
     print(f"[P4 MomentumOverlay] Error: {_mo_e}", file=sys.stderr)
     _mo_score, _mo_details = 50.0, {"error": str(_mo_e), "status": "fallback", "available": False}
 
+# ── P5: BitMEX funding regime — display-only CONFIRMATION layer ──
+#   Research (2026-09, funding_regime_analysis.py): BitMEX XBTUSD funding 2016+
+#   is an era-STABLE bull/bear discriminator (corr bull +0.16/+0.41/+0.26) and a
+#   valid stress read (turns negative in crises), but REDUNDANT with price/vol
+#   (adds Δ≈0 AUC). => surface as context/confirmation, NOT a scoring input.
+_funding_display = {"available": False, "latest": None, "z": None,
+                    "regime": None, "bull_confirm": None, "caveat": None}
+try:
+    _fund_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "bitmex_funding_daily.json")
+    if os.path.exists(_fund_path):
+        _fd = json.load(open(_fund_path))
+        _fd_days = sorted(_fd)
+        if _fd_days:
+            _fz_hist = [float(_fd[d].get("funding_mean")) for d in _fd_days[-366:] if _fd[d].get("funding_mean") is not None]
+            if len(_fz_hist) >= 90:
+                _latest = _fz_hist[-1]
+                _mean, _sd = float(np.mean(_fz_hist)), float(np.std(_fz_hist))
+                _z = (_latest - _mean) / _sd if _sd > 0 else 0.0
+                _regime = "long-crowding" if _z > 1.0 else ("short-crowding" if _z < -1.0 else "neutral")
+                # era-stable bull confirmation: positive funding (contango) confirms bull
+                _bull_confirm = "bull" if _latest > 0 and _z > 0.3 else ("bear/stress" if _latest < 0 and _z < -0.3 else "mixed")
+                _funding_display = {"available": True, "latest": round(_latest, 6), "z": round(_z, 2),
+                                    "regime": _regime, "bull_confirm": _bull_confirm,
+                                    "caveat": "era-stable read; redundant with price/vol (confirmation only, not scoring)"}
+                print(f"[P5 Funding] latest={_latest:.6f} z={_z:+.2f} regime={_regime} confirm={_bull_confirm}", file=sys.stderr)
+            else:
+                _funding_display["caveat"] = f"insufficient history ({len(_fz_hist)}d)"
+except Exception as _fund_e:
+    print(f"[P5 Funding] Error: {_fund_e}", file=sys.stderr)
+    _funding_display = {"available": False, "error": str(_fund_e), "caveat": "compute error"}
+
 # ── BTC price history seed for the dashboard line chart ──
 # The front-end BTC/USD price chart used to be fed ONLY by ephemeral live ticks
 # collected in the tab's sessionStorage, so it auto-scaled to a handful of points
@@ -4712,6 +4743,13 @@ out = {
     "mo_confidence": _mo_details.get("confidence"),
     "mo_action_reason": _mo_details.get("action_reason"),
     "mo_caveat": _mo_details.get("caveat"),
+    # ── P5: BitMEX funding regime (display-only confirmation layer) ──
+    "funding_available": bool(_funding_display.get("available")),
+    "funding_latest": _funding_display.get("latest"),
+    "funding_z": _funding_display.get("z"),
+    "funding_regime": _funding_display.get("regime"),
+    "funding_bull_confirm": _funding_display.get("bull_confirm"),
+    "funding_caveat": _funding_display.get("caveat"),
 }
 
 # ── Circuit Breaker: validate output before writing ──
