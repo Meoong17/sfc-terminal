@@ -30,21 +30,36 @@ Definitif **TIDAK**, pada frekuensi monthly yang dipakai SLR.md:
 Konsisten dengan temuan lama repo: GLF→BTC juga TIDAK punya edge monthly
 (causal battery, BF≈0.003). SLR bukan pengecualian.
 
-## Namun: sinyal pendek (event-driven) ADA
-- Weekly lagged OLS: SLR_Liquidity signifikan di lag 1-2 minggu (p≈0.003 / 0.016),
-  **dan bertahan setelah kontrol GLF** (p≈0.003 / 0.016). Lenyap di lag ≥4 mgg.
-- Test #2 (policy attribution, event study): POS events → +10/+12/+18% return fwd
-  7/14/30d; NEG events → +3%/-0.9%/-5.0%. Arah sesuai hipotesis (Pos>Neutral>Neg),
-  tapi n sangat kecil (5-6 vs 4) — hipotesis, bukan kesimpulan.
+## Namun: sinyal pendek (event-driven) ADA — TAPI itu ILUSI (momentum)
+Weekly lagged OLS awalnya menunjukkan SLR_Liquidity signifikan di lag 1-2 minggu
+(p≈0.003/0.016) bahkan setelah kontrol GLF. Tapi DEKOMPOSISI komponen (lag-2, dengan
+kontrol GLF) membuktikan sinyal itu BUKAN mekanisme SLR:
+- **M91 (sovereign duration stress): coef=-0.031, p=0.20 → TIDAK signifikan, tanda NEGATIF.**
+  Komponen inti SLR tidak punya edge, dan arahnya malah berlawanan tesis.
+- **TC (market response = momentum BTC): coef=+0.081, p=0.0000 → paling dominan.**
+  korelasi SLR~TC = 0.61 → SLR_Liquidity signifikan (p=0.016) hanya karena menyerap
+  komponen momentum BTC. Ini sirkuler (BTC yang sudah naik cenderung terus naik).
+- M92 (policy): coef=+0.359, p=0.038, tapi ~86% hari netral — didorong segelintir
+  hari event.
 
-## Verdict (per gating rule SLR.md)
-Test #1 GAGAL pada frekuensi yang ditentukan → **JANGAN blend SLR ke composite SFC**.
-Sesuai prinsip repo (Pitfall 18 walk-forward-validation: tahu kapan berhenti build).
-Nilai SLR adalah sebagai sinyal EVENT/SHORT-HORIZON, bukan prediktor macro monthly;
-untuk itu butuh event registry yang dikurasi lebih besar + sample daily — effort
-terpisah, bukan alasan untuk wiring SLR sekarang.
+## Event study daily (analysis/slr_event_study_daily.py)
+- 92 event sovereign-duration-stress terdeteksi objektif (M91 z>=1.5).
+- Forward return BTC setelah stress (30d +3.8%) **tidak lebih tinggi dari baseline
+  random-date placebo (+6.4%)** — justru lebih rendah. Mekanisme "stress→likuiditas→BTC
+  naik" TIDAK didukung di level agregat.
+- Split kebijakan (Test #2) **tidak teruji**: registry 10 event tidak sejajar trigger
+  M91 → 0 event positif, 3 negatif yang kena. n terlalu kecil.
+
+## Verdict (per gating rule SLR.md + prinsip repo)
+Test #1 GAGAL (monthly) + event study daily tidak mendukung + dekomposisi membuktikan
+"sinyal short-horizon" hanyalah momentum BTC yang tertanam di komponen TC, BUKAN
+mekanisme sovereign-stress (M91 n.s. & wrong-sign). **SLR DITOLAK sebagai sinyal
+independen — JANGAN blend ke composite SFC.** Ini pola narasi→uji→tolak yang sama
+dengan China M2/JPY carry/HY/momentum/Alphractal/WWI/Kronos. Momentum sendiri sudah
+pernah DITOLAK repo via purged-CV (AUC<0.5). Berhenti membangun (Pitfall 18).
 
 ## Aset
 - `analysis/slr_engine.py` — rekonstruksi (reusable, point-in-time, no scoring impact)
-- `analysis/slr_test1_incremental.py` — test suite (walk-forward, BIC, weekly OLS, purged-CV, event study)
-- `.slr_series.json`, `.slr_test1.json` — hasil (gitignored runtime cache)
+- `analysis/slr_test1_incremental.py` — test suite monthly (walk-forward, BIC, weekly OLS, purged-CV, event study)
+- `analysis/slr_event_study_daily.py` — event study daily (Test #2 attribution + Test #3 placebo) + dekomposisi komponen
+- `.slr_series.json`, `.slr_test1.json`, `.slr_event_study.json` — hasil (gitignored runtime cache)
