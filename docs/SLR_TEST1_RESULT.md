@@ -44,9 +44,12 @@ kontrol GLF) membuktikan sinyal itu BUKAN mekanisme SLR:
 
 ## Event study daily (analysis/slr_event_study_daily.py)
 - 92 event sovereign-duration-stress terdeteksi objektif (M91 z>=1.5).
-- Forward return BTC setelah stress (30d +3.8%) **tidak lebih tinggi dari baseline
-  random-date placebo (+6.4%)** — justru lebih rendah. Mekanisme "stress→likuiditas→BTC
-  naik" TIDAK didukung di level agregat.
+- **Stress events TIDAK menambah apa-apa di atas base rate (netral, bukan aktif buruk):**
+  mean unconditional 30d forward return = +6.30%, stress-event = +3.81% (CI [-0.10,+7.84]
+  mencakup base rate). Bootstrap diff (stress − unconditional) di SEMUA horizon (1/3/7/14/30d)
+  n.s. — 30d = -2.50pp, CI [-6.44,+1.65] memuat nol. Placebo random-date (+6.4%) cocok dengan
+  mean unconditional → estimasi base rate yang tak bias. Hint lemah arah negatif (semua diff
+  negatif) tapi tak signifikan.
 - Split kebijakan (Test #2) **tidak teruji**: registry 10 event tidak sejajar trigger
   M91 → 0 event positif, 3 negatif yang kena. n terlalu kecil.
 
