@@ -22,8 +22,10 @@ DATA = REPO / "data"
 OIF = DATA / "binance_oi_daily.json"
 OPTF = DATA / "deribit_options_daily.json"
 CMF = DATA / "coinmetrics_btc_daily.json"
+OKXF = DATA / "okx_oi_daily.json"
 UA = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) SFC/1.0"}
 T = 30
+ONCHAIN_METRICS = "AdrActCnt,CapMVRVCur,TxCnt,SplyCur,AdrBalCnt,HashRate"
 
 def load(path):
     if path.exists():
@@ -102,20 +104,37 @@ def collect_options(out):
         return False
 
 def collect_onchain(out):
-    """CoinMetrics community active addresses (backfill ~400d + today)."""
+    """CoinMetrics community on-chain behaviour (active addr, MVRV, tx, supply,
+    addr-with-balance, hashrate) — free tier; backfill ~400d + append."""
     try:
         d = fetch("https://community-api.coinmetrics.io/v4/timeseries/asset-metrics",
-                  {"assets": "btc", "metrics": "AdrActCnt",
+                  {"assets": "btc", "metrics": ONCHAIN_METRICS,
                    "frequency": "1d", "page_size": 10000,
                    "start_time": time.strftime("%Y-%m-%d", time.localtime(time.time() - 400 * 86400))})
         n = 0
         for row in d.get("data", []):
-            out[row["time"][:10]] = {"AdrActCnt": float(row["AdrActCnt"])}
+            rec = {k: (float(v) if v not in (None, "") else None)
+                   for k, v in row.items() if k not in ("time", "asset")}
+            out[row["time"][:10]] = rec
             n += 1
-        print(f"[ONC] rows={n} total_days={len(out)} last={sorted(out)[-1]}")
+        print(f"[ONC] metrics={ONCHAIN_METRICS} rows={n} total_days={len(out)} last={sorted(out)[-1]}")
         return True
     except Exception as e:
         print(f"[ONC] ERR {type(e).__name__}: {str(e)[:120]}")
+        return False
+
+def collect_oi_okx(out):
+    """OKX BTC-SWAP open interest snapshot (second exchange, append daily)."""
+    try:
+        d = fetch("https://www.okx.com/api/v5/public/open-interest",
+                  {"instType": "SWAP", "instId": "BTC-USDT-SWAP"})
+        row = d.get("data", [])[0]
+        today = time.strftime("%Y-%m-%d")
+        out[today] = {"oi_btc": float(row["oiCcy"]), "oi_usd": float(row["oiUsd"])}
+        print(f"[OKX] today OI={out[today]['oi_btc']:.0f} BTC ({out[today]['oi_usd']/1e9:.2f}B usd)")
+        return True
+    except Exception as e:
+        print(f"[OKX] ERR {type(e).__name__}: {str(e)[:120]}")
         return False
 
 def main():
@@ -128,6 +147,9 @@ def main():
     cm = load(CMF)
     if collect_onchain(cm):
         save(CMF, cm)
+    ok = load(OKXF)
+    if collect_oi_okx(ok):
+        save(OKXF, ok)
     print("done")
 
 if __name__ == "__main__":
