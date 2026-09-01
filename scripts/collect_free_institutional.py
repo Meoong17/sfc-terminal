@@ -23,6 +23,7 @@ OIF = DATA / "binance_oi_daily.json"
 OPTF = DATA / "deribit_options_daily.json"
 CMF = DATA / "coinmetrics_btc_daily.json"
 OKXF = DATA / "okx_oi_daily.json"
+FUNDF = DATA / "bitmex_funding_daily.json"
 UA = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) SFC/1.0"}
 T = 30
 ONCHAIN_METRICS = "AdrActCnt,CapMVRVCur,TxCnt,SplyCur,AdrBalCnt,HashRate"
@@ -123,6 +124,45 @@ def collect_onchain(out):
         print(f"[ONC] ERR {type(e).__name__}: {str(e)[:120]}")
         return False
 
+def collect_funding(out):
+    """BitMEX XBTUSD funding history 2016+ (8h events -> daily mean). Free public API."""
+    out.clear()  # full deterministic backfill — recompute fresh each run (idempotent)
+    try:
+        n = 0
+        start = 0
+        count = 500
+        while True:
+            rows = fetch("https://www.bitmex.com/api/v1/funding",
+                         {"symbol": "XBTUSD", "count": count,
+                          "start": start, "startTime": "2016-05-01T00:00:00.000Z"})
+            if not rows:
+                break
+            new = 0
+            for r in rows:
+                ts = r["timestamp"][:10]
+                rate = r.get("fundingRate")
+                if rate is None:
+                    continue
+                d = out.setdefault(ts, {"n": 0, "sum": 0.0, "min": None, "max": None})
+                d["n"] += 1
+                d["sum"] += float(rate)
+                d["min"] = float(rate) if d["min"] is None else min(d["min"], float(rate))
+                d["max"] = float(rate) if d["max"] is None else max(d["max"], float(rate))
+                new += 1
+            n += new
+            if new < count:
+                break
+            start += count
+            time.sleep(0.4)
+        for d, rec in out.items():
+            rec["funding_mean"] = rec["sum"] / rec["n"] if rec["n"] else None
+        print(f"[FND] BitMEX funding 2016+ rows={n} days={len(out)} "
+              f"{min(out) if out else '-'} .. {max(out) if out else '-'}")
+        return True
+    except Exception as e:
+        print(f"[FND] ERR {type(e).__name__}: {str(e)[:120]}")
+        return False
+
 def collect_oi_okx(out):
     """OKX BTC-SWAP open interest snapshot (second exchange, append daily)."""
     try:
@@ -150,6 +190,9 @@ def main():
     ok = load(OKXF)
     if collect_oi_okx(ok):
         save(OKXF, ok)
+    fnd = load(FUNDF)
+    if collect_funding(fnd):
+        save(FUNDF, fnd)
     print("done")
 
 if __name__ == "__main__":
