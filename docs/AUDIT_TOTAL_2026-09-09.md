@@ -160,3 +160,21 @@ P3 (UX/teks): selaraskan determine_state dgn zone/signal_decision pakai mult (A-
    asli data macet sejak 2026-09-03. cached_at DIKEMBALIKAN ke state lama (Sep-04) supaya staleness
    tetap terlihat & modul terus retry, bukan menutupi data 4 hari dengan cap 'fresh'. m81/m82
    display-only -> tak kena skor. Perlu workaround scraping/alternatif sumber + flag staleness.
+
+
+---
+
+## Lampiran — Metode: scan konstansi lintas waktu (40 commit data.json, 2026-09-09)
+Melengkapi subagent metode yang timeout. 66 field metode/score disampling; klasifikasi per nilai unik:
+- 15 CONSTANT (tak pernah berubah -> NOL daya seleksi lintas waktu): m8_yield, m14_skew,
+  m15_concentration, m17_granger, m19_mutual_info, m23_liquidity, m24_cape, m28_summers,
+  m29_debt, m30_rajan, m31_altman, m32_proadapt_weight, m33_glo_score, m69_btc_systemic_risk,
+  m74_fed_balance.
+- 17 NEAR-CONST (<=3 nilai unik): m10,m11,m12,m16,m18,m21,m22,m25,m26,m3,m7,m71,m73,m80,m82,m84,m86.
+- 34 LIVE. Inti m1m6 yg benar2 variatif: m1_klr(10 unik), m2_logit(31), m4_ewc(34; std 14.5 =
+  PALING volatil dr core), m5_qreg(30), m6_regime(5). sfc_base/effective 100% live.
+Arti: dari ~40 kartu metode yg "aktif", ~15 konstan (dead-display, tak diskriminatif) & inti
+penyumbang skor yg variatif terbatas ke m1/m2/m4/m5. Konsisten dgn audit 2026-08 (~22/48 konstan).
+m4_ewc std 14.5 (tertinggi) menguatkan temuan M4 abs() sbg penyumbang dominan/volatil di core.
+Tindakan: konstanta display bisa dipertahankan utk konteks, TAPI jangan dianggap 'aktif' dgn
+bobot seleksi. Perubahan M4 abs() = scoring-affecting -> keputusan + walk-forward (belum dieksekusi).
