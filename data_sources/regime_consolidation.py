@@ -28,6 +28,14 @@ CONSENSUS RULE (defensible, not arbitrary):
         adv regime  : BULL=20, SIDEWAYS=25, BEAR=60, CRISIS=85,
                       NORMAL=20, STRESS=55, CAPITULATION=85
 
+    Participation of each source is OPTIONAL at the call site (a source is only
+    included if its arg is passed). SFC's live wiring (collect.py) deliberately
+    excludes adv_regime from the consensus — the adv detector is fit on ~5 days of
+    data with no walk-forward, so its label is treated as noise/display-only and
+    emitted as its own field. behavior_state is likewise a display-only overlay
+    that the SCORING driver excludes; only the display (late) consolidation merges
+    it back. This module just implements the rule; inclusion is the caller's call.
+
     SIDEWAYS = 25 (NOT 45): a sideways state is neutral/non-trending, not
     stress. Rating it 45 (ELEVATED bucket) made a single neutral HMM source
     veto an otherwise bullish majority and overstate risk even when
@@ -192,9 +200,11 @@ def consolidate_regime(regime=None, regime_prob=None, hmm_regime=None,
 
 
 if __name__ == "__main__":
-    # Self-test with the live-observed contradiction (regime=STRESS, hmm=SIDEWAYS,
-    # adv=CRISIS, behavior=EXPANSION) plus calm and crisis cases. Note: adv now
-    # uses the 4-regime space (CRISIS=85), so it participates in the consensus.
+    # Self-test of the module's rule (source participation is opt-in at the call
+    # site, so these cases exercise the full source space INCLUDING adv/behavior).
+    # Note: SFC's live collect.py call excludes adv_regime and the behavior
+    # scoring-driver call excludes behavior_state — that is a wiring choice, not
+    # enforced here.
     import sys
     live = dict(regime="STRESS", regime_prob=0.434, hmm_regime="SIDEWAYS",
                 hmm_crisis_prob=0.05, adv_regime="CRISIS", adv_crisis_prob=0.2,

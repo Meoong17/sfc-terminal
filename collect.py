@@ -4440,6 +4440,10 @@ out = {
     "ml_accuracy": ml_metrics.get("accuracy"),
     "ml_total_labeled": ml_metrics.get("total", 0),
     "ml_correct": ml_metrics.get("correct", 0),
+    # Class-balance honesty (2026-09-09 audit): a bare ml_accuracy=1.0 with zero
+    # stress events in the labeled window is a calm-majority artifact, not skill.
+    "ml_accuracy_reliable": bool(ml_metrics.get("accuracy_reliable")),
+    "ml_stress_events": ml_metrics.get("stress_events", 0),
     # Blend info
     "m1_m6_weight_pct": round(p1 * 100, 1) if causal_filter else 85.0,
     "m7_m19_weight_pct": round(p2 * 100, 1) if causal_filter else (10.0 if new_active > 0 else 0.0),
@@ -4784,6 +4788,18 @@ if CB_AVAILABLE and _CIRCUIT_BREAKER is not None:
             out = _CB_OUT
     except Exception as _cb_e:
         print(f"[CB] Validation error: {_cb_e}", file=sys.stderr)
+
+# Emit LIVE circuit-breaker state (post-validate). The cb_* fields were built
+# into `out` above from get_stats() BEFORE validate() ran, so they reflected the
+# pre-run (disk-loaded) counter, not this run's outcome. Refresh them here so
+# data.json cb_tripped/cb_failures/cb_total_failures are current (2026-09-09
+# audit: cb_failures was a frozen constant because of this ordering + the
+# never-firing persistence gate).
+if CB_AVAILABLE and _CIRCUIT_BREAKER is not None:
+    _cb_stats = _CIRCUIT_BREAKER.get_stats()
+    out["cb_tripped"] = _cb_stats.get("tripped", False)
+    out["cb_failures"] = _cb_stats.get("consecutive_failures", 0)
+    out["cb_total_failures"] = _cb_stats.get("total_failures", 0)
 
 print(json.dumps(out, indent=2))
 btc_str = f"${btc:,.0f}" if btc is not None else "N/A"

@@ -87,8 +87,22 @@ def log_cycle(effective_sfc, composite_confidence, regime, method_scores):
         if len(log) > MAX_RETAINED_POINTS:
             log = log[-MAX_RETAINED_POINTS:]
 
-        with open(LOG_FILE, "w") as f:
-            json.dump(log, f)
+        # Atomic write (tmp + os.replace) so a crash mid-write can never truncate
+        # the history into an unparseable file again (2026-09-09 audit: a non-atomic
+        # "w" write left .probabilistic_head_history.json truncated at EOF, breaking
+        # reads on every live cycle for ~a month).
+        import tempfile as _tf
+        _fd, _tmp = _tf.mkstemp(dir=os.path.dirname(LOG_FILE), prefix=".prob_head_tmp_")
+        try:
+            with os.fdopen(_fd, "w") as _f:
+                json.dump(log, _f)
+            os.replace(_tmp, LOG_FILE)
+        except BaseException:
+            try:
+                os.unlink(_tmp)
+            except OSError:
+                pass
+            raise
     except Exception as e:
         print(f"[ProbHeadTracker] Logging failed (non-fatal): {e}", file=sys.stderr)
 

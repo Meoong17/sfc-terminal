@@ -307,6 +307,12 @@ class CircuitBreaker:
                         f"CIRCUIT BREAKER TRIPPED after {self._consecutive_failures} "
                         f"consecutive failures. Output purged."
                     )
+                # Persist the trip/failure counter NOW — a fresh CircuitBreaker is
+                # instantiated every collect run, so if we don't save here the
+                # trip state dies with this process and never reaches the next run
+                # (2026-09-09 audit: this early return skipped _save_state entirely,
+                # freezing disk state at Aug 7 and leaving purge to restore nothing).
+                self._save_state()
                 return {}, False, warnings
         else:
             self._consecutive_failures = 0
@@ -332,9 +338,14 @@ class CircuitBreaker:
                 warnings.append(f"Circuit breaker still active ({remaining}s remaining).")
                 return {}, False, warnings
 
-        # Persist state every 10 valid runs
-        if self._total_valid % 10 == 0 or self._tripped:
-            self._save_state()
+        # Persist state after EVERY validate() call (valid, warning-level, or
+        # cooldown-return). 2026-09-09 audit: the old gate `total_valid % 10 == 0`
+        # never fired because collect.py instantiates a fresh CircuitBreaker per
+        # run and validate() runs once, so total_valid only ever went 0 -> 1 each
+        # process and the disk state froze (last_valid={}, cb_failures=4 constant
+        # since Aug 7). Saving every 5-min run is cheap and makes last-known-good
+        # actually persist so a purge can restore it.
+        self._save_state()
 
         return cleaned, all_ok, warnings
 
