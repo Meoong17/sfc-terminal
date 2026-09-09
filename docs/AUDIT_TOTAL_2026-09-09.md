@@ -178,3 +178,26 @@ penyumbang skor yg variatif terbatas ke m1/m2/m4/m5. Konsisten dgn audit 2026-08
 m4_ewc std 14.5 (tertinggi) menguatkan temuan M4 abs() sbg penyumbang dominan/volatil di core.
 Tindakan: konstanta display bisa dipertahankan utk konteks, TAPI jangan dianggap 'aktif' dgn
 bobot seleksi. Perubahan M4 abs() = scoring-affecting -> keputusan + walk-forward (belum dieksekusi).
+
+
+---
+
+## M4 Option-B — penilaian dampak (2026-09-09; replay historis TIDAK valid)
+Percobaan replay era-split Opsi B (p_ewc_B = sum w_ad*max(-factor,0)/3) atas snapshot data.json
+GAGAL validasi: rekonstruksi ensemble 6-metode (p_ens = .19 p_klr+.16 p_logit+.12 p_bayes+.16 p_ewc
++.23 p_quantile+.14 p_regime) meleset rata2 14.8pp dari sfc_base tersimpan — sfc_base bukan sekadar
+6 metode (ada causal-weight lintas grup m1m6/m7-19/m20-31 + perubahan komposisi lintas versi kode),
+dan faktor tersimpan tak selaras dgn m4 yang dipakai tiap versi. Jadi era-split historis yang adil
+perlu harness replay berkode-konsisten, bukan artifact lama. Tidak dijadikan dasar keputusan.
+
+Yang sah secara analitik (tanpa replay):
+- p_ewc_B <= p_ewc_A SELALU (B buang sisi positif/calm). Opsi B hanya bisa MENURUNKAN m4, tak pernah menaikkan.
+- Efek dibatasi: bobot p_ewc di ensemble m1m6 cuma 0.16. Kasus ekstrem euforia (semua faktor positif besar)
+  -> diff p_ewc maks ~0.33 -> shift ensemble <= ~5.3pp. Di hari live saat ini m4_A p_ewc 0.336 vs B 0.186
+  -> shift -2.4pp. Pada hari stress sejati (faktor negatif) B≈A -> TIDAK menumpulkan sinyal krisis.
+- Artinya Opsi B memangkas "stress palsu" saat euforia/calm (batch kecil), TIDAK menyentuh sisi krisis.
+  Efek pada sfc_base terencer lagi oleh bobot grup. Gap stress->return inti (sudah era-stable walk-forward)
+  praktis tak berubah karena hari stress asli tak tersentuh.
+Keputusan tetap milik user: A (pertahankan, |deviasi|=instabilitas) vs B (konsisten sisi-stress). Opsi B
+bukan bug urgen (efek terbatas & hanya sisi calm). Bila mau B: implementasi + walk-forward/era-split dgn
+harness replay kode-konsisten sblm deploy.
