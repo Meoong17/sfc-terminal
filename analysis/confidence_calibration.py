@@ -294,16 +294,65 @@ def _compute_ece_model_only(curve: List[Dict]) -> float:
 # ════════════════════════════════════════════════════════════════
 
 
+def _interp_monotone(x: float, kx: List[float], ky: List[float]) -> float:
+    """Interpolasi linear pada knot monoton (tanpa dependency numpy)."""
+    if not kx or len(kx) != len(ky):
+        return x
+    if x <= kx[0]:
+        return ky[0]
+    if x >= kx[-1]:
+        return ky[-1]
+    for i in range(len(kx) - 1):
+        if kx[i] <= x <= kx[i + 1]:
+            span = kx[i + 1] - kx[i]
+            t = (x - kx[i]) / span if span > 1e-12 else 0.0
+            return ky[i] + t * (ky[i + 1] - ky[i])
+    return ky[-1]
+
+
 def recalibrate(raw_confidence: float, state: Optional[Dict] = None) -> float:
     """Map raw confidence to calibrated confidence.
 
-    Uses linear interpolation between calibration points.
-    Falls back to raw confidence if no calibration data.
+    Prioritas (2026-09):
+      1. Peta ISOTONIC (PAV) — dipakai HANYA bila `accepted: true`, yaitu lolos
+         gate OOS: ECE **dan** Brier membaik di data uji, dan peta monoton.
+         Dibangun oleh analysis/calibration_isotonic.py.
+      2. Fallback: peta bin-based legacy (mapping_points) — non-monoton, hanya
+         sebagai back-compat bila belum ada peta isotonic yang lolos gate.
+      3. Fallback terakhir: kembalikan raw confidence.
     """
     if state is None:
         state = _load_state()
         if not state:
             return raw_confidence
+
+    # 1. Peta kalibrasi BARU (analysis/calibration_isotonic.py) — dipakai HANYA
+    #    bila `accepted: true` (lolos gate OOS: ECE **dan** Brier membaik di
+    #    hold-out). Bentuk primer: beta calibration (monoton terjamin untuk n kecil).
+    cmap = state.get("calibration_map")
+    # `monotone_verified` wajib True: peta non-monoton dilarang dipakai (cacat yang
+    # ditemukan pada state 2026-08-12). Default True hanya untuk back-compat state lama.
+    if cmap and cmap.get("accepted") and cmap.get("monotone_verified", True):
+        p = cmap.get("params_beta")
+        if p:
+            eps = 1e-6
+            s = min(max(float(raw_confidence), eps), 1 - eps)
+            z = (p.get("a", 1.0) * math.log(s) + p.get("b", 0.0) * math.log(1 - s)
+                 + p.get("c", 0.0))
+            z = max(-30.0, min(30.0, z))
+            return round(max(0.0, min(1.0, 1.0 / (1.0 + math.exp(-z)))), 3)
+        if cmap.get("knots_x") and cmap.get("knots_y"):
+            v = _interp_monotone(float(raw_confidence),
+                                 [float(v) for v in cmap["knots_x"]],
+                                 [float(v) for v in cmap["knots_y"]])
+            return round(max(0.0, min(1.0, v)), 3)
+
+    # 2. Peta isotonic lama (bila pernah disimpan terpisah)
+    isot = state.get("isotonic")
+    if isot and isot.get("accepted") and isot.get("knots_x") and isot.get("knots_y"):
+        v = _interp_monotone(float(raw_confidence), [float(v) for v in isot["knots_x"]],
+                             [float(v) for v in isot["knots_y"]])
+        return round(max(0.0, min(1.0, v)), 3)
 
     mapping = state.get("mapping_points", {})
     if not mapping:
@@ -346,6 +395,15 @@ def get_calibration_info() -> Dict[str, Any]:
         "curve_points": len(state.get("calibration_curve", [])),
         "total_snapshots": state.get("total_snapshots"),
         "price_outcome_weight": state.get("price_outcome_weight"),
+        "isotonic_active": bool((state.get("isotonic") or {}).get("accepted")),
+        "isotonic_fitted_at": (state.get("isotonic") or {}).get("fitted_at"),
+        "isotonic_metrics": (state.get("isotonic") or {}).get("metrics"),
+        # Peta kalibrasi aktif (analysis/calibration_isotonic.py)
+        "calibration_map_active": bool((state.get("calibration_map") or {}).get("accepted")),
+        "calibration_map_method": (state.get("calibration_map") or {}).get("chosen_method"),
+        "calibration_map_fitted_at": (state.get("calibration_map") or {}).get("fitted_at"),
+        "calibration_map_monotone": (state.get("calibration_map") or {}).get("monotone_verified"),
+        "calibration_map_metrics": (state.get("calibration_map") or {}).get("metrics"),
     }
 
 
