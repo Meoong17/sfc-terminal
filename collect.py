@@ -2803,6 +2803,19 @@ adv_uncertainty = {}
 adv_alt = {}
 adv_regime_boost = 0
 regime_detector = None
+# Reliability flag detektor regime k-means+Markov (lihat guard di bawah)
+adv_regime_reliable = False
+adv_regime_fit_rows = 0
+adv_regime_note = "not evaluated"
+
+# Ambang minimum riwayat harian sebelum label regime k-means+Markov diterbitkan.
+# RASIONAL (2026-09, diverifikasi dari sumber): data_collection_daily.json berisi
+# ~38 baris (≈1.3 bulan), sehingga centroid k-means dan matriks transisi Markov
+# diestimasi dari ~7 transisi (baris nyata: 0 / 0.286 / 0.571 / 0.143 = 2,4,1
+# kejadian) — label yang dihasilkan derau dan bertabrakan dengan HMM/regime
+# utama (CRISIS vs BULL). Di bawah ambang ini label TIDAK diterbitkan (None +
+# alasan), bukan dipublikasikan seolah fakta.
+_ADV_MIN_FIT_ROWS = 250   # ≈1 tahun observasi harian
 
 if ADVANCED_AVAILABLE is None or ADVANCED_AVAILABLE:
     # Lazy import on first use
@@ -2818,9 +2831,12 @@ if ADVANCED_AVAILABLE is None or ADVANCED_AVAILABLE:
                 with open(_regime_cache_path) as _rcf:
                     _rc = json.load(_rcf)
                 _cache_age = time.time() - _rc.get("_ts", 0)
-                if _cache_age < 21600:  # 6 hours
+                # Cache pra-guard menyimpan label non-reliabel → wajib diabaikan.
+                if _cache_age < 21600 and _rc.get("regime_reliable") is True:
                     adv_regime = _rc.get("regime_status", {})
                     adv_regime_boost = _rc.get("regime_boost", 0)
+                    adv_regime_reliable = True
+                    adv_regime_fit_rows = int(_rc.get("regime_fit_rows", 0))
                     _regime_needs_refit = False
                     print(f"  [Advanced] Regime from cache: {adv_regime.get('regime','?')} "
                           f"(age={_cache_age/3600:.1f}h boost=+{adv_regime_boost})", file=sys.stderr)
@@ -2860,7 +2876,8 @@ if ADVANCED_AVAILABLE is None or ADVANCED_AVAILABLE:
                 except:
                     all_feats = [list(feat_dict.values())] * 30
                 
-                if len(all_feats) >= 20:
+                adv_regime_fit_rows = len(all_feats)
+                if len(all_feats) >= _ADV_MIN_FIT_ROWS:
                     # Fit regime detector
                     regime_detector = RegimeDetector_(n_regimes=4)
                     regime_detector.fit(np.array(all_feats))
@@ -2878,13 +2895,27 @@ if ADVANCED_AVAILABLE is None or ADVANCED_AVAILABLE:
                                 "_ts": time.time(),
                                 "regime_status": adv_regime,
                                 "regime_boost": adv_regime_boost,
+                                "regime_reliable": adv_regime_reliable,
+                                "regime_fit_rows": adv_regime_fit_rows,
                             }, _rcf)
                     except Exception:
                         pass
                     
+                    adv_regime_reliable = True
+                    adv_regime_note = None
                     print(f"  [Advanced] Regime: {adv_regime.get('regime','?')} | "
                           f"Crisis prob: {adv_regime.get('crisis_probability',0):.0%} | "
-                          f"Boost: +{regime_boost}", file=sys.stderr)
+                          f"Boost: +{regime_boost} | fit_rows={adv_regime_fit_rows}",
+                          file=sys.stderr)
+                else:
+                    # Riwayat harian belum cukup → JANGAN terbitkan label regime.
+                    adv_regime = {}
+                    adv_regime_boost = 0
+                    adv_regime_reliable = False
+                    adv_regime_note = (f"insufficient daily history for k-means+Markov "
+                                       f"regime ({adv_regime_fit_rows} rows < "
+                                       f"{_ADV_MIN_FIT_ROWS}); label/probabilities not published")
+                    print(f"  [Advanced] Regime SKIPPED — {adv_regime_note}", file=sys.stderr)
         except Exception as e:
             print(f"[Advanced] Regime detection error: {e}", file=sys.stderr)
             adv_regime = {'regime': 'NORMAL', 'crisis_probability': 0.0, 'stability': 0.9}
@@ -4516,10 +4547,20 @@ out = {
     "ewma_corrected": bool(True) if '_ewma' in dir() else False,
     "ewma_available": bool(_get_adv_online() is not None),
     # Advanced modules: Regime Detection (P2), Uncertainty (P4), Alt Data (P6)
-    "adv_regime": adv_regime.get('regime', 'NORMAL') if adv_regime else 'NORMAL',
-    "adv_crisis_prob": round(adv_regime.get('crisis_probability', 0), 3) if adv_regime else 0,
-    "adv_regime_stability": round(adv_regime.get('stability', 0.9), 3) if adv_regime else 0.9,
+    # Detektor regime k-means+Markov: terbitkan label/probabilitas HANYA bila lolos
+    # guard riwayat minimum; jika tidak → None + alasan (jangan tampilkan label
+    # yang tak punya dasar statistik). Lihat _ADV_MIN_FIT_ROWS di atas.
+    "adv_regime": (adv_regime.get('regime') if (adv_regime_reliable and adv_regime) else None),
+    "adv_crisis_prob": (round(adv_regime.get('crisis_probability', 0), 3)
+                        if (adv_regime_reliable and adv_regime) else None),
+    "adv_regime_stability": (round(adv_regime.get('stability', 0.0), 3)
+                             if (adv_regime_reliable and adv_regime) else None),
+    "adv_regime_exit_prob": (round(adv_regime.get('exit_probability', 0.0), 3)
+                             if (adv_regime_reliable and adv_regime) else None),
     "adv_regime_boost": adv_regime_boost,
+    "adv_regime_reliable": bool(adv_regime_reliable),
+    "adv_regime_fit_rows": int(adv_regime_fit_rows),
+    "adv_regime_note": adv_regime_note,
     "adv_uncertainty": round(adv_uncertainty.get('uncertainty', 0), 3) if adv_uncertainty else None,
     "adv_confidence": adv_uncertainty.get('recommended_action', 'UNKNOWN') if adv_uncertainty else 'UNKNOWN',
     "adv_trends_recession": round(adv_alt.get('trends_recession', 0.5), 3) if adv_alt else None,

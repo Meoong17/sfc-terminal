@@ -48,6 +48,7 @@ class RegimeDetector:
         """
         features = np.asarray(features, dtype=float)
         n = len(features)
+        self.n_fit_obs = int(n)          # dicatat untuk audit reliabilitas
         if n < self.n_regimes * 5:
             return self
         
@@ -132,7 +133,13 @@ class RegimeDetector:
             for i in range(self.n_regimes):
                 raw_target = int(self.state_order[i]) if self.state_order is not None else i
                 trans_probs[self.regime_labels[i]] = float(self.transmat[raw_current, raw_target])
-            stability = 1.0 - trans_probs.get(rlabel[0] if isinstance(rlabel, list) else rlabel, 0.0)
+            # FIX (2026-09): `stability` = peluang TETAP di regime sekarang,
+            # yaitu trans_probs[label_sekarang]. Sebelumnya ditulis
+            # `1 - trans_probs[label]` = peluang MENINGGALKAN regime, lalu
+            # dilaporkan sebagai "stability" → angka terbalik (kasus nyata:
+            # stability 0.857 padahal peluang bertahan hanya 0.143).
+            current_label = rlabel[0] if isinstance(rlabel, list) else rlabel
+            stability = float(trans_probs.get(current_label, 0.0))
             crisis_idx = self.regime_labels.index('CRISIS')
             crisis_prob = float(trans_probs.get('CRISIS', 0.0))
         else:
@@ -144,8 +151,10 @@ class RegimeDetector:
             'regime_id': int(regime_id),
             'regime': rlabel[0] if isinstance(rlabel, list) else rlabel,
             'stability': round(stability, 3),
+            'exit_probability': round(max(0.0, 1.0 - stability), 3),
             'crisis_probability': round(crisis_prob, 3),
             'transition_probabilities': trans_probs,
+            'n_fit_obs': int(getattr(self, 'n_fit_obs', 0)),
         }
     
     def score_stress_boost(self, current_features):
