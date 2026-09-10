@@ -82,13 +82,13 @@ $PYTHON inject_data.py data.json index.html 2>>sfc-pipeline.log || \
 # only needs refreshing every THROTTLE_MIN. Non-data changes (code/dashboard) and any
 # unpushed local commits always push immediately.
 log "Committing (throttled)..."
-git add data.json paper_trades.json paper_history.json
+git add data.json
 # Audit 2026-08-03: plain `git add -u` staged EVERY modified tracked file,
 # so unrelated code edits got swept into "auto: SFC data" commits with a
 # generic message (happened to collect.py/circuit_breaker.py/etf_flow.py).
 # Restrict auto-staging to the data files only — code changes stay uncommitted
 # and attributable (manual commits are still pushed via the AHEAD check below).
-git add -u data.json paper_trades.json paper_history.json 2>/dev/null || true
+git add -u data.json 2>/dev/null || true
 git reset HEAD index.html 2>/dev/null || true
 
 THROTTLE_MIN=60
@@ -96,7 +96,7 @@ NOW=$(date +%s)
 LAST_PUSH=$(cat /tmp/sfc_last_data_push 2>/dev/null || echo 0)
 AHEAD=$(git status -sb | grep -c "ahead" || true)
 # staged non-data files?
-NON_DATA=$(git diff --cached --name-only 2>/dev/null | grep -v -E '^(data\.json|paper_trades\.json|paper_history\.json)$' | wc -l)
+NON_DATA=$(git diff --cached --name-only 2>/dev/null | grep -v -E '^(data\.json)$' | wc -l)
 
 if [ "$AHEAD" -eq 0 ] && [ "$NON_DATA" -eq 0 ] && [ $((NOW - LAST_PUSH)) -lt $((THROTTLE_MIN * 60)) ]; then
     log "Throttled data commit ($(((NOW - LAST_PUSH) / 60))m < ${THROTTLE_MIN}m, data-only) — skipping commit/push"
@@ -107,13 +107,13 @@ elif git diff --staged --quiet && [ "$AHEAD" -eq 0 ]; then
     GIT_RESULT="no-change"
 else
     DATA_COMMITTED=0
-    if ! git diff --staged --quiet -- data.json paper_trades.json paper_history.json; then
+    if ! git diff --staged --quiet -- data.json; then
         # Commit ONLY the data pathspec (not the whole index). This prevents
         # sweeping code files that another process pre-staged with `git add`
         # into an "auto: SFC data" commit (same class of bug as 2e104fd8, which
         # only guarded against UNSTAGED code files — insufficient when a file
         # was already staged before this pipeline ran).
-        if git commit -m "auto: SFC data $(date -u '+%Y-%m-%d %H:%M:%S')" -- data.json paper_trades.json paper_history.json; then
+        if git commit -m "auto: SFC data $(date -u '+%Y-%m-%d %H:%M:%S')" -- data.json; then
             DATA_COMMITTED=1
         fi
     fi
