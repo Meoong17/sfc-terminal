@@ -148,3 +148,25 @@ Output: `analysis/.validate_igc_criticality.json` (deterministik; seed 20260911)
    komponen yang gagal null.
 3. Untuk early-warning: tunggu lebih banyak event drawdown (≥15 event) agar daya uji
    memadai.
+
+## RUN-3 (2026-09) — panel kanonik ter-refresh, n=3301 hari (2017-08-18 .. 2026-08-31)
+
+Panel kanonik `data/binance_vision_daily.json` ternyata **ketinggalan 1 bulan** (berhenti
+di 2026-07-31 padahal arsip Agustus tersedia). Setelah refresh (3270 → 3301 hari), baterai
+dijalankan ulang; **verdict tidak berubah** dan arah efek tetap sama.
+
+| sinyal | purged-CV AUC (terbaik) | era1 / era2 / era3 (gap 30d) | p_surrogate | ΔAUC vs vol-21d | verdict |
+|---|---|---|---|---|---|
+| `igc` (komposit, primer) | 0.485 [0.437, 0.528] @7d | −7.70 / +8.79 / −8.69 (TIDAK konsisten) | 0.22 | +0.018 [−0.016, +0.054] | NOT_BLEND |
+| `fim_excess` (sekunder) | 0.715 [0.645, 0.794] @90d | +32.21 / +19.33 / +4.54 (tanda konsisten, **meluruh**) | 0.000 | +0.384 [+0.277, +0.490] | NOT_BLEND |
+| `fr_drift` | 0.673 [0.589, 0.758] @90d | +23.53 / +14.68 / +6.08 | — | +0.338 [+0.207] | gugur era-stability |
+| `te_asym` | 0.291 @90d (di bawah koin) | −10.66 / −1.29 / −8.51 | — | −0.034 | gugur |
+| `rho1` | 0.530 @30d | −22.27 / −1.70 / −2.28 | — | +0.076 | gugur |
+| `lam1` | 0.457 @30d | +5.66 / +5.95 / +1.08 | — | — | gugur |
+| `skew` | 0.427 @30d | −1.50 / −0.72 / +2.81 | — | — | gugur |
+
+Kesimpulan tambahan: memperpanjang panel 31 hari tidak menyelamatkan komposit; satu-satunya
+besaran dengan daya uji nyata (`fim_excess`) tetap **gagal era-stability** karena efeknya
+meluruh monoton antar era (+32 → +19 → +4.5), dan karena itu tetap hanya hipotesis, bukan sinyal.
+
+Syarat untuk mengubah verdict di atas (butir 1-3) tetap berlaku apa adanya.
