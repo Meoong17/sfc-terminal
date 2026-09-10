@@ -43,24 +43,9 @@ def parse_value(val_str):
     except (ValueError, TypeError):
         return 0.0
 
-def fetch_flows():
-    """Fetch ETF flow data from Farside all-data page. Returns (flows_list, cumulative_total_millions)."""
-    try:
-        r = requests.get('https://farside.co.uk/bitcoin-etf-flow-all-data/', timeout=30, headers=HEADERS)
-        r.raise_for_status()
-    except requests.RequestException as e:
-        print(f"[WARN] Network error fetching ETF data: {e}")
-        return [], 0.0
-    
-    try:
-        soup = BeautifulSoup(r.text, 'html.parser')
-    except Exception as e:
-        print(f"[WARN] Failed to parse HTML: {e}")
-        return [], 0.0
-    
+def _extract_from_soup(soup):
+    """Parse flows + cumulative (millions) from a BeautifulSoup of the all-data page."""
     tables = soup.find_all('table')
-    
-    # Find the table with our headers
     target_table = None
     for table in tables:
         thead = table.find('thead')
@@ -69,51 +54,40 @@ def fetch_flows():
             if headers[:3] == ['Date', 'IBIT', 'FBTC']:
                 target_table = table
                 break
-    
     if not target_table:
-        print("[WARN] Could not find the ETF flow data table on the page")
         return [], 0.0
-    
-    tbody = target_table.find('tbody') or target_table
-    rows = tbody.find_all('tr')
-    
+
+    rows = target_table.find_all('tr')
     flows = []
     etf_names = ['IBIT', 'FBTC', 'BITB', 'ARKB', 'BTCO', 'EZBC', 'BRRR', 'HODL', 'BTCW', 'MSBT', 'GBTC', 'BTC']
-    
     for row in rows:
         try:
             cells = row.find_all('td')
-            if len(cells) != 14:  # Date + 12 ETFs + Total
+            if len(cells) != 14:
                 continue
-            
             date_raw = cells[0].get_text(strip=True)
-            
-            # Skip non-date rows
-            if date_raw in ('Total', 'Average', 'Maximum', 'Minimum'):
+            if date_raw in ('Total', 'Average', 'Maximum', 'Minimum', 'Fee'):
                 continue
-            
             date_parsed = parse_date(date_raw)
             if not date_parsed:
                 continue
-            
+            raw = [c.get_text(strip=True) for c in cells[1:-1]]
+            # A pending placeholder row is all dashes/empty (not yet reported) -> skip.
+            if all(v in ('', '-') for v in raw):
+                continue
             etfs = {}
             for i, name in enumerate(etf_names):
                 etfs[name] = round(parse_value(cells[i+1].get_text(strip=True)), 4)
-            
             total_val = parse_value(cells[-1].get_text(strip=True))
-            total_usd = int(round(total_val * 1_000_000))
-            
             flows.append({
                 "date": date_parsed,
                 "total_btc": None,
-                "total_usd": total_usd,
+                "total_usd": int(round(total_val * 1_000_000)),
                 "etfs": etfs
             })
         except Exception:
-            # Skip malformed row rather than crashing the entire fetch
             continue
-    
-    # Get cumulative total from the Total row
+
     cumulative_total_millions = 0.0
     for row in rows:
         try:
@@ -123,8 +97,106 @@ def fetch_flows():
                 break
         except Exception:
             continue
-    
     return flows, cumulative_total_millions
+
+
+def _fetch_playwright():
+    """Fallback via headless Chromium when Cloudflare blocks plain requests."""
+    try:
+        from playwright.sync_api import sync_playwright
+    except Exception as e:
+        print(f"[WARN] Playwright unavailable: {e}")
+        return [], 0.0
+    flows, cum = [], 0.0
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True, args=['--no-sandbox', '--disable-blink-features=AutomationControlled'])
+        ctx = browser.new_context(
+            user_agent=HEADERS['User-Agent'],
+            viewport={'width': 1700, 'height': 1200})
+        pg = ctx.new_page()
+        try:
+            pg.goto('https://farside.co.uk/bitcoin-etf-flow-all-data/', timeout=60000, wait_until='domcontentloaded')
+            for _ in range(30):
+                if 'All Data' in pg.title():
+                    break
+                import time as _t; _t.sleep(1.5)
+            # The all-data table may lazy-load rows. Poll until row count is stable,
+            # scrolling all scrollable containers, so no trailing dates are missed.
+            import time as _t
+            last_n = -1
+            stable = 0
+            for _ in range(60):
+                n = pg.evaluate('document.querySelectorAll("table")[0] ? document.querySelectorAll("table")[0].querySelectorAll("tbody tr").length : 0')
+                if n == last_n:
+                    stable += 1
+                else:
+                    stable = 0
+                    last_n = n
+                if stable >= 4 and n > 0:
+                    break
+                pg.evaluate('window.scrollTo(0, document.body.scrollHeight)')
+                pg.evaluate('''()=>{document.querySelectorAll('div').forEach(e=>{if(e.scrollHeight>e.clientHeight+10){e.scrollTop=e.scrollHeight;}})}''')
+                pg.wait_for_timeout(600)
+            pg.wait_for_timeout(1500)
+            html = pg.content()
+        except Exception as e:
+            print(f"[WARN] Playwright nav error: {e}")
+            browser.close()
+            return [], 0.0
+        browser.close()
+    from bs4 import BeautifulSoup as BS
+    try:
+        flows, cum = _extract_from_soup(BS(html, 'html.parser'))
+    except Exception as e:
+        print(f"[WARN] Playwright parse error: {e}")
+        return [], 0.0
+    return flows, cum
+
+
+URL = 'https://farside.co.uk/bitcoin-etf-flow-all-data/'
+
+
+def _fetch_curl_cffi():
+    """Primary path: TLS/JA3 impersonation (curl_cffi). Farside sits behind Cloudflare,
+    which 403s plain `requests` — impersonating a real Chrome handshake passes."""
+    try:
+        from curl_cffi import requests as curl_requests
+    except Exception as e:
+        print(f"[WARN] curl_cffi unavailable: {e}")
+        return None
+    try:
+        r = curl_requests.get(URL, impersonate='chrome', timeout=40)
+    except Exception as e:
+        print(f"[WARN] curl_cffi failed ({e})")
+        return None
+    if r.status_code != 200 or 'Just a moment' in r.text:
+        print(f"[WARN] curl_cffi blocked (status={r.status_code})")
+        return None
+    return _extract_from_soup(BeautifulSoup(r.text, 'html.parser'))
+
+
+def fetch_flows():
+    """Fetch ETF flow data from Farside all-data page. Returns (flows_list, cumulative_total_millions)."""
+    # Primary: curl_cffi browser-impersonation (beats the Cloudflare 403 on plain requests).
+    out = _fetch_curl_cffi()
+    if out is not None and out[0]:
+        return out
+    print("[WARN] curl_cffi path returned nothing; trying plain requests...")
+
+    # Fallback 1: plain requests.
+    try:
+        r = requests.get(URL, timeout=30, headers=HEADERS)
+        r.raise_for_status()
+        if 'Just a moment' not in r.text and r.status_code != 403:
+            flows, cum = _extract_from_soup(BeautifulSoup(r.text, 'html.parser'))
+            if flows:
+                return flows, cum
+    except requests.RequestException as e:
+        print(f"[WARN] requests failed ({e})")
+
+    # Fallback 2: headless Chromium.
+    print("[WARN] Falling back to headless Chromium...")
+    return _fetch_playwright()
 
 
 def main():
@@ -157,8 +229,15 @@ def main():
         print(f"Date range: {merged_flows[0]['date']} to {merged_flows[-1]['date']}")
         print(f"Cumulative total (millions USD): {cumulative_total_millions}")
     
-    # Compute cumulative_usd from the total row data if available
-    cumulative_usd = int(round(cumulative_total_millions * 1_000_000))
+    # Compute cumulative_usd from the total row data if available.
+    # Guard: if the fetch failed/returned nothing, keep the previous cumulative
+    # value instead of zeroing it out (would corrupt the cache).
+    if cumulative_total_millions and len(new_flows) > 0:
+        cumulative_usd = int(round(cumulative_total_millions * 1_000_000))
+    else:
+        cumulative_usd = existing.get('cumulative_usd')
+        if cumulative_usd is None:
+            cumulative_usd = 0
     
     # If we don't have a cumulative_btc from the page, compute from existing
     cumulative_btc = existing.get('cumulative_btc')
