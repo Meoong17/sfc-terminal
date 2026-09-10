@@ -375,10 +375,12 @@ function render(d) {
   const signal  = d.signal || 'Standard allocation';
   const state   = d.state || 'NORMAL OSCILLATION';
 
-  // Compute ADV regime label with condition context
+  // Label regime untuk pill sinyal — sumber WAJIB yang tervalidasi.
+  // 2026-09: `d.adv_regime` (k-means+Markov, dilatih 38 baris harian) DILARANG dipakai;
+  // sumbernya diganti HMM (`d.hmm_regime`) yang labelnya BULL/BEAR/CRISIS.
   const isExtremeFear = (d.fng||50) < 15;
   const hasCascade = (d.cascade_risk||0) > 0.5;
-  const advRegime = d.adv_regime || 'BULL';
+  const advRegime = typeof d.hmm_regime === 'string' ? d.hmm_regime : 'BULL';
   let advLabel = advRegime;
   let advDotColor = (advRegime === 'BEAR' || advRegime === 'CRISIS' || advRegime === 'CAPITULATION') ? 'dot-r' : 'dot-g';
   if (isExtremeFear && advRegime === 'BULL') {
