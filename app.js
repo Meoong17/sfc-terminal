@@ -1528,7 +1528,7 @@ function render(d) {
 function updateRegimeDisplay(d) {
   var el = document.getElementById('regimeDisplay_xyz');
   if (!el) return;
-  var val = typeof d.regime === 'string' && isNaN(d.regime) ? d.regime : (d.adv_regime || 'NORMAL');
+  var val = typeof d.regime === 'string' && isNaN(d.regime) ? d.regime : 'NORMAL';
   var color = val === 'CAPITULATION' || val === 'CRISIS' ? 'var(--red)' : val === 'STRESS' || val === 'BEAR' ? 'var(--amber)' : 'var(--green)';
   el.textContent = val;
   el.style.color = color;
@@ -1539,7 +1539,7 @@ setInterval(function() {
   if (!el) return;
   var d = currentData || window.__EMBEDDED_DATA;
   if (!d) return;
-  var val = typeof d.regime === 'string' && isNaN(d.regime) ? d.regime : (d.adv_regime || 'NORMAL');
+  var val = typeof d.regime === 'string' && isNaN(d.regime) ? d.regime : 'NORMAL';
   var txt = el.textContent;
   // If it contains a $ sign or a number with decimal, overwrite
   if (/^\$?[\d,]+\.?\d*$/.test(txt.trim())) {
