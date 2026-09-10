@@ -82,6 +82,11 @@ RSS_FEEDS = [
     {"url": "https://news.google.com/rss/search?q=crypto+regulation+sec+etf&hl=en-US&gl=US&ceid=US:en", "name": "Google:Reg", "weight": 2.0, "factor": "Sc"},
     {"url": "https://news.google.com/rss/search?q=US+Treasury+announcement&hl=en-US&gl=US&ceid=US:en", "name": "Google:UST", "weight": 2.5, "factor": "Lt"},
     {"url": "https://news.google.com/rss/search?q=treasury+bond+market+liquidity&hl=en-US&gl=US&ceid=US:en", "name": "Google:Bond", "weight": 2.5, "factor": "Ft"},
+    # === TREASURY GENERAL ACCOUNT (TGA) — fiscal/liquidity layer (Lt) ===
+    # Captures TGA cash-pile / drawdown / buyback headlines, e.g.
+    # "Bessent could tap near $1 trillion Treasury General Account to fund bond buybacks"
+    # (2026-08). TGA drawdown = liquidity injection → bullish for the Lt factor.
+    {"url": "https://news.google.com/rss/search?q=Treasury+General+Account&hl=en-US&gl=US&ceid=US:en", "name": "Google:TGA", "weight": 2.5, "factor": "Lt"},
 ]
 
 HEADERS = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 SFC-Terminal/7"}
@@ -143,8 +148,19 @@ def fetch_rss_feed(feed_def, max_age_hours=6, max_items=8):
 def score_article(article):
     title_lower = article["title"].lower()
     words = title_lower.split()
+    # Ambiguity guard (user correction 2026-08): in a US-Treasury / fiscal /
+    # TGA context the words "treasury" (US dept, not BTC-treasury adoption) and
+    # "buyback" (bond buyback, not equity) are NOT bullish. A TGA drawdown,
+    # cash-pile tap, or debt-financing story is not auto-positive — label neutral
+    # unless other unambiguous sentiment words are present.
+    FISCAL_CTX = ("treasury general account", "general account", "cash pile",
+                  "cash account", "us treasury", "u.s. treasury", "the treasury",
+                  "debt financing", "debt ceiling", "bond buyback", "bond buybacks",
+                  "tga", "secretary")
+    is_fiscal = any(c in title_lower for c in FISCAL_CTX)
+    _neutral_bull = {"treasury", "buyback"}
     bear = sum(1 for w in words if w in BEARISH)
-    bull = sum(1 for w in words if w in BULLISH)
+    bull = sum(1 for w in words if w in BULLISH and not (is_fiscal and w in _neutral_bull))
     for phrase in ["rate hike","margin call","bank run","flash crash","circuit breaker","all-time high","spot etf","etf approval","emergency cut"]:
         if phrase in title_lower:
             if phrase in {"all-time high","spot etf","etf approval","emergency cut"}:
@@ -211,8 +227,25 @@ def get_news_stress_v2(cryptopanic_key=None, max_workers=8):
     total_stress = round(min(total_stress, 30.0), 1)
     avg_sentiment = round(sum(sentiments) / len(sentiments), 3) if sentiments else 0.0
     
+    # Display selection (News feed) — decouple from the stress sort.
+    # `scored` stays sorted by stress_contrib (drives news_stress + black-swan).
+    # But surfacing ONLY the top-|stress| headlines starves neutral macro/fiscal
+    # news (e.g. "Treasury could tap $935B cash pile" — a 0-stress Lt story) out
+    # of the visible feed entirely. So: lead with the stress-drivers, then fill
+    # remaining slots factor-diversely, prioritizing macro factors (Lt/Ft) so
+    # Treasury/TGA/global-liquidity headlines stay visible. Display-only.
+    MAX_HEADLINES = 12
+    shown = list(scored[:5])
+    rest = scored[5:]
+    _factor_prio = {"Lt": 0, "Ft": 1, "Rt": 2, "Sc": 3, "St": 4}
+    def _disp_key(a):
+        fi = _factor_prio.get(a.get("factor", ""), 99)
+        # freshness, then macro priority, then |stress|
+        return (fi, -a.get("age_hours", 99), -abs(a.get("stress_contrib", 0.0)))
+    shown += sorted(rest, key=_disp_key)[: (MAX_HEADLINES - len(shown))]
+
     headlines = []
-    for a in scored[:8]:
+    for a in shown:
         icon = "🔴" if a["sentiment"] < -0.5 else "🟢" if a["sentiment"] > 0.5 else "⚪"
         age_str = f"{a['age_hours']:.1f}h" if a["age_hours"] < 99 else ""
         src = a["source"][:12]
