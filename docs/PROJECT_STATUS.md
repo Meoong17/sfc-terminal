@@ -1,6 +1,6 @@
 # SFC Terminal — Project Status
 
-_Last updated: 2026-08-16_
+_Last updated: 2026-09-09_
 
 ## Model focus
 
@@ -781,6 +781,74 @@ look at, mis-order realized returns (most-stressed bucket → highest forward re
 treat LM stress adjustments as predictive. To validate properly: accumulate ≥6 months of
 GLF daily history (≥180d) so that both LM (30d change) and 30d forward BTC returns exist
 for a meaningful set of days, then re-run `analysis/validate_liquidity_momentum.py`.
+
+
+## Kanal macro-liquidity & crypto-flow — DITUTUP (2026-09-09)
+
+Rangkaian pengujian tesis "likuiditas eksternal menggerakkan BTC" ditutup. Tiga kanal macro
+berturut-turut gagal dengan pola identik (screen in-sample tampak → jatuh di uji decisive
+bersih), plus family crypto-native marginal-flow. **JANGAN uji ulang kanal-kanal ini tanpa
+alasan baru (mis. sumber data baru dengan sejarah panjang).** Semua display-only/context.
+
+| Kanal | Script | Screen in-sample | Gate decisive (purged WF / event) | Verdict |
+|---|---|---|---|---|
+| Yield LEVEL (Y10/real/BE) | `analysis/yield_level_btc_test.py` | korelasi kontemporer ~0; prediktif era-flip | era-flip; corr(Y10,FFR)=+0.90 → redundan dgn policy/GLF | DITOLAK (context-only) |
+| Term premium (proxy TP2=10Y−FFR, TP3=30Y−10Y) | `analysis/term_premium_btc_test.py`, `term_premium_regime_interaction.py` | level era-flip; TP2 vs TP3 tanda BERLAWANAN | proxy saling bertentangan tanda; kanal TP→vol spurious | DITOLAK |
+| Term premium ASLI (ACM NY Fed + Kim-Wright FRED) | `analysis/fetch_term_premium.py`, `tp_real_test.py`, `tp_encompassing_test.py`, `tp_purged_walkforward.py` | ACM~KW r=0.82; level era-konsisten −, Δ era-konsisten +; TP×hike state-dependent | purged WF GAGAL: regime-cond terbaik IC +0.076, AUC 0.525 (<0.55) | DITOLAK (commit fcb5e8b46) |
+| Net liquidity (FED_BS−TGA−RRP) | `analysis/net_liquidity_btc_test.py`, `net_liquidity_incremental.py`, `net_liquidity_event_study.py` | dnet_us_30 WF AUC 0.552, permutation p=0.000; menambah di atas GLF-proxy (p=0.027) | **event study 8 episode terbesar TIDAK mengonfirmasi** (event mean DI BAWAH baseline, z −0.22/−0.55/−0.51; rentang −65%..+28%) | DITOLAK (commit 2c63bfc42) |
+| Crypto-native marginal flow (funding + taker imbalance + whale share + size) | `analysis/crypto_flow_stress_test.py` | funding "menambah" +0.054 pada bull-regime | **permutation: null(shuffle) 0.785 ≈ obs 0.784, p=0.54 → artefak jumlah fitur**; flow extras ΔAUC<0 | DITOLAK (commit 42e87b6c3) |
+
+**Pelajaran metodologis (WAJIB):** saat membandingkan set fitur BERSARANG dengan purged-WF AUC,
+menambah fitur apa pun (bahkan noise yang diacak) menaikkan AUC OOS ~0.05. Kontrol permutasi
+(feature-block shuffle, ≥100×) WAJIB sebelum mengklaim sebuah faktor "menambah". Terekam di skill
+`walk-forward-validation` pitfall 44.
+
+**Hipotesis batas struktural:** episode likuiditas-macro "bersih" untuk BTC praktis hanya ~2
+(QE 2020-21; TGA/RRP drain 2023-24) dan arahnya berseberangan → kegagalan berulang kemungkinan
+adalah batas STRUKTURAL (kekurangan episode bersih), bukan sekadar salah spesifikasi.
+
+**Arsitektur yang bertahan (jangan diubah tanpa uji baru):** sinyal hidup di harga/vol (stress-gauge
+price/vol, era-stable); funding = pembaca keadaan KONTEMPORER/konfirmasi (bukan prediktor forward —
+lihat juga verdict funding purged-CV 2026-08 di atas); macro/liquidity = CONTEXT/display.
+
+**Koreksi metodologis yang dicatat:** (a) term premium TIDAK bisa = 10Y−real−breakeven (identik nol,
+sd=0.0000); butuh ACM/KW. (b) "sign-flip antar-proxy" pada proxy spread adalah artefak, bukan
+masalah konstruk (ACM vs KW r=0.82). (c) kanal TP→vol pada proxy spurious (hilang dengan TP asli).
+
+
+## P2 — Konsolidasi (2026-09-09): audit label display-honesty + verifikasi ulang inti era-stable
+
+**1. Audit label display-only (semua KPI/kartu diperiksa; cari klaim prediktif berlebih):**
+
+Ditemukan & DIPERBAIKI (sumber: `index.html`):
+- **Kartu "Kelly Position Sizing"** — "Signal Confidence", "Timing Precision", "Alert Window", dan
+  angka alokasi sebenarnya fungsi dari `composite_confidence` (collect.py:4570-4598), BUKAN backtest
+  tervalidasi walk-forward, tapi sebelumnya tampil tanpa caveat (berbeda dari kartu Backtest Metrics
+  yang sudah berlabel ESTIMATED + banner amber). Perbaikan: badge → "Heuristic sizing · not validated"
+  (amber), tooltip judul diberi catatan HEURISTIC, ditambah baris caveat amber di body kartu, + entri
+  i18n EN/ID. Verifikasi: extract 3 blok JS dari index.html → `node --check` semua lolos.
+  Catatan: `index.html` ber-flag skip-worktree (S) → edit berlaku live tapi tidak ikut commit.
+
+Sudah jujur sebelum audit (tidak diubah): XGBoost P(6h drop) (display-only, bukan blend); kartu
+trend-continuation (caveat "reduced replay", pakai era3 + `era_stable`, "bukan bukti mekanisme kausal");
+kartu Backtest Metrics (ESTIMATED + banner amber); IMBS L5/L8/L6 (display-only + "NOT validated …
+era-flips P≈0"); kartu **Funding (BitMEX)** (sudah menyatakan CONFIRMATION layer, bukan predictor,
+tidak di-blend); tooltip skor inti SFC (menyatakan validasi WF hanya pada proxy 4-input, bukan skor
+90+ method live).
+
+**2. Verifikasi ulang inti era-stable (gate yang sama):**
+- **Stress-gauge core**: `.walk_forward_summary.json` → `gap_7d_era_stable=True` (era2 −1.34 sig,
+  era3 −0.69 sig), `gap_30d_era_stable=True` (era2 −4.59 sig, era3 −4.76 sig). Era1 (+4.4/+10.82)
+  tidak signifikan = noise bull-run, bukan kontra. **Inti era-stable TETAP TERVERIFIKASI.**
+- **Funding**: era-stable sebagai pembaca regime KONTEMPORER (corr bull +0.16/+0.41/+0.26; tercile
+  bull% 41→82; negatif di krisis) — TAPI incremental ΔAUC = 0.000 vs baseline harga/vol di SEMUA era
+  (`docs/FUNDING_INCREMENTAL_TEST.md`). Jadi funding = CONTEXT/CONFIRMATION, bukan input classifier.
+  Dashboard sudah menyatakan tepat ini (kartu Funding BitMEX). **Konsisten.**
+
+**Kesimpulan P2:** arsitektur SFC tidak diubah (tidak ada fitur baru di-blend); satu klaim display
+yang menyesatkan diperbaiki; inti era-stable diverifikasi ulang lolos gate. Kanal macro-liquidity &
+crypto-flow resmi DITUTUP (lihat tabel di atas) — jangan diuji ulang tanpa sumber data baru.
+
 
 
 
