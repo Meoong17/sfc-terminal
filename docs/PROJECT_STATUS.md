@@ -854,3 +854,53 @@ crypto-flow resmi DITUTUP (lihat tabel di atas) — jangan diuji ulang tanpa sum
 
 
 
+
+## P3 — Pengembangan inti stress-gauge (2026-09-11): TIDAK ada kandidat yang memperkuat + label `era_stable` tidak reprodusibel
+
+Arah pengembangan yang tersisa setelah semua kanal macro ditutup (2026-09-09) adalah
+memperkuat inti era-stable (stress-gauge harga/vol). Diuji 12 estimator price/vol
+alternatif pada panel 5.357 hari (Bitstamp 2012-2017 + Binance Vision 2017-2026).
+Laporan lengkap: `docs/VOL_STRESS_ESTIMATOR_TEST.md` dan
+`docs/STRESS_EDGE_UNIVERSALITY_AND_WFV_ERA_STABLE.md`. Skrip:
+`analysis/vol_stress_estimator_test.py`, `cross_asset_universality.py`,
+`purged_cv_era.py`, `reconcile_stress_gap_frames.py`, `fetch_binance_vision_symbol.py`.
+
+**Verdict perkuatan: TIDAK ADA kandidat yang lolos dua bar sekaligus.**
+purged-CV pooled (2012-2026) justru menghadiahi sinyal yang skill-nya hidup di
+era0/era1 (di mana polaritas stress→return TERBALIK) — `jump_ratio30` AUC 0.5643 /
+ΔAUC +0.032 / perm_p 0.00 tapi bertanda SALAH di era3a/era3b (+9.71*, +9.41);
+sama untuk `tail30` (+0.079), `dvol30` (+0.058), `vov30` (+0.043). Di era sekarang
+hanya `semidev30`@7d lolos gate (era3b −2.53) dan ia TIDAK menambah di atas
+baseline `[rv30, mom30]` (ΔAUC −0.022, perm_p 1.0, Spearman 0.853 vs rv30).
+`sfc_pct` sendiri di purged-CV pooled: uni AUC 0.493, ΔAUC −0.051.
+**Pelajaran metodologis:** pooled-AUC adalah metrik yang salah untuk model yang
+harus bekerja di struktur sekarang — ia memberi hadiah atas skill rezim lama.
+
+**Edge tidak universal di keempat sumbu** (rincian + tabel di docs):
+lintas-waktu (era0/era1 tanda terbalik, +9.23*/+10.29*), lintas-definisi (12
+estimator, tanda berbeda di era yang sama), lintas-horizon (7d vs 30d berlawanan),
+lintas-aset (BTC/ETH/SOL sepakat NEGATIF di jendela identik 2024 — semua
+block-signifikan — tapi PECAH di era3b penuh 2024-2026: SOL tetap negatif kuat,
+BTC berbalik positif, ETH ambigu). `sfc_pct` tetap satu-satunya sinyal negatif di
+keempat era pasca-2015 di kedua horizon → sifat lintas-era ada pada KOMBINASI,
+bukan pada komponen mana pun.
+
+**TEMUAN PERLU TINDAKAN — badge `era_stable ✓` tidak reprodusibel.**
+`analysis/walk_forward_validation.py` memakai CI **90% satu-sisi** (`significant =
+hi < 0`) dengan bootstrap **iid tak ter-seed** dan tanpa penanganan label forward
+tumpang tindih. Memanggil `_gap_stats(series, 7, '2022-01-01','2099-01-01')`
+langsung pada data cache: 15 panggilan → `hi_90` ∈ [−0.0769, −0.0133] `sig=True`
+15/15; 1 panggilan → `hi_90 = +0.00101` `sig=False`. Ambang keputusan duduk di
+≈ 0 (margin −0.04 pada gap −0.68). Re-run penuh (n_periods 4256→4266)
+mereproduksi `era_stable: True`, jadi bukan cache basi — prosedurnya sendiri tidak
+deterministik. Dengan moving-block bootstrap (blok=h) pada data yang sama:
+p(gap ≥ 0) = 0.957 (7d) / 1.000 (30d) untuk era3 → tidak signifikan pada 95%
+(era3b: 0.909 / 1.000). Sebagai pembanding, era2 kokoh (hi_90 = −0.2004) dan
+full-sample kokoh (CI90 [−2.0626, −0.8933]).
+Rekomendasi: (1) seed bootstrap di semua jalur; (2) jangan pakai `hi<0` pada CI 90%
+satu-sisi sebagai bukti era-stable tanpa margin minimum — tampilkan `hi_90` di
+kartu; (3) pisahkan klaim "signifikan" (full-sample/era2 kokoh) dari "era-stable"
+(era3 marginal). **Belum diterapkan — menunggu keputusan pemilik model.**
+
+**Tidak ada perubahan skor** dalam pekerjaan ini (sesuai aturan: jangan sentuh
+scoring sebelum walk-forward tervalidasi).
