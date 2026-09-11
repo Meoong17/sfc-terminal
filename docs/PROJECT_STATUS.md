@@ -923,3 +923,18 @@ di `index.html`, yang ber-flag skip-worktree sehingga live-only).
 KEPUTUSAN TERTUNDA: memindahkan `era_stable` utama ke definisi blok akan membuatnya
 False untuk era2 dan era3 sekaligus — jangan lakukan sebelum sensitivitas panjang blok
 diuji. Detail: `docs/STRESS_EDGE_UNIVERSALITY_AND_WFV_ERA_STABLE.md`.
+
+### P3c — KOREKSI: uji per-era menemukan kandidat yang dibuang pooled (2026-09-11)
+
+`analysis/purged_cv_era.py` (200 permutasi, `.purged_cv_era.json`) membatalkan bagian
+"tidak ada kandidat" di P3. Di era3b, `maxdd90` (kedalaman drawdown 90d): AUC univariat
+0.5786@7d / 0.6752@30d (ci95_lo 0.5375 / 0.5838 — satu-satunya yang di atas 0.5),
+ΔAUC +0.1257 / +0.0818, perm_p 0.00, dan TIDAK redundan dengan rv30 (Spearman 0.344).
+Pada uji pooled sinyal yang SAMA ditolak (ΔAUC −0.0015 / −0.0336, perm_p 1.0) — bukti
+tambahan bahwa pooled-AUC adalah gate yang salah untuk klaim struktur-sekarang.
+CAVEAT mengikat: 130 sel (multiplisitas), dispersi antar-fold besar (era3b 30d
+0.276-0.686), n≈967 dgn label tumpang tindih. Status = kandidat untuk walk-forward
+penuh, BUKAN siap blend; skor tidak disentuh.
+Catatan operasional: edit `index.html` repo PASTI hilang karena `sfc-pipeline.sh`
+memulihkannya dari master `/home/ubuntu/index.html` tiap siklus — semua edit dashboard
+harus ke master. Detail: `docs/STRESS_EDGE_UNIVERSALITY_AND_WFV_ERA_STABLE.md`.

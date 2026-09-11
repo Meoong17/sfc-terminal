@@ -215,3 +215,60 @@ selama ini tercatat sebagai satu-satunya konfirmasi terverifikasi, dan (b) hasil
 sangat bergantung pilihan panjang blok (= horizon) — **sensitivitas panjang blok wajib
 diuji lebih dulu** sebelum dijadikan label utama. Selama itu, field `_block` dan
 `_margin_block` sudah tersedia untuk pemeriksaan.
+
+---
+
+# KOREKSI PENTING — pooled-purged-CV menyembunyikan kandidat terbaik
+
+Hasil uji **per-era** (`analysis/purged_cv_era.py`, 200 permutasi, output
+`.purged_cv_era.json`) **membatalkan kesimpulan "tidak ada kandidat"** di bagian
+verdict sebelumnya. Pooled-AUC bukan cuma "menghadiahi rezim lama" — ia membuang
+kandidat yang justru spesifik struktur sekarang.
+
+Baseline `[rv30_z, mom30_z]`, era3b (2024-2026, n≈967):
+
+```
+sinyal        h    uni_AUC   ci95_lo    ΔAUC     perm_p
+maxdd90       7d    0.5786    0.5375   +0.1257   0.00
+semidev30     7d    0.5063    0.4564   +0.1081   0.00
+rs30          7d    0.5334    0.4504   +0.0790   0.00
+maxdd90      30d    0.6752    0.5838   +0.0818   0.00
+dvol30       30d    0.6013    0.4795   +0.0814   0.00
+```
+
+Bandingkan pooled (semua era, dari `docs/VOL_STRESS_ESTIMATOR_TEST.md`):
+`maxdd90` ΔAUC 7d **−0.0015** / 30d **−0.0336** (perm_p 1.0) → ditolak.
+Era yang sama, sinyal yang sama, verdict berlawanan.
+
+**`maxdd90` (kedalaman drawdown dari puncak 90 hari) kini kandidat terkuat:**
+- polaritas benar di SEMUA era modern (7d: era2 −2.49, era3a −1.47, era3b −0.68);
+  hanya terbalik di era0/era1 (era yang polaritasnya memang terbalik untuk semua);
+- satu-satunya kandidat dengan `ci95_lo` AUC univariat **> 0.5** di era3b
+  (7d 0.5375, 30d 0.5838);
+- ΔAUC +0.126 (7d) / +0.082 (30d) dengan perm_p 0.00;
+- **tidak redundan** dengan realized-vol (Spearman hanya 0.344 vs rv30) —
+  berbeda dari keluarga range-vol (0.89-0.96) yang praktis duplikat.
+
+**Tetap JANGAN blend sebelum uji lanjut.** Caveat yang mengikat:
+1. 5 era × 2 horizon × 13 sinyal = **130 sel** → sebagian signifikan bisa
+   kebetulan; jumlahnya jauh melebihi ~6 yang diharapkan acak, jadi bukan
+   seluruhnya noise, tapi klaim per-sel tetap perlu koreksi multiplisitas.
+2. **Dispersi antar-fold besar** di era3b 30d (0.276 / 0.350 / 0.487 / 0.642 /
+   0.686) → estimasi pooled 0.6752 rapuh; jangan dibaca sebagai presisi.
+3. n era3b ≈ 967 hari dengan label 30d tumpang tindih → effective n jauh lebih kecil.
+4. Verdict per-era lain juga bergerak (`jump_ratio30` era3a 30d AUC 0.7496) —
+   pola lintas-era masih tidak konsisten, sesuai temuan universalitas di atas.
+
+**Status: kandidat untuk walk-forward penuh (purged-CV + embargo lebih ketat,
+sensitivitas panjang blok, dan uji inkremental terhadap `sfc_pct` sendiri) —
+BUKAN siap blend. Skor SFC tidak disentuh.**
+
+## Catatan operasional — edit dashboard WAJIB di master
+
+`sfc-pipeline.sh` memulihkan `index.html` dari `/home/ubuntu/index.html` setiap
+siklus (5 menit), dan `scripts/deploy.sh` menyalin master yang sama. Edit langsung
+ke `index.html` repo **pasti hilang** pada siklus berikutnya. Perbaikan kartu WFV di
+atas diterapkan ke master, lalu direstore + inject ke repo
+(`cp /home/ubuntu/index.html index.html && python3 inject_data.py data.json index.html`).
+Diverifikasi: `node --check` lolos pada dua blok JS, injeksi 451 field, dan baris
+"Regime check (era2 vs era3)" ada di `index.html` hasil.
