@@ -4595,7 +4595,13 @@ out = {
     "wfv_gap_7d_era2_significant": _wfv_summary.get("gap_7d_era2_significant"),
     "wfv_gap_7d_era3": _wfv_summary.get("gap_7d_era3"),
     "wfv_gap_7d_era3_significant": _wfv_summary.get("gap_7d_era3_significant"),
+    # Uji yang menghormati label forward tumpang tindih (blok = horizon) +
+    # margin keputusan dalam pp. margin_block < 0 = uji blok TIDAK lolos,
+    # artinya verdict "significant" bertumpu pada margin yang tipis.
+    "wfv_gap_7d_era3_significant_block": _wfv_summary.get("gap_7d_era3_significant_block"),
+    "wfv_gap_7d_era3_margin_block": _wfv_summary.get("gap_7d_era3_margin_block"),
     "wfv_gap_7d_era_stable": _wfv_summary.get("gap_7d_era_stable"),
+    "wfv_gap_7d_era_stable_block": _wfv_summary.get("gap_7d_era_stable_block"),
     "wfv_gap_30d": _wfv_summary.get("gap_30d"),
     "wfv_gap_30d_ci_lo": _wfv_summary.get("gap_30d_ci_lo"),
     "wfv_gap_30d_ci_hi": _wfv_summary.get("gap_30d_ci_hi"),
@@ -4604,7 +4610,10 @@ out = {
     "wfv_gap_30d_era2_significant": _wfv_summary.get("gap_30d_era2_significant"),
     "wfv_gap_30d_era3": _wfv_summary.get("gap_30d_era3"),
     "wfv_gap_30d_era3_significant": _wfv_summary.get("gap_30d_era3_significant"),
+    "wfv_gap_30d_era3_significant_block": _wfv_summary.get("gap_30d_era3_significant_block"),
+    "wfv_gap_30d_era3_margin_block": _wfv_summary.get("gap_30d_era3_margin_block"),
     "wfv_gap_30d_era_stable": _wfv_summary.get("gap_30d_era_stable"),
+    "wfv_gap_30d_era_stable_block": _wfv_summary.get("gap_30d_era_stable_block"),
     "wfv_n_stress_pct": _wfv_summary.get("n_stress_pct"),
     "wfv_label": "WALK-FORWARD VALIDATED — reduced 4-input proxy (price, DXY, M2, FNG; St/Ft=0), NOT the full 90+ method live score" if _wfv_available else "NOT YET RUN",
     # — Kelly Criterion Position Sizing (Gap 2 dari Reality Check) —

@@ -904,3 +904,22 @@ kartu; (3) pisahkan klaim "signifikan" (full-sample/era2 kokoh) dari "era-stable
 
 **Tidak ada perubahan skor** dalam pekerjaan ini (sesuai aturan: jangan sentuh
 scoring sebelum walk-forward tervalidasi).
+
+### P3b — Perbaikan verdict WFV: determinisme + margin diekspos (2026-09-11)
+
+`analysis/walk_forward_validation.py`: RNG bootstrap di-seed (`BOOTSTRAP_SEED=42`)
+sehingga CI/verdict deterministik — **dua run penuh berturut-turut menghasilkan 62
+kunci identik** (sebelumnya flag `significant`/`era_stable` bisa berubah antar-run pada
+data yang sama; terukur 1 dari 16 panggilan `_gap_stats` memberi hasil berbeda).
+Ditambah `bootstrap_diff_ci_block()` (moving-block, blok = horizon) yang menghormati
+label forward tumpang tindih; cache kini menyimpan `..._significant_block`,
+`..._ci_hi_block`, `..._margin_block` (margin = −ci_hi_block; negatif = uji blok gagal).
+Definisi utama `era_stable` SENGAJA tidak diubah (tetap uji iid) supaya label historis
+tidak berubah diam-diam; varian konservatif tersedia di `era_stable_block`.
+Hasil saat ini: era2 & era3 lolos uji iid tapi margin block negatif (7d era3 −0.75pp,
+30d era3 −1.21pp) → klaim era-stable kini ditampilkan bersama marginnya di kartu WFV
+(`collect.py` meneruskan field baru; baris "Regime check (era2 vs era3)" + peringatan ⚠
+di `index.html`, yang ber-flag skip-worktree sehingga live-only).
+KEPUTUSAN TERTUNDA: memindahkan `era_stable` utama ke definisi blok akan membuatnya
+False untuk era2 dan era3 sekaligus — jangan lakukan sebelum sensitivitas panjang blok
+diuji. Detail: `docs/STRESS_EDGE_UNIVERSALITY_AND_WFV_ERA_STABLE.md`.

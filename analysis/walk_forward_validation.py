@@ -99,6 +99,12 @@ FORWARD_HORIZONS_DAYS = [7, 30]  # matches this project's own signal-generation
 BUCKET_EDGES = [(0, 25, "CALM"), (25, 45, "ELEVATED"), (45, 101, "STRESS")]
 
 N_BOOTSTRAP = 2000   # resamples for confidence interval estimation
+
+# Determinisme: verdict & CI yang tersimpan di cache harus bisa direproduksi
+# persis. Sebelum ini RNG-nya TIDAK di-seed, sehingga pada margin yang tipis
+# (mis. era3 7d: ci_hi ~ 0) flag "significant"/"era_stable" bisa berubah antar-run
+# pada data yang sama.
+BOOTSTRAP_SEED = 42
 N_QUANTILES = 10     # deciles for threshold-free quantile analysis
 
 SUMMARY_CACHE_FILE = os.path.join(
@@ -118,9 +124,47 @@ ERAS = [
 ]
 
 
-def _gap_stats(series, horizon, lo_date=None, hi_date=None):
-    """Calm-vs-stress forward-return gap (bootstrap diff) for an optional
-    date-window subset. Returns (est, lo, hi, significant)."""
+def bootstrap_diff_ci_block(group_a, group_b, block, n_bootstrap=N_BOOTSTRAP, ci=0.90):
+    """Moving-block bootstrap of the difference (blok kontigu panjang `block`).
+
+    WAJIB untuk horizon > 1 hari. Label forward h-hari yang berturutan saling
+    tumpang tindih (30d berturut-turut berbagi 29 hari), sehingga resample iid
+    meremehkan varians dan membuat verdict "signifikan" terlalu mudah — pada
+    era3 7d, bootstrap iid satu-sisi menempatkan batas atas di sekitar 0,
+    artinya keputusannya nyaris undian.
+    """
+    if len(group_a) < 2 or len(group_b) < 2 or block < 2:
+        return None, None, None
+    rng = random.Random(BOOTSTRAP_SEED)
+
+    def resample(x):
+        n = len(x)
+        out = []
+        while len(out) < n:
+            start = rng.randrange(n)
+            out.extend(x[(start + k) % n] for k in range(block))
+        return out[:n]
+
+    diffs = []
+    for _ in range(n_bootstrap):
+        sa = resample(group_a)
+        sb = resample(group_b)
+        diffs.append(sum(sb) / len(sb) - sum(sa) / len(sa))
+    diffs.sort()
+    lo_idx = int((1 - ci) / 2 * n_bootstrap)
+    hi_idx = int((1 + ci) / 2 * n_bootstrap) - 1
+    est = sum(group_b) / len(group_b) - sum(group_a) / len(group_a)
+    return est, diffs[lo_idx], diffs[hi_idx]
+
+
+def _gap_stats(series, horizon, lo_date=None, hi_date=None, block=0):
+    """Calm-vs-stress forward-return gap for an optional date-window subset.
+    Returns (est, lo, hi, significant).
+
+    block=0 -> bootstrap iid (definisi lama, dipertahankan untuk kontinuitas).
+    block=h -> moving-block bootstrap yang menghormati label forward tumpang
+    tindih; ini yang dipakai sebagai verdict utama.
+    """
     buckets = {label: [] for _, _, label in BUCKET_EDGES}
     for point in series:
         d = point.get("date", "")
@@ -136,7 +180,10 @@ def _gap_stats(series, horizon, lo_date=None, hi_date=None):
     stress_vals = buckets["STRESS"]
     if len(calm_vals) < 2 or len(stress_vals) < 2:
         return None, None, None, None
-    est, lo, hi = bootstrap_diff_ci(calm_vals, stress_vals)
+    if block >= 2:
+        est, lo, hi = bootstrap_diff_ci_block(calm_vals, stress_vals, block)
+    else:
+        est, lo, hi = bootstrap_diff_ci(calm_vals, stress_vals)
     significant = hi < 0 if hi is not None else None
     return est, lo, hi, significant
 
@@ -161,22 +208,44 @@ def write_summary_cache(series):
         summary[f"gap_{horizon}d_ci_lo"] = round(lo, 2) if lo is not None else None
         summary[f"gap_{horizon}d_ci_hi"] = round(hi, 2) if hi is not None else None
         summary[f"gap_{horizon}d_significant"] = sig
-        # Per-era
+        # Per-era. Verdict UTAMA memakai moving-block bootstrap (blok = horizon)
+        # karena label forward tumpang tindih; verdict iid disimpan terpisah
+        # sebagai rujukan historis/audit, bukan sebagai label utama.
         for label, lo_date, hi_date in ERAS:
             e_est, e_lo, e_hi, e_sig = _gap_stats(series, horizon, lo_date, hi_date)
             p = f"gap_{horizon}d_{label}"
             summary[p] = round(e_est, 2) if e_est is not None else None
             summary[f"{p}_significant"] = e_sig
+            summary[f"{p}_ci_lo"] = round(e_lo, 2) if e_lo is not None else None
+            summary[f"{p}_ci_hi"] = round(e_hi, 2) if e_hi is not None else None
+            b_est, b_lo, b_hi, b_sig = _gap_stats(series, horizon, lo_date, hi_date,
+                                                  block=horizon)
+            summary[f"{p}_significant_block"] = b_sig
+            summary[f"{p}_ci_lo_block"] = round(b_lo, 2) if b_lo is not None else None
+            summary[f"{p}_ci_hi_block"] = round(b_hi, 2) if b_hi is not None else None
+            # Margin keputusan (pp): makin kecil, makin rapuh. ci_hi_block ~ 0
+            # berarti verdict nyaris undian dan TIDAK layak jadi label "stable".
+            summary[f"{p}_margin_block"] = round(-b_hi, 2) if b_hi is not None else None
         # Era-stability across the two recent, well-populated eras (era2+era3):
         # edge is "stable" only if both era2 and era3 are significantly NEGATIVE
-        # (the working direction). If era3 is positive or insignificant, the
-        # edge has faded/inverted in the current regime.
+        # (the working direction). Definisi UTAMA tetap uji standar (iid) supaya
+        # label historis tidak berubah diam-diam; varian blok disediakan di
+        # `..._era_stable_block` + `..._margin_block` sebagai pembanding.
         s2 = summary.get(f"gap_{horizon}d_era2_significant")
         s3 = summary.get(f"gap_{horizon}d_era3_significant")
         g2 = summary.get(f"gap_{horizon}d_era2")
         g3 = summary.get(f"gap_{horizon}d_era3")
         summary[f"gap_{horizon}d_era_stable"] = bool(
             s2 and s3 and g2 is not None and g3 is not None and g2 < 0 and g3 < 0
+        )
+        # Varian konservatif: signifikan HANYA kalau lolos uji yang menghormati
+        # label tumpang tindih (blok = horizon). Saat ini era2 & era3 lolos uji
+        # standar tapi TIDAK lolos uji blok -> jangan tampilkan "era-stable"
+        # tanpa menyebut margin_block yang negatif.
+        b2 = summary.get(f"gap_{horizon}d_era2_significant_block")
+        b3 = summary.get(f"gap_{horizon}d_era3_significant_block")
+        summary[f"gap_{horizon}d_era_stable_block"] = bool(
+            b2 and b3 and g2 is not None and g3 is not None and g2 < 0 and g3 < 0
         )
     total_with_signal = sum(
         1 for p in series
@@ -275,8 +344,9 @@ def bootstrap_mean_ci(values, n_bootstrap=N_BOOTSTRAP, ci=0.90):
         return None, None, None
     means = []
     n = len(values)
+    rng = random.Random(BOOTSTRAP_SEED)
     for _ in range(n_bootstrap):
-        sample = [values[random.randrange(n)] for _ in range(n)]
+        sample = [values[rng.randrange(n)] for _ in range(n)]
         means.append(sum(sample) / n)
     means.sort()
     lo_idx = int((1 - ci) / 2 * n_bootstrap)
@@ -298,10 +368,11 @@ def bootstrap_diff_ci(group_a, group_b, n_bootstrap=N_BOOTSTRAP, ci=0.90):
     if len(group_a) < 2 or len(group_b) < 2:
         return None, None, None
     n_a, n_b = len(group_a), len(group_b)
+    rng = random.Random(BOOTSTRAP_SEED)
     diffs = []
     for _ in range(n_bootstrap):
-        sample_a = [group_a[random.randrange(n_a)] for _ in range(n_a)]
-        sample_b = [group_b[random.randrange(n_b)] for _ in range(n_b)]
+        sample_a = [group_a[rng.randrange(n_a)] for _ in range(n_a)]
+        sample_b = [group_b[rng.randrange(n_b)] for _ in range(n_b)]
         diffs.append(sum(sample_b) / n_b - sum(sample_a) / n_a)
     diffs.sort()
     lo_idx = int((1 - ci) / 2 * n_bootstrap)

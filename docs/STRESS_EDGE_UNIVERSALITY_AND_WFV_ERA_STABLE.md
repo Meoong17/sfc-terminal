@@ -171,3 +171,47 @@ keputusannya ≈ 0 pada CI 90% satu-sisi dan verdict-nya dapat berubah antar-run
 - `sfc_pct` = replay faktor tereduksi dari cache WFV, bukan replay penuh sistem
   live. Dipakai sebagai tolok ukur inti, bukan deskripsi sistem live.
 - Uji lintas-aset mencakup tiga aset besar; stablecoin/aset non-kripto tidak diuji.
+
+## PERBAIKAN DITERAPKAN (2026-09-11) — verdict deterministik + margin diekspos
+
+1. **Determinisme.** `analysis/walk_forward_validation.py`: RNG bootstrap di-seed
+   (`BOOTSTRAP_SEED = 42`, `random.Random(...)` lokal per panggilan). Sebelumnya
+   tanpa seed → verdict bisa berubah antar-run pada data yang sama.
+   Dibuktikan: dua run penuh berturut-turut → 62 kunci identik (kecuali `generated_at`).
+2. **Uji yang menghormati label tumpang tindih.** Fungsi baru
+   `bootstrap_diff_ci_block()` + parameter `block` di `_gap_stats()`: moving-block
+   bootstrap (blok = horizon).
+3. **Margin disimpan, bukan disembunyikan.** Cache kini memuat
+   `gap_{h}d_{era}_ci_lo/_ci_hi`, `..._significant_block`, `..._ci_hi_block`,
+   `..._margin_block` (margin = −ci_hi_block; **negatif = uji blok tidak lolos**).
+4. **Definisi utama `era_stable` TIDAK diubah** (tetap uji standar/iid) supaya label
+   historis tidak berubah diam-diam; varian konservatif `era_stable_block` disediakan
+   sebagai pembanding.
+5. `collect.py` meneruskan `wfv_gap_{7d,30d}_era3_significant_block`,
+   `_era3_margin_block`, `_era_stable_block` ke `data.json`.
+6. Kartu WFV di `index.html` menampilkan baris **Regime check (era2 vs era3)** plus
+   peringatan ⚠ bila margin era3 negatif. (index.html ber-flag skip-worktree →
+   berlaku live tapi tidak ikut commit.)
+
+Hasil (dua run identik):
+
+```
+horizon  era    est(pp)   sig_iid   margin_block   era_stable   era_stable_block
+7d       era2    -1.34    True        -0.91          True          False
+7d       era3    -0.68    True        -0.75          True          False
+30d      era2    -4.59    True        -6.51          True          False
+30d      era3    -4.43    True        -1.21          True          False
+```
+
+Interpretasi: full-sample tetap kokoh; era2 dan era3 lolos uji standar TAPI margin
+block-nya negatif — di bawah uji yang menghormati label forward tumpang tindih,
+keduanya tidak mengecualikan nol. Karena itu klaim era-stability kini ditampilkan
+**bersama marginnya**, bukan sebagai badge kosong.
+
+**Belum diputuskan (menunggu pemilik model):** apakah `era_stable` utama harus
+dipindah ke definisi blok (konsekuensinya menjadi `False` untuk era2 DAN era3).
+Saya tidak melakukannya sepihak karena (a) itu membatalkan klaim era-stable inti yang
+selama ini tercatat sebagai satu-satunya konfirmasi terverifikasi, dan (b) hasil blok
+sangat bergantung pilihan panjang blok (= horizon) — **sensitivitas panjang blok wajib
+diuji lebih dulu** sebelum dijadikan label utama. Selama itu, field `_block` dan
+`_margin_block` sudah tersedia untuk pemeriksaan.
