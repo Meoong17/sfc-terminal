@@ -72,8 +72,16 @@ def _extract_from_soup(soup):
             if not date_parsed:
                 continue
             raw = [c.get_text(strip=True) for c in cells[1:-1]]
-            # A pending placeholder row is all dashes/empty (not yet reported) -> skip.
+            total_raw = cells[-1].get_text(strip=True)
+            # Skip a *pending* row: Farside pre-renders the current (not-yet-reported)
+            # session as dashes with a '0.0' total -- and sometimes a stray '0.0' listed
+            # in one fund column (e.g. MSBT) once that issuer reports. Without this, the
+            # pending row lands in the cache as a fake zero-flow day until the next run.
+            # A row is pending when its total is 0 and at least one issuer cell is a dash
+            # (real published days carry actual figures; holidays are all dashes too).
             if all(v in ('', '-') for v in raw):
+                continue
+            if '-' in raw and parse_value(total_raw) == 0.0:
                 continue
             etfs = {}
             for i, name in enumerate(etf_names):
