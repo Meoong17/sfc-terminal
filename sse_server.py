@@ -198,6 +198,7 @@ async def snapshot():
 _PUBLIC_FILES = {
     "index.html",   # SFC dashboard
     "sw.js",        # service worker
+    "manifest.json",  # PWA manifest (audit G10: dulu 404 walau Worker mengiklankannya)
     "data.json",    # pipeline output (public dashboard data)
     "btc_ws.json",  # live BTC ws data (public dashboard data)
     "ai_analysis.json",  # weekly Hermes LLM analyst brief (public dashboard data)
@@ -218,7 +219,9 @@ async def static_file(path: str):
     # resolve() + is_file() blocks path traversal even if the list grows.
     # `fonts/` prefix is allowed for the self-hosted Inter webfonts only.
     is_font = path.startswith("fonts/") and path.endswith(".woff2")
-    if path in _PUBLIC_FILES or is_font:
+    # Ikon PWA (audit G10): hanya PNG di bawah icons/, tetap melewati guard traversal di bawah.
+    is_icon = path.startswith("icons/") and path.endswith(".png")
+    if path in _PUBLIC_FILES or is_font or is_icon:
         fpath = (BASE_DIR / path).resolve()
         try:
             fpath.relative_to(BASE_DIR.resolve())
