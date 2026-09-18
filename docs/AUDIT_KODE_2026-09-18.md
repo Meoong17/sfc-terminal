@@ -295,7 +295,11 @@ tidak sepenuhnya tepat dan label perlu dikoreksi.
 
 ---
 
-## E. Rekomendasi berprioritas (belum dieksekusi — audit ini tidak mengubah kode)
+## E. Rekomendasi berprioritas
+
+Status: per 2026-09-18 hanya **dua perbaikan non-scoring di lapisan operasi** yang sudah diterapkan
+(G1 sinkronisasi + propagasi exit kode skrip training mingguan; G2 `chown sse_server.log`). Tidak ada kode
+skoring yang diubah.
 
 **P0 — perbaikan non-scoring (bisa langsung, tanpa walk-forward):**
 1. Cache atomic: semua `_save*` di `data_sources/` → pola `tmp + json.load validasi + os.replace` (C1).
@@ -326,11 +330,114 @@ tidak sepenuhnya tepat dan label perlu dikoreksi.
 
 ---
 
+## G. Lapisan operasi, dashboard, dan penyajian publik (`[V]`, workstream lanjutan)
+
+Audit higiene operasi + kontrak field dashboard + lapisan publik. Dua item KRITIS sudah **saya perbaiki**
+(ditandai DIPERBAIKI); sisanya laporan temuan tanpa perubahan.
+
+### G1. `[V]` KRITIS (DIPERBAIKI) — Pelatihan mingguan gagal total tapi dilaporkan `ok` selama berbulan-bulan
+Cron `7c8b06a1fddf` ("SFC Weekly Heavy Train", `0 3 * * 0`) mengeksekusi salinan Hermes
+`~/.hermes/scripts/sfc-weekly-train.sh`, **Last run: 2026-09-13 ok**. Isi run terakhir:
+`can't open file '/home/ubuntu/sfc/train_mamba.py'` (tidak ada; file sebenarnya `models/train_mamba.py`)
+→ `[MAMBA] ❌ Training failed (exit=2)`; langkah 2 → `ModuleNotFoundError: No module named 'qlstm_model'`;
+lalu skrip tetap mencetak `✅ Weekly heavy training complete` **dan tidak pernah `exit 1`** → Hermes mencatat `ok`.
+
+Bukti tambahan (verifikasi saya): fungsi yang dipanggil langkah 2 **tidak ada** —
+`from qlstm_enhanced import build_training_data` → `ImportError: cannot import name 'build_training_data'`
+(`models/qlstm_enhanced.py` 10.788 B). Jadi langkah 2 rusak bukan hanya karena `sys.path`.
+
+Perbaikan yang diterapkan: (a) salinan Hermes disinkronkan ke versi repo (md5 `e68616353d0d2c3400a215201d55ec99`
+identik repo ↔ `~/.hermes/scripts`); (b) `sys.path.insert(0, '/home/ubuntu/sfc/models')` (mengikuti aturan
+wajib `PYTHONPATH=models` untuk modul ML); (c) `QLSTM_EXIT=${PIPESTATUS[0]}` + `exit 1` bila salah satu
+langkah gagal — logika diuji dua arah (`2/1` → `exit 1`, `0/0` → `exit 0`), `bash -n` bersih.
+Konsekuensi yang diharapkan: run 2026-09-20 akan berstatus error (jujur) sampai langkah 2 diperbaiki.
+**Keputusan yang saya tahan untuk Anda:** menulis ulang langkah QLSTM memakai API `qlstm_enhanced` saat ini,
+atau memensiunkan langkah itu — terlebih mengingat temuan A3 (checkpoint QLSTM berasal dari target sirkular,
+`val_loss 8.1e-08`) dan fakta Mamba sudah dikeluarkan dari retrain harian 2026-09 (inert).
+
+### G2. `[V]` KRITIS (DIPERBAIKI) — `sse_server.log` milik root → restart watchdog akan gagal tanpa suara
+`sse_server.log` = `root:root 644` (14.581.181 B) padahal `sse-watchdog.sh:32` melakukan
+`nohup "$PY" sse_server.py >> "$LOG" 2>&1 &` sebagai user `ubuntu`; redirect gagal → server tidak pernah
+start, tapi `:34` tetap menulis PID ke `$PID_FILE`, dan watchdog hanya bicara via stderr yang dibuang ke
+`/dev/null` → kegagalan tak terlihat. Proses yang hidup (start 23 Agu) hanya bertahan karena FD lama.
+Diperbaiki: `sudo chown ubuntu:ubuntu sse_server.log` (terverifikasi `-rw-r--r-- ubuntu ubuntu`).
+Sisa pekerjaan: entri logrotate untuk file ini + verifikasi pasca-start (`kill -0` + `curl /health`) dengan
+keluar non-zero bila gagal.
+
+### G3. `[V]` KRITIS — `sfc-pipeline.sh` tidak punya jalur exit non-zero
+`sfc-pipeline.sh:4` `set -uo pipefail` (tanpa `-e`); nilai balik `collect_with_retry` (return `1` di `:50`)
+diabaikan di `:53` (`COLLECT_RESULT`/`GIT_RESULT` hanya dicetak); perintah terakhir adalah
+`log "Pipeline done: ..."` (fungsi `log` = `echo` → exit 0). Akibat: kegagalan `collect.py` atau push
+`data.json` **tidak pernah** terlihat sebagai error cron. Perbaikan yang disarankan: `exit 1` bila
+`COLLECT_RESULT=failed` atau `GIT_RESULT` ∈ {push-failed, sync-failed}.
+
+### G4. `[V]` HIGH — Drift salinan repo ↔ `~/.hermes/scripts` dan dua skrip menunjuk venv yang tidak ada
+`ws-watchdog.sh` beda (`nohup python3 binance_ws.py` di repo vs `/usr/bin/python3` di salinan Hermes);
+`sfc-pipeline.sh` dan `sse-watchdog.sh` identik. `scripts/weekly-model-train.sh:9` meng-`export
+PYTHONPATH="${REPO_DIR}/sfc2/venv/..."` sedangkan `/home/ubuntu/sfc2` **tidak ada** (verifikasi `ls`),
+dan `scripts/mamba-weekly-train.sh` juga memakai `python3` telanjang — keduanya skrip mati (tidak dipanggil
+cron mana pun) dan pasti gagal bila dijalankan. Perbaikan: satu sumber kebenaran (symlink) + pre-flight
+`"$PY" -c "import ..."` dan pemeriksaan md5.
+
+### G5. `[V]` HIGH — Dashboard memakai 2 ambang zona, backend 4 → warna dan label saling bertentangan
+`index.html:2582` (`_zoneClass`) memakai `>=50` / `>=25`, sedangkan `collect.py:3171` punya 4 zona
+(`CRITICAL >0.75`, `HIGH >0.50`, `ELEVATED >0.25`, `NORMAL`). Pada skor 60 backend berkata `HIGH` (oranye)
+tapi `index.html:2746` memberi kelas `zone-critical` (merah), sementara teks badge mengambil `d.zone` mentah
+→ badge berlabel "HIGH" berwarna CRITICAL. Perbaikan: ekspor ambang dari backend, atau tambah kelas 0.50–0.75.
+
+### G6. `[V]` MED — Falsy-zero di UI (`||`) menelan nilai 0 yang sah
+`index.html:2369-2375`, `2759`: `d.composite_confidence || 0.5`, `(d.fng||50) < 15`, `d.rsi_14 || 50`.
+Saya turunkan severity dari HIGH ke MED karena dampak praktisnya terbatas: `composite_confidence` di-clamp
+≥ 0.05 dan FNG/RSI tepat 0 praktis tidak terjadi (kini fng 68 / RSI-14 bulanan 52,5 → tidak terpicu).
+Tetap bug kelas: nilai sah 0 akan berubah menjadi default netral/optimistis. Perbaikan: `?? 50` / `!= null`.
+
+### G7. `[V]` MED — Worker mengembalikan `{}` dengan status 200 saat origin gagal → service worker men-cache sebagai data segar
+`worker/index.js:373-374`: kegagalan origin → `new Response('{}', { status: 200, ...})` sehingga
+`res.ok === true` di `sw.js:46-51` → `{}` ikut di-`cache.put` dengan header `Date` baru → cek umur
+`sw.js:58-65` lolos dan dashboard menerima JSON kosong sebagai data terkini. Jalur `/snapshot` sudah benar
+(`502 Backend unreachable`, `worker/index.js:325`). Perbaikan: status non-2xx / flag `error` di body, dan SW
+jangan menyimpan body kosong; jalur `catch` hanya boleh menyajikan cache bila umurnya ≤ `MAX_DATA_AGE_MS`.
+
+### G8. `[V]` MED — `/snapshot`: cache-buster `?t=` mematikan cache, dan respons ber-CORS bisa ter-cache edge
+`worker/index.js:319-322`: `const cacheKey = new Request(url.toString())` menyertakan query, jadi setiap
+`?t=<baru>` melewati cache sepenuhnya; early-return `if (cached) return cached` juga melewati
+`getCorsHeaders(request)`. Header `access-control-allow-origin` dinamis + `cache-control: public, max-age=30`
+berarti respons ber-ACAO dapat disimpan dan disajikan ke origin lain di luar allowlist.
+Perbaikan: cacheKey tanpa query + `Vary: Origin` di luar jalur cache (atau `Cache-Control: private`).
+
+### G9. `[V]` LOW — Aset/versi service worker
+`sw.js:46-51` sudah update cache, lalu `sw.js:69-73` mengulang `fetch` + `cache.put` untuk request yang sama
+(dua permintaan per poll `data.json`); string versi tidak konsisten (`CACHE_NAME v13` di `:5`, komentar v11 di
+`:2`, log v9 di `:171`); `/sw.js` disajikan `public, max-age=3600` (`worker/index.js:476`) sehingga update
+service worker tertunda hingga 1 jam.
+
+### G10. `[V]` LOW — Klaim PWA tidak dapat dijalankan
+`manifest.json`: `"icons": []`; `index.html` tidak memuat `<link rel="manifest">`; `/manifest.json` → **404**,
+`/app.js` → **404** (masih diteruskan Worker tapi tidak ada di `_PUBLIC_FILES` `sse_server.py:198-207`);
+`/icon-192.png` → **200 `text/html` 359.664 B** (catch-all SPA menyajikan index.html, menyamarkan 404).
+Perbaikan: sediakan ikon + tautkan manifest, atau hapus klaim PWA.
+
+### G11. `[V]` LOW — SSE: klien kedua tidak menerima pembaruan; komentar tidak sesuai perilaku
+`sse_server.py:64-71`: mtime dedup memakai variabel global (`_btc_mtime/_sfc_mtime`, `_last_broadcast_*`) →
+hanya koneksi pertama yang "melihat" perubahan berkas; klien konkuren hanya menerima heartbeat. Komentar
+`:147` ("Heartbeat ... also delivers initial data") tidak benar: payload heartbeat hanya `{"ts": ...}` (`:148`).
+`/events` publik tanpa auth dan tanpa cap jumlah klien (sudah tercatat terbuka di `docs/SECURITY_AUDIT.md`).
+
+### G12. `[V]` LOW — Cakupan logrotate
+`/etc/logrotate.d/sfc-pipeline` hanya menangani `sfc-pipeline.log` (24,6 MB, `daily/rotate 7/size 50M`);
+`sse_server.log` (14,5 MB) **tidak punya entri** → tumbuh tanpa batas. Catatan operasi lain: job
+`707bb2af6b4e` ("SFC Weekly AI Analyst") ber-`deliver: local` (tidak ada kanal pengiriman) — perlu dipastikan
+outputnya memang dikonsumsi dari berkas, bukan diharapkan terkirim.
+
+
+
 ## F. Yang belum tercakup (jujur)
 
-1. **Sub-audit pipeline/dashboard TIMEOUT** (600 s, 46 panggilan) — kontrak `inject_data.py`,
-   `index.html` 157 KB (skip-worktree), `worker/index.js`, `sw.js`, `sse_server.py`, konsistensi
-   cron/venv belum diaudit. Saya hanya sempat menutup risiko stdout-contamination (D2).
+1. **Workstream operasi/dashboard/publik** → **SUDAH DITUTUP** di bagian G (14 temuan G1-G12, dua di antaranya
+   sudah diperbaiki). Yang masih terbuka dari workstream itu: keputusan nasib langkah QLSTM (G1), entri
+   logrotate `sse_server.log` + verifikasi restart watchdog (G2), jalur exit `sfc-pipeline.sh` (G3),
+   rate-limit `/events` (G11), identitas `worker/index.js` on-disk vs deployment aktif, config
+   `cloudflared`/systemd/nanti WAF, dan master `/home/ubuntu/index.html` (mtime 11 Sep).
 2. ~~Faktor `Rt`/`Sc` konstan sepanjang jendela histori `.factor_history.json`~~ → **SUDAH DITUTUP** (A13/A14):
    konstantanya adalah artefak SMA 30 hari (bukan input mati); `Rt` dan `Sc` direproduksi persis dari
    `.daily_market_cache.json`. Sisa celahnya hanya tampilan (spot vs rata-rata) — tercatat sebagai A13.

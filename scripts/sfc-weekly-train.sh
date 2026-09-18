@@ -28,6 +28,7 @@ echo "[2/2] QLSTM model retrain..." | tee -a "$LOG"
 /home/ubuntu/sfc/.venv/bin/python -c "
 import sys, os
 sys.path.insert(0, '/home/ubuntu/sfc')
+sys.path.insert(0, '/home/ubuntu/sfc/models')  # modul ML ada di models/ (bukan root)
 from qlstm_model import train
 from qlstm_enhanced import build_training_data
 print('[QLSTM] Building training data from git history...')
@@ -49,8 +50,15 @@ if model is not None:
     print('[QLSTM] ✅ Model saved to qlstm_model.pt')
 else:
     print('[QLSTM] ❌ Training failed')
-" 2>&1 | tee -a "$LOG"
+)" 2>&1 | tee -a "$LOG"
+QLSTM_EXIT=${PIPESTATUS[0]}
 
 # ── Summary ──
 echo "" | tee -a "$LOG"
-echo "✅ Weekly heavy training complete — $(date)" | tee -a "$LOG"
+if [ "${MAMBA_EXIT:-1}" -eq 0 ] && [ "${QLSTM_EXIT:-1}" -eq 0 ]; then
+    echo "✅ Weekly heavy training complete — $(date)" | tee -a "$LOG"
+    exit 0
+else
+    echo "❌ Weekly heavy training FAILED (mamba=${MAMBA_EXIT:-?} qlstm=${QLSTM_EXIT:-?}) — $(date)" | tee -a "$LOG"
+    exit 1
+fi
