@@ -14,6 +14,12 @@ set -uo pipefail
 REPO_DIR="/home/ubuntu/sfc"
 cd "$REPO_DIR" || exit 1
 
+# Cron fires with a minimal environment: pin HOME (git + ssh key lookup) and the
+# tool paths rather than trusting PATH.
+export HOME="${HOME:-/home/ubuntu}"
+GIT="/usr/bin/git"
+[ -x "$GIT" ] || GIT="git"
+
 LOG="$REPO_DIR/logs/daily_state_backup.log"
 PYTHON="/home/ubuntu/sfc/.venv/bin/python3"
 
@@ -55,18 +61,18 @@ d = json.load(open('data_collection_daily.json'))
 print(len(d.get('dates', [])))" 2>/dev/null || echo "?")
 log "adv_regime rows=$ROWS (publication gate = 250)"
 
-git add -- "$SNAP_DIR" 2>>"$LOG" || { log "ERROR git add failed"; exit 1; }
-if git diff --cached --quiet -- "$SNAP_DIR"; then
+"$GIT" add -- "$SNAP_DIR" 2>>"$LOG" || { log "ERROR git add failed"; exit 1; }
+if "$GIT" diff --cached --quiet -- "$SNAP_DIR"; then
   log "no change since last snapshot — nothing to commit"
   exit 0
 fi
 
-if git commit -q \
+if "$GIT" commit -q \
     -m "chore(backup): snapshot gitignored daily state ($(date +%F), adv_regime rows=$ROWS)" \
     -m "Weekly plain-JSON copy of state kept out of git by .gitignore. Source data_collection_daily.json is the adv_regime (k-means+Markov) daily observation set: +1 row/day, publishes at 250 rows, so a lost file resets that gate to zero (would delay publication to ~2027). Snapshot is named adv_regime_dataset.json because the .gitignore pattern matches the original basename in any directory. Live file remains untracked." \
     -- "$SNAP_DIR"; then
-  log "committed $(git rev-parse --short HEAD)"
-  if git push -q origin main 2>>"$LOG"; then
+  log "committed $("$GIT" rev-parse --short HEAD)"
+  if "$GIT" push -q origin main 2>>"$LOG"; then
     log "pushed to origin/main"
   else
     log "WARN push failed — commit is local; sfc-pipeline.sh pushes whenever AHEAD>0"
