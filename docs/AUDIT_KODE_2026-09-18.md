@@ -30,6 +30,8 @@ Tidak ada kode produksi yang diubah dalam audit ini. `git status` bersih kecuali
 | A10 | MPI: komponen gagal diisi 0.50 berbobot penuh + penalti `_pen_mpi` belum pernah menyala | MED | YA (kecil) | `[V]` |
 | A11 | `confidence_components` mencampur 3 besaran; DVOL tampil dua kali; penalti RSI tidak tampil | MED | Tampilan | `[V]` |
 | A12 | `EWMA` correction inert tapi `ewma_available: true`; instance yang disimpan salah | MED | Tidak (kini) | `[V]` |
+| A13 | Faktor memakai SMA 30 hari tapi UI menampilkan nilai spot (faktor tidak dapat direproduksi pembaca) | MED | Tampilan | `[V]` |
+| A14 | Sensitivitas faktor dekat saturasi (Rt 0.62 dari plafon; dRt/dFNG 0.0575) → skor tidak responsif harian | LOW | Tidak langsung | `[V]` |
 | B1–B10 | Metode rusak/konstan yang saat ini berbobot 0 (M8 satuan bps vs persen, M12 tanpa `open`, M10/M11/M16 ambang skala bulanan, M21/M22/M23/M25/M30/M31 ambang di luar rentang fisik) | MED–HIGH | Tidak (kini) — **jadi YA bila bobot kausal di-refit** | `[V]` |
 | C1–C8 | Cache non-atomic (23 penulis) + `timeout 150` SIGKILL; stablecoin refresh TTL tanpa data; alphractal 33 hari + wipe-on-failure; 404 SPX 2540×; drift/DQ mati tapi `available:true`; sigma metode beda satuan (floor 3.0); `ml_ensemble_confidence` bukan keyakinan | MED–LOW | Tidak | `[V]`/`[R]` |
 
@@ -191,6 +193,26 @@ bukan kontribusinya (0.408×0.15 = 0.061); penalti RSI tidak tampil di komponen 
 Kartu UI merender dict ini (`app.js:778` `Object.entries(d.confidence_components)`).
 Komentar `3549-3552` ("penalty dihitung SEKALI dan dipakai computation + display") tidak berlaku untuk RSI/DVOL.
 
+### A13. `[V]` MED — Faktor memakai SMA 30 hari, UI menampilkan nilai spot (tidak dapat direproduksi pembaca)
+`collect.py:2135-2151` mengoper **rata-rata 30 hari** ke `score_factors_from_market`, sedangkan dashboard
+menampilkan nilai spot. Bukti reproduksi persis dari `.daily_market_cache.json`:
+
+| Faktor | Rumus aktual | Hasil hitung | data.json |
+|--------|--------------|--------------|-----------|
+| Rt | `sigmoid(fng_30d=72.77, 50, k=0.08)` + whale_adj(55.4 → +0.216) | **+2.3804** | +2.3804 |
+| Sc | `-sigmoid(dxy_30d=99.21, 100, k=0.2)` ×0.5 (rezim MIXED, corr 0.005) | **+0.1183** | +0.1183 |
+
+Artinya: pembaca yang mencoba mereproduksi faktor dari angka di dashboard (FNG spot 68, DXY spot 100.15)
+akan meleset — Rt seharusnya +2.067 (selisih 0.314), Sc +0.047. Perbaikannya: tampilkan nilai input yang
+benar-benar dipakai (30d-SMA) di samping spot, atau beri label "faktor memakai SMA 30 hari".
+
+### A14. `[V]` LOW — Sensitivitas faktor dekat saturasi → skor tidak responsif pada rentang normal
+`Rt = +2.380` dari plafon clamp ±3.0 (jarak 0.620) dengan `dRt/dFNG = 0.0575` per poin
+(gerakan 10 poin FNG = 0.575 pada skala ±3). Dalam 10 entri `.factor_history.json`, rentang gerak:
+Rt 0.0019, Sc 0.0000 (1 nilai unik), St 0.0006, Ft 0.0012, Lt 0.0039 — semuanya < 0.5% rentang faktor.
+Ini **konsekuensi desain SMA 30 hari**, bukan input mati (lihat A13), tetapi berarti klaim dashboard
+tentang perubahan sentimen harian praktis tidak tercermin di faktor.
+
 ### A12. `[V]` MED — EWMA "online learning" inert tapi dilaporkan aktif
 `models/ewma_state.json` = `{"baseline": 0.0, "history": []}`; 2542/2542 baris log identik
 (`[EWMA] Corrected: 12.7% → 12.7%`, `26.4% → 26.4%`); `data.json` tetap `ewma_available: true`.
@@ -309,8 +331,9 @@ tidak sepenuhnya tepat dan label perlu dikoreksi.
 1. **Sub-audit pipeline/dashboard TIMEOUT** (600 s, 46 panggilan) — kontrak `inject_data.py`,
    `index.html` 157 KB (skip-worktree), `worker/index.js`, `sw.js`, `sse_server.py`, konsistensi
    cron/venv belum diaudit. Saya hanya sempat menutup risiko stdout-contamination (D2).
-2. Faktor `Rt`/`Sc` konstan sepanjang jendela histori `.factor_history.json` (8 periode) — belum
-   ditelusuri apakah konstantanya struktural atau input mati (kandidat audit lanjutan).
+2. ~~Faktor `Rt`/`Sc` konstan sepanjang jendela histori `.factor_history.json`~~ → **SUDAH DITUTUP** (A13/A14):
+   konstantanya adalah artefak SMA 30 hari (bukan input mati); `Rt` dan `Sc` direproduksi persis dari
+   `.daily_market_cache.json`. Sisa celahnya hanya tampilan (spot vs rata-rata) — tercatat sebagai A13.
 3. M65 (CNN), M68 (DRL), M69 (GNN) hanya dilihat call-site-nya (semuanya display-only).
 4. Validitas isi `data_collection.json` per-era (perubahan skala historis m5/m6) belum diuji.
 5. Root cause CoinGecko konsisten partial (0–3/4 koin stablecoin) belum dipastikan.
