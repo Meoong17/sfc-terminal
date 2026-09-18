@@ -346,14 +346,15 @@ Bukti tambahan (verifikasi saya): fungsi yang dipanggil langkah 2 **tidak ada** 
 `from qlstm_enhanced import build_training_data` → `ImportError: cannot import name 'build_training_data'`
 (`models/qlstm_enhanced.py` 10.788 B). Jadi langkah 2 rusak bukan hanya karena `sys.path`.
 
-Perbaikan yang diterapkan: (a) salinan Hermes disinkronkan ke versi repo (md5 `e68616353d0d2c3400a215201d55ec99`
-identik repo ↔ `~/.hermes/scripts`); (b) `sys.path.insert(0, '/home/ubuntu/sfc/models')` (mengikuti aturan
-wajib `PYTHONPATH=models` untuk modul ML); (c) `QLSTM_EXIT=${PIPESTATUS[0]}` + `exit 1` bila salah satu
-langkah gagal — logika diuji dua arah (`2/1` → `exit 1`, `0/0` → `exit 0`), `bash -n` bersih.
-Konsekuensi yang diharapkan: run 2026-09-20 akan berstatus error (jujur) sampai langkah 2 diperbaiki.
-**Keputusan yang saya tahan untuk Anda:** menulis ulang langkah QLSTM memakai API `qlstm_enhanced` saat ini,
-atau memensiunkan langkah itu — terlebih mengingat temuan A3 (checkpoint QLSTM berasal dari target sirkular,
-`val_loss 8.1e-08`) dan fakta Mamba sudah dikeluarkan dari retrain harian 2026-09 (inert).
+Perbaikan yang diterapkan: (a) salinan Hermes disinkronkan (md5 repo ↔ `~/.hermes/scripts` identik);
+(b) **langkah QLSTM dipensiunkan** (keputusan user) — skrip menjadi Mamba-only; (c) pre-flight nyata
+(`"$PY" -c "import torch, einops"` → terverifikasi `torch 2.12.0+cu130`, `einops 0.8.2`, plus cek keberadaan
+`models/train_mamba.py`) dan `MAMBA_EXIT=${PIPESTATUS[0]}` + `exit 1` bila gagal — logika diuji dua arah
+(`2` → `exit 1`, `0` → `exit 0`), `bash -n` bersih, salinan Hermes md5 `8552df696b19216df5b016dd0dcfd0e9`
+identik dengan repo. Efeknya: run mingguan berikutnya melaporkan status jujur (selesai hanya bila benar
+selesai). Catatan penting: Mamba sendiri sudah dikeluarkan dari retrain harian 2026-09 karena inert
+(`m32_mamba: null` di `data.json`) — bila Mamba memang tidak dipakai, seluruh job `7c8b06a1fddf` layak
+dipensiunkan juga (kandidat keputusan berikutnya).
 
 ### G2. `[V]` KRITIS (DIPERBAIKI) — `sse_server.log` milik root → restart watchdog akan gagal tanpa suara
 `sse_server.log` = `root:root 644` (14.581.181 B) padahal `sse-watchdog.sh:32` melakukan
