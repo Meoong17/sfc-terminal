@@ -18,6 +18,7 @@ cd "$REPO_DIR" || { log "FATAL: Cannot cd to $REPO_DIR"; exit 1; }
 
 COLLECT_RESULT="skipped"
 GIT_RESULT="skipped"
+GIT_ADD_FAILED=0
 
 PYTHON="/home/ubuntu/sfc/.venv/bin/python3"
 TMP_FILE="$REPO_DIR/data.json.tmp"
@@ -82,7 +83,10 @@ $PYTHON inject_data.py data.json index.html 2>>sfc-pipeline.log || \
 # only needs refreshing every THROTTLE_MIN. Non-data changes (code/dashboard) and any
 # unpushed local commits always push immediately.
 log "Committing (throttled)..."
-git add data.json
+if ! git add data.json 2>>sfc-pipeline.log; then
+    log "❌ git add data.json FAILED — data baru tidak akan ter-commit"
+    GIT_ADD_FAILED=1
+fi
 # Audit 2026-08-03: plain `git add -u` staged EVERY modified tracked file,
 # so unrelated code edits got swept into "auto: SFC data" commits with a
 # generic message (happened to collect.py/circuit_breaker.py/etf_flow.py).
@@ -145,4 +149,16 @@ fi
 
 git update-index --skip-worktree index.html 2>/dev/null || true
 
+# ── Exit status (audit 2026-09-18, G3) ──
+# Sebelumnya skrip selalu keluar 0 (perintah terakhir `log` = echo) sehingga cron mencatat "ok"
+# walau collect gagal atau push data.json gagal. Sekarang kegagalan nyata = exit 1 agar terlihat.
+case "$COLLECT_RESULT" in failed) PIPELINE_FAILED=1 ;; *) PIPELINE_FAILED=0 ;; esac
+case "$GIT_RESULT" in push-failed|sync-failed) PIPELINE_FAILED=1 ;; esac
+if [ "$GIT_ADD_FAILED" -eq 1 ]; then PIPELINE_FAILED=1; fi
+
 log "Pipeline done: collect=$COLLECT_RESULT | git=$GIT_RESULT"
+if [ "$PIPELINE_FAILED" -eq 1 ]; then
+    log "❌ Pipeline FAILED (collect=$COLLECT_RESULT git=$GIT_RESULT)"
+    exit 1
+fi
+exit 0

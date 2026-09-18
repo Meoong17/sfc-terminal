@@ -316,10 +316,24 @@ export default {
 
     // /snapshot — initial data (cached 30s for faster repeat loads)
     if (path === '/snapshot') {
-      const cacheKey = new Request(url.toString());
+      // Audit 2026-09-18 (G8): kunci cache TIDAK menyertakan query. Sebelumnya
+      // `new Request(url.toString())` membuat setiap `?t=<baru>` menjadi entri baru →
+      // cache-buster justru mematikan cache sepenuhnya, dan respons ber-ACAO ikut tersimpan.
+      const cacheKey = new Request(url.origin + url.pathname);
       const cache = caches.default;
       const cached = await cache.match(cacheKey);
-      if (cached) return cached;
+      if (cached) {
+        // Header CORS dihitung ulang per-request (jangan mewarisi ACAO pemanggil pertama).
+        return new Response(await cached.text(), {
+          status: 200,
+          headers: {
+            'Content-Type': 'application/json',
+            'Cache-Control': 'public, max-age=30',
+            'Vary': 'Origin',
+            ...getCorsHeaders(request),
+          },
+        });
+      }
 
       const resp = await fetchAny(env, '/snapshot', 'application/json');
       if (!resp) return new Response('Backend unreachable', { status: 502 });
@@ -329,6 +343,7 @@ export default {
         headers: {
           'Content-Type': 'application/json',
           'Cache-Control': 'public, max-age=30',
+          'Vary': 'Origin',
           ...getCorsHeaders(request),
         },
       });
@@ -370,9 +385,13 @@ export default {
     // /data.json — SFC live data (passthrough, no gzip — saves Worker CPU)
     if (path === '/data.json') {
       const resp = await fetchAny(env, '/data.json', 'application/json');
-      if (!resp) return new Response('{}', {
-        status: 200,
-        headers: { 'Content-Type': 'application/json', ...getCorsHeaders(request) },
+      // Audit 2026-09-18 (G7): sebelumnya kegagalan origin dibalas `{}` dengan status 200 →
+      // service worker menganggapnya data segar (res.ok) dan meng-cache `{}`, sehingga
+      // dashboard menerima "data kosong" sebagai pembacaan terkini. Non-2xx membuat
+      // index.html melempar (fallback ke data embedded) dan SW menolak men-cache.
+      if (!resp) return new Response(JSON.stringify({ error: 'unreachable' }), {
+        status: 502,
+        headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', ...getCorsHeaders(request) },
       });
       const data = await resp.json();
       return new Response(JSON.stringify(data), {
@@ -473,7 +492,9 @@ export default {
         status: 200,
         headers: {
           'Content-Type': contentType + '; charset=utf-8',
-          'Cache-Control': 'public, max-age=3600',
+          // Audit 2026-09-18 (G9): /sw.js tidak boleh di-cache 1 jam — update service worker
+          // tertunda selama itu. Skrip lain tetap boleh di-cache.
+          'Cache-Control': path === '/sw.js' ? 'no-cache, must-revalidate' : 'public, max-age=3600',
         },
       });
     }

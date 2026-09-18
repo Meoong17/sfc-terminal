@@ -1,9 +1,10 @@
 /**
- * Service Worker v11 — Network-first for index.html + reload guard
+ * Service Worker v14 — Network-first for index.html + reload guard
+ * (audit 2026-09-18: data.json tidak lagi menyimpan respons error/kosong; fetch ganda dihapus)
  */
 
-const CACHE_NAME = "sfc-terminal-v13";
-const DATA_CACHE = "sfc-data-v6";
+const CACHE_NAME = "sfc-terminal-v14";
+const DATA_CACHE = "sfc-data-v7";
 const MAX_DATA_AGE_MS = 5 * 60 * 1000; // 5 minutes (was 30 min — dashboard was serving stale data)
 
 const STATIC_ASSETS = [
@@ -40,11 +41,25 @@ self.addEventListener("fetch", e => {
 
   if (url.pathname.includes("data.json")) {
     // Stale-while-revalidate: serve cached instantly, update in background
+    // Audit 2026-09-18 (G7/G9):
+    //  - jangan simpan respons yang BUKAN data nyata (status non-2xx, body kosong, `{}`,
+    //    atau berisi {"error": ...}) — dulu Worker membalas `{}` status 200 dan ikut ter-cache;
+    //  - satu fetch saja: dulu ada fetch kedua di bawah yang mengulang permintaan & cache.put.
+    const isRealData = async (res) => {
+      if (!res || !res.ok) return false;
+      try {
+        const txt = (await res.clone().text()).trim();
+        if (txt === "" || txt === "{}") return false;
+        const j = JSON.parse(txt);
+        if (!j || j.error || Object.keys(j).length === 0) return false;
+      } catch (_) { return false; }
+      return true;
+    };
     e.respondWith(
       caches.open(DATA_CACHE).then(async cache => {
         const cachedResponse = await cache.match(e.request);
-        const networkFetch = fetch(e.request).then(res => {
-          if (res.ok) {
+        const networkFetch = fetch(e.request).then(async res => {
+          if (await isRealData(res)) {
             cache.put(e.request, res.clone());
           }
           return res;
@@ -64,14 +79,7 @@ self.addEventListener("fetch", e => {
           }
         }
 
-        // Serve cached, refresh in background
-        // We still fire networkFetch for the next visit
-        fetch(e.request).then(res => {
-          if (res.ok) {
-            cache.put(e.request, res.clone());
-          }
-        }).catch(() => {});
-
+        // Serve cached; networkFetch di atas sudah memperbarui cache untuk kunjungan berikutnya.
         return cachedResponse;
       })
     );
@@ -168,4 +176,4 @@ self.addEventListener("notificationclick", (event) => {
   );
 });
 
-console.log("[SW] Service Worker v9 loaded");
+console.log("[SW] Service Worker v14 loaded");
