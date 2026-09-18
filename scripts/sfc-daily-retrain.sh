@@ -31,7 +31,7 @@ hmm = HMMRegimeDetector()
 result = hmm.fit_from_git()
 if result:
     result.save('/home/ubuntu/sfc/models/hmm_regime.pkl')
-    print(f'[HMM] Retrained: {result.n_components} states, saved')
+    print(f'[HMM] Retrained: {result.n_regimes} states, saved')
 else:
     print('[HMM] Retrain failed or skipped')
 " 2>&1 | tee -a "$LOG"
