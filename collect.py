@@ -4347,7 +4347,10 @@ out = {
     "inst_methods_avg": round(inst_avg_value, 3) if inst_active_count > 0 and inst_avg_value is not None else None,
     # Stablecoin liquidity (M76-M80)
     "sc_methods_active": sc_active,
-    "total_methods_active": total_active_methods + sc_active,
+    # sc_active is ALREADY a term inside total_active_methods (see the
+    # total_active_methods definition ~line 3035), so adding it again here
+    # overstated the sidebar's "N active methods" (42 shown vs 37 logged).
+    "total_methods_active": total_active_methods,
     # M20-M31 individual scores
     "m20_obi": round(inst_results.get("m20_obi", 0), 3) if "m20_obi" in inst_results else None,
     "m20_detail": inst_details.get("m20_detail"),
