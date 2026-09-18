@@ -467,10 +467,23 @@ Perbaikan lapisan operasi/tampilan (tidak ada kode skoring yang diubah):
 (`sfc-pipeline.sh:66`) lalu menyuntik data baru. Perbaikan UI harus ditulis ke **master** `/home/ubuntu/index.html`
 dulu, baru disalin ke repo (kini md5 `268aeab7cc6436c63b865dd542684ace` identik di keduanya), supaya bertahan.
 
-**Sisa yang butuh keputusan Anda (belum dikerjakan):**
-1. G13 — nasib job `7c8b06a1fddf`: turunkan jumlah epoch secara drastis, atau pensiunkan job-nya (Mamba inert,
-   `m32_mamba: null`), atau beri timeout di peluncur cron.
-2. G10 — `/app.js` & `/manifest.json` 404: hapus klaim PWA, atau sediakan ikon + `<link rel="manifest">`.
-3. G11 — rate-limit `/events` (SSE publik tanpa cap klien).
-4. Identitas `worker/index.js` on-disk vs deployment aktif kini terjawab sebagian (deploy dari repo ini sukses,
-   Version ID di atas); sisa: config `cloudflared`/systemd/WAF dan master `index.html` (kini sudah sinkron).
+**Sisa yang butuh keputusan Anda (belum dikerjakan):** ~~semua item di bawah sudah dikerjakan 2026-09-18 malam
+— lihat tabel "Ditahan → dikerjakan" di bagian I.~~
+
+---
+
+## I. Item yang tadinya ditahan → sudah dikerjakan (2026-09-18)
+
+| Item | Keputusan & tindakan | Bukti verifikasi |
+|------|----------------------|------------------|
+| G13 job `7c8b06a1fddf` | **Di-pause** (bukan dihapus, reversible). Dasar: `collect.py:2780` menyatakan Mamba compute sudah **dihapus** ("DISABLED (2026-08 audit) … Compute removed to save CPU"), jadi melatih 15 jam/minggu tidak menghasilkan apa pun yang dibaca | `cronjob list` → `enabled: false, state: paused, paused_at 18:51:23`; `models/mamba_weights.pth` (yang tertimpa run uji, lalu salah pulih jadi 0 byte) dikembalikan dari checkpoint 39-dim md5 `5fed7e6e85369bec6418d5b02e301704`; tidak ada berkas 0-byte tersisa |
+| G10 PWA | Manifest + ikon **benar-benar disajikan**: 2 ikon PNG dibuat (`icons/icon-192.png` 4.417 B, `icon-512.png` 12.403 B, diinspeksi visual: "SFC" + "STRESS TERMINAL"), `manifest.json` diberi `id/scope/orientation/icons`, `<link rel="manifest">` + `icon` + `apple-touch-icon` dipasang di **master** `index.html`, `manifest.json` masuk `_PUBLIC_FILES`, prefiks `icons/*.png` diizinkan (tetap lewat guard traversal) | Live: `/manifest.json` 200 `application/json` (590 B), `/icons/icon-192.png` 200 `image/png` (4.417 B), `/icons/icon-512.png` 200 (12.403 B) |
+| G10 lanjutan | `/app.js` dihapus dari daftar passthrough Worker; catch-all SPA kini **tidak** lagi menyamarkan 404: path berekstensi aset yang tak dikenal → 404 tegas | Live: `/app.js` 404 `text/plain`; `/icon-192.png` (jalur lama) 404 `text/plain` — sebelumnya keduanya 200 `text/html` |
+| G11 `/events` | Dua pagar di Worker: (1) Origin ada tapi di luar allowlist → 403 `forbidden_origin` (EventSource same-origin tidak mengirim Origin, jadi jalur normal tetap lolos); (2) cap 60 stream konkuren per isolate → 503 `too_many_streams`. Catatan: ini best-effort per isolate, **rate-limit WAF Cloudflare tetap lapisan yang sebenarnya** (di luar repo) | Live: `-H "Origin: https://evil.example"` → **403** `{"error":"forbidden_origin"}`; tanpa Origin → **200** + stream `event: btc_ticker` berisi harga nyata |
+| Regresi | Semua jalur lama dites ulang setelah deploy kedua | `/data.json` 200 JSON, `/snapshot` 200 JSON, `/live.json` 200 JSON (Pine aman), `/health` SSE 200 — Version ID `f8491b01-baf1-4936-8589-b59ffcf5b85e` |
+
+Catatan di luar lingkup yang saya temukan saat memeriksa cron: job `e0b1a6bd0ac9` ("Altcoin Terminal daily collect")
+berstatus **paused karena error nyata** — `ZeroDivisionError` di `/opt/altcoin-terminal/altcoin/correlation.py:21`
+(`closes[i]/closes[i-1]` dengan `closes[i-1]==0`) dan `deliver: all` gagal karena platform `whatsapp` tidak aktif.
+Tidak saya sentuh (proyek terpisah / di luar perintah "yang ditahan"), tapi layak diperbaiki atau diubah
+`deliver`-nya.
