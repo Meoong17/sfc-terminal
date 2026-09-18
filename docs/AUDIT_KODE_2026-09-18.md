@@ -446,3 +446,31 @@ outputnya memang dikonsumsi dari berkas, bukan diharapkan terkirim.
 4. Validitas isi `data_collection.json` per-era (perubahan skala historis m5/m6) belum diuji.
 5. Root cause CoinGecko konsisten partial (0–3/4 koin stablecoin) belum dipastikan.
 6. Dampak penuh B1–B10 bila `.causal_cache.json` di-refit belum diukur (perlu harness replay kode-konsisten).
+
+---
+
+## H. Status akhir 2026-09-18 (apa yang benar-benar sudah dieksekusi & diverifikasi)
+
+Perbaikan lapisan operasi/tampilan (tidak ada kode skoring yang diubah):
+
+| Item | Perubahan | Verifikasi nyata |
+|------|-----------|------------------|
+| G1 | Langkah QLSTM dipensiunkan (keputusan user); skrip jadi Mamba-only + pre-flight + exit code jujur | `bash -n` bersih; pre-flight nyata `torch 2.12.0+cu130`, `einops 0.8.2`; logika exit diuji 2 arah; salinan Hermes md5 `8552df696b19216df5b016dd0dcfd0e9` |
+| G13 (baru) | — | Run nyata: **epoch 1 = 551,3 s** untuk 100 epoch → ±15 jam; job mingguan tak bisa selesai (dibatalkan setelah bukti) |
+| G2 | `sudo chown ubuntu:ubuntu sse_server.log` + logrotate `/etc/logrotate.d/sse-server` (daily/rotate 7/size 20M/copytruncate) | Restart nyata: PID 4738 (hidup 25 hari) dimatikan → watchdog menyalakan PID 2047498 → `/health` 200 → log append bekerja; `logrotate -d` lulus |
+| G3 | `sfc-pipeline.sh`: cek `git add` gagal (`GIT_ADD_FAILED`) + blok exit non-zero | Blok exit diuji dari teks berkas: `ok/ok`→0, `failed`→1, `push-failed`→1, `throttled`→0, `add_failed=1`→1; md5 salinan `5f8469be07bfe9883c8b6b319e060412` |
+| G5 | Zona: `d.zone` jadi satu sumber kebenaran (peta `_ARC_MULT` karangan dihapus) + kelas `.zone-high`/`.kb-o`/`.pf-orange` | Harness node mengekstrak fungsi asli dari `index.html`: 6/6 PASS; 0 sisa `_arcMult` di kode; live `curl /` memuat `_badgeClass`/`zone-high` |
+| G7/G8/G9 | Worker: `/data.json` gagal → 502 + `no-store`; `/snapshot` cache key tanpa query + `Vary: Origin` + CORS dihitung ulang; `/sw.js` → `no-cache, must-revalidate`. `sw.js`: guard `isRealData()`, fetch ganda dihapus, versi v14 | **Di-deploy** (Version ID `d55b349f-5619-4ec3-9429-83c7c9884511`); live: `/snapshot?t=…` → `vary: Origin` + ACAO; `/sw.js` → 6288 B, `no-cache, must-revalidate`, berisi `isRealData` + `sfc-terminal-v14`; `/data.json` 200 json; `/live.json` tetap 200 (Pine tidak terpengaruh) |
+
+**Trap penting yang terkonfirmasi (jangan diulang):** perbaikan UI pertama saya tulis ke `sfc/index.html` dan
+**hilang dalam hitungan menit** — pipeline 5-menit memulihkan berkas itu dari master `/home/ubuntu/index.html`
+(`sfc-pipeline.sh:66`) lalu menyuntik data baru. Perbaikan UI harus ditulis ke **master** `/home/ubuntu/index.html`
+dulu, baru disalin ke repo (kini md5 `268aeab7cc6436c63b865dd542684ace` identik di keduanya), supaya bertahan.
+
+**Sisa yang butuh keputusan Anda (belum dikerjakan):**
+1. G13 — nasib job `7c8b06a1fddf`: turunkan jumlah epoch secara drastis, atau pensiunkan job-nya (Mamba inert,
+   `m32_mamba: null`), atau beri timeout di peluncur cron.
+2. G10 — `/app.js` & `/manifest.json` 404: hapus klaim PWA, atau sediakan ikon + `<link rel="manifest">`.
+3. G11 — rate-limit `/events` (SSE publik tanpa cap klien).
+4. Identitas `worker/index.js` on-disk vs deployment aktif kini terjawab sebagian (deploy dari repo ini sukses,
+   Version ID di atas); sisa: config `cloudflared`/systemd/WAF dan master `index.html` (kini sudah sinkron).
