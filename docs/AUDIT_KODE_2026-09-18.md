@@ -193,6 +193,11 @@ bukan kontribusinya (0.408×0.15 = 0.061); penalti RSI tidak tampil di komponen 
 Kartu UI merender dict ini (`app.js:778` `Object.entries(d.confidence_components)`).
 Komentar `3549-3552` ("penalty dihitung SEKALI dan dipakai computation + display") tidak berlaku untuk RSI/DVOL.
 
+### A12. `[V]` MED — EWMA "online learning" inert tapi dilaporkan aktif
+`models/ewma_state.json` = `{"baseline": 0.0, "history": []}`; 2542/2542 baris log identik
+(`[EWMA] Corrected: 12.7% → 12.7%`, `26.4% → 26.4%`); `data.json` tetap `ewma_available: true`.
+`ewma_corrected: true` dengan koreksi nol = klaim adaptif yang tidak berdasar.
+
 ### A13. `[V]` MED — Faktor memakai SMA 30 hari, UI menampilkan nilai spot (tidak dapat direproduksi pembaca)
 `collect.py:2135-2151` mengoper **rata-rata 30 hari** ke `score_factors_from_market`, sedangkan dashboard
 menampilkan nilai spot. Bukti reproduksi persis dari `.daily_market_cache.json`:
@@ -212,11 +217,6 @@ benar-benar dipakai (30d-SMA) di samping spot, atau beri label "faktor memakai S
 Rt 0.0019, Sc 0.0000 (1 nilai unik), St 0.0006, Ft 0.0012, Lt 0.0039 — semuanya < 0.5% rentang faktor.
 Ini **konsekuensi desain SMA 30 hari**, bukan input mati (lihat A13), tetapi berarti klaim dashboard
 tentang perubahan sentimen harian praktis tidak tercermin di faktor.
-
-### A12. `[V]` MED — EWMA "online learning" inert tapi dilaporkan aktif
-`models/ewma_state.json` = `{"baseline": 0.0, "history": []}`; 2542/2542 baris log identik
-(`[EWMA] Corrected: 12.7% → 12.7%`, `26.4% → 26.4%`); `data.json` tetap `ewma_available: true`.
-`ewma_corrected: true` dengan koreksi nol = klaim adaptif yang tidak berdasar.
 
 ---
 
