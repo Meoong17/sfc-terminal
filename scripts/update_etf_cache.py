@@ -83,6 +83,11 @@ def _extract_from_soup(soup):
                 continue
             if '-' in raw and parse_value(total_raw) == 0.0:
                 continue
+            # A *mixed* newest row (some issuers reported, others still dashes) is the
+            # same pending state: Farside pre-fills 0.0 for part of the book and dashes
+            # for the rest. Only the last (most recent) date can be pending -- historical
+            # rows with dashes (pre-launch BTC column, holidays) are final. Drop it.
+            partial_newest = any(v == '-' for v in raw)
             etfs = {}
             for i, name in enumerate(etf_names):
                 etfs[name] = round(parse_value(cells[i+1].get_text(strip=True)), 4)
@@ -91,10 +96,18 @@ def _extract_from_soup(soup):
                 "date": date_parsed,
                 "total_btc": None,
                 "total_usd": int(round(total_val * 1_000_000)),
-                "etfs": etfs
+                "etfs": etfs,
+                "_partial": partial_newest
             })
         except Exception:
             continue
+
+    # Drop the pending (partial) newest row so it never lands in the cache as a
+    # fake low-flow day; the next run picks it up once Farside finalises it.
+    if flows and flows[-1].get("_partial"):
+        flows.pop()
+    for f in flows:
+        f.pop("_partial", None)
 
     cumulative_total_millions = 0.0
     for row in rows:
