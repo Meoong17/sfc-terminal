@@ -83,11 +83,15 @@ def _extract_from_soup(soup):
                 continue
             if '-' in raw and parse_value(total_raw) == 0.0:
                 continue
-            # A *mixed* newest row (some issuers reported, others still dashes) is the
-            # same pending state: Farside pre-fills 0.0 for part of the book and dashes
-            # for the rest. Only the last (most recent) date can be pending -- historical
-            # rows with dashes (pre-launch BTC column, holidays) are final. Drop it.
-            partial_newest = any(v == '-' for v in raw)
+            # A *mixed* newest row (some issuers reported, others still dashes) can be a
+            # pending state: Farside pre-fills 0.0 for part of the book and dashes for the
+            # rest. But a FINALISED day can legitimately carry a single '-' for an issuer
+            # that did not report (seen 23 Oct 2026: HODL '-', Total -137.9 = exact column
+            # sum). So key off the Total cell, not on the mere presence of a dash: a
+            # pending/holiday row always has a zero total. Dropping only zero-total newest
+            # rows is also self-healing -- once a newer date lands above it, the row stops
+            # being "newest" and is kept on the next run.
+            partial_newest = parse_value(total_raw) == 0.0
             etfs = {}
             for i, name in enumerate(etf_names):
                 etfs[name] = round(parse_value(cells[i+1].get_text(strip=True)), 4)
@@ -250,10 +254,15 @@ def main():
         print(f"Date range: {merged_flows[0]['date']} to {merged_flows[-1]['date']}")
         print(f"Cumulative total (millions USD): {cumulative_total_millions}")
     
-    # Compute cumulative_usd from the total row data if available.
-    # Guard: if the fetch failed/returned nothing, keep the previous cumulative
-    # value instead of zeroing it out (would corrupt the cache).
-    if cumulative_total_millions and len(new_flows) > 0:
+    # Compute cumulative_usd. Prefer the sum of the *finalized* rows kept in the
+    # cache: Farside's own "Total" row includes the still-pending newest session
+    # (some issuers pre-filled, IBIT often a dash), so using it makes cumulative
+    # jump by a partial day and become inconsistent with `flows`. Fall back to the
+    # page Total row, then to the previous value (never zero it out on a bad fetch).
+    flows_sum_usd = int(round(sum(f['total_usd'] for f in merged_flows)))
+    if flows_sum_usd:
+        cumulative_usd = flows_sum_usd
+    elif cumulative_total_millions and len(new_flows) > 0:
         cumulative_usd = int(round(cumulative_total_millions * 1_000_000))
     else:
         cumulative_usd = existing.get('cumulative_usd')
