@@ -91,7 +91,12 @@ def _extract_from_soup(soup):
             # pending/holiday row always has a zero total. Dropping only zero-total newest
             # rows is also self-healing -- once a newer date lands above it, the row stops
             # being "newest" and is kept on the next run.
-            partial_newest = parse_value(total_raw) == 0.0
+            # IBIT is the largest issuer and always reports on a finalized session;
+            # a dash in its cell on the newest row means Farside is still filling the
+            # day (seen 28 Oct 2026: IBIT '-', HODL '-', FBTC 24.5, Total 24.5 -- a
+            # non-zero total built from one issuer only). Treat that as pending too.
+            ibit_dash = cells[1].get_text(strip=True) in ('', '-')
+            partial_newest = parse_value(total_raw) == 0.0 or ibit_dash
             etfs = {}
             for i, name in enumerate(etf_names):
                 etfs[name] = round(parse_value(cells[i+1].get_text(strip=True)), 4)
