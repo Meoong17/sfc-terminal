@@ -205,6 +205,78 @@ def _fetch_curl_cffi():
     return _extract_from_soup(BeautifulSoup(r.text, 'html.parser'))
 
 
+JINA_URL = 'https://r.jina.ai/' + URL
+
+
+def _parse_markdown_table(text):
+    """Parse the all-data table from a markdown dump (r.jina.ai reader output)."""
+    flows = []
+    cum = 0.0
+    etf_names = ['IBIT', 'FBTC', 'BITB', 'ARKB', 'BTCO', 'EZBC', 'BRRR', 'HODL', 'BTCW', 'MSBT', 'GBTC', 'BTC']
+    for line in text.splitlines():
+        line = line.strip()
+        if not line.startswith('|'):
+            continue
+        parts = [p.strip() for p in line.strip('|').split('|')]
+        if len(parts) != 14:
+            continue
+        label = parts[0]
+        if label == 'Total':
+            cum = parse_value(parts[-1])
+            continue
+        if label in ('Date', 'Fee', 'Average', 'Maximum', 'Minimum', ''):
+            continue
+        date_parsed = parse_date(label)
+        if not date_parsed:
+            continue
+        raw = parts[1:-1]
+        if all(v in ('', '-') for v in raw):
+            continue
+        total_val = parse_value(parts[-1])
+        if '-' in raw and total_val == 0.0:
+            continue
+        etfs = {name: round(parse_value(parts[i + 1]), 4) for i, name in enumerate(etf_names)}
+        partial = total_val == 0.0 or parts[1] in ('', '-')
+        flows.append({
+            "date": date_parsed,
+            "total_btc": None,
+            "total_usd": int(round(total_val * 1_000_000)),
+            "etfs": etfs,
+            "_partial": partial,
+        })
+    if flows and flows[-1].get('_partial'):
+        flows.pop()
+    for f in flows:
+        f.pop('_partial', None)
+    return flows, cum
+
+
+def _fetch_jina():
+    """Fallback: read the page through the r.jina.ai reader proxy.
+
+    Farside sits behind Cloudflare; when the edge serves a "Just a moment" challenge
+    (plain curl/requests) or a 522 because its origin is down for our PoP, direct
+    fetches (curl_cffi / requests / headless Chromium) all return nothing. Jina
+    fetches from its own network and hands back the same table as markdown.
+    """
+    try:
+        # NB: do NOT send the Chrome UA here -- r.jina.ai itself 403s spoofed browser
+        # user-agents; its API wants the default client UA.
+        r = requests.get(JINA_URL, timeout=90)
+        if r.status_code != 200:
+            print(f"[WARN] jina status {r.status_code}")
+            return None
+        flows, cum = _parse_markdown_table(r.text)
+        if not flows:
+            print("[WARN] jina returned no parsable rows")
+            return None
+        print(f"[INFO] jina proxy OK: {len(flows)} rows")
+        return flows, cum
+    except Exception as e:
+        print(f"[WARN] jina failed ({e})")
+        return None
+
+
 def fetch_flows():
     """Fetch ETF flow data from Farside all-data page. Returns (flows_list, cumulative_total_millions)."""
     # Primary: curl_cffi browser-impersonation (beats the Cloudflare 403 on plain requests).
@@ -224,7 +296,12 @@ def fetch_flows():
     except requests.RequestException as e:
         print(f"[WARN] requests failed ({e})")
 
-    # Fallback 2: headless Chromium.
+    # Fallback 2: r.jina.ai reader proxy (works when Cloudflare challenges our PoP).
+    out = _fetch_jina()
+    if out is not None and out[0]:
+        return out
+
+    # Fallback 3: headless Chromium.
     print("[WARN] Falling back to headless Chromium...")
     return _fetch_playwright()
 
