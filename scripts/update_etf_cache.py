@@ -95,8 +95,14 @@ def _extract_from_soup(soup):
             # a dash in its cell on the newest row means Farside is still filling the
             # day (seen 28 Oct 2026: IBIT '-', HODL '-', FBTC 24.5, Total 24.5 -- a
             # non-zero total built from one issuer only). Treat that as pending too.
+            # IBIT alone being a dash does NOT mean pending: on 30 Oct 2026 Farside
+            # published IBIT '-' while FBTC/BITB/ARKB/GBTC all carried real figures and
+            # Total -409.5 was their exact sum -- a finalized day. A truly pending row
+            # only has *one* issuer reporting (seen 28 Oct: FBTC 24.5 = Total 24.5).
+            # So require both: an IBIT dash AND at most one non-zero issuer column.
             ibit_dash = cells[1].get_text(strip=True) in ('', '-')
-            partial_newest = parse_value(total_raw) == 0.0 or ibit_dash
+            n_nonzero = sum(1 for v in raw if parse_value(v) != 0.0)
+            partial_newest = parse_value(total_raw) == 0.0 or (ibit_dash and n_nonzero <= 1)
             etfs = {}
             for i, name in enumerate(etf_names):
                 etfs[name] = round(parse_value(cells[i+1].get_text(strip=True)), 4)
@@ -236,7 +242,10 @@ def _parse_markdown_table(text):
         if '-' in raw and total_val == 0.0:
             continue
         etfs = {name: round(parse_value(parts[i + 1]), 4) for i, name in enumerate(etf_names)}
-        partial = total_val == 0.0 or parts[1] in ('', '-')
+        # Same rule as the HTML path: an IBIT dash alone is not pending (30 Oct 2026);
+        # pending means a zero total, or an IBIT dash with at most one issuer reporting.
+        n_nonzero = sum(1 for v in raw if parse_value(v) != 0.0)
+        partial = total_val == 0.0 or (parts[1] in ('', '-') and n_nonzero <= 1)
         flows.append({
             "date": date_parsed,
             "total_btc": None,
