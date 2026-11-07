@@ -13,6 +13,11 @@ HEADERS = {
     'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
 }
 
+# Newest date seen by an extractor as "Farside is still filling this session".
+# main() uses it to also evict an earlier cached copy of that same date, so a
+# partial day written by a previous run does not linger in the cache.
+PENDING_DATE = [None]
+
 MONTH_MAP = {
     'Jan': '01', 'Feb': '02', 'Mar': '03', 'Apr': '04', 'May': '05', 'Jun': '06',
     'Jul': '07', 'Aug': '08', 'Sep': '09', 'Oct': '10', 'Nov': '11', 'Dec': '12'
@@ -101,8 +106,16 @@ def _extract_from_soup(soup):
             # only has *one* issuer reporting (seen 28 Oct: FBTC 24.5 = Total 24.5).
             # So require both: an IBIT dash AND at most one non-zero issuer column.
             ibit_dash = cells[1].get_text(strip=True) in ('', '-')
+            fbtc_dash = cells[2].get_text(strip=True) in ('', '-')
             n_nonzero = sum(1 for v in raw if parse_value(v) != 0.0)
-            partial_newest = parse_value(total_raw) == 0.0 or (ibit_dash and n_nonzero <= 1)
+            # Both mega-issuers (IBIT ~65B AUM, FBTC ~10B) unreported = the day is
+            # still being filled: on 06 Nov 2026 IBIT+FBTC were both '-', only
+            # BITB/ARKB/GBTC reported and Total (-51.7) was their partial sum.
+            # Caching that as the day's flow would understate it by the bulk of
+            # the book, so treat it as pending.
+            partial_newest = (parse_value(total_raw) == 0.0
+                              or (ibit_dash and n_nonzero <= 1)
+                              or (ibit_dash and fbtc_dash))
             etfs = {}
             for i, name in enumerate(etf_names):
                 etfs[name] = round(parse_value(cells[i+1].get_text(strip=True)), 4)
@@ -120,6 +133,7 @@ def _extract_from_soup(soup):
     # Drop the pending (partial) newest row so it never lands in the cache as a
     # fake low-flow day; the next run picks it up once Farside finalises it.
     if flows and flows[-1].get("_partial"):
+        PENDING_DATE[0] = flows[-1]["date"]
         flows.pop()
     for f in flows:
         f.pop("_partial", None)
@@ -245,7 +259,9 @@ def _parse_markdown_table(text):
         # Same rule as the HTML path: an IBIT dash alone is not pending (30 Oct 2026);
         # pending means a zero total, or an IBIT dash with at most one issuer reporting.
         n_nonzero = sum(1 for v in raw if parse_value(v) != 0.0)
-        partial = total_val == 0.0 or (parts[1] in ('', '-') and n_nonzero <= 1)
+        partial = (total_val == 0.0
+                   or (parts[1] in ('', '-') and n_nonzero <= 1)
+                   or (parts[1] in ('', '-') and parts[2] in ('', '-')))
         flows.append({
             "date": date_parsed,
             "total_btc": None,
@@ -254,6 +270,7 @@ def _parse_markdown_table(text):
             "_partial": partial,
         })
     if flows and flows[-1].get('_partial'):
+        PENDING_DATE[0] = flows[-1]['date']
         flows.pop()
     for f in flows:
         f.pop('_partial', None)
@@ -289,6 +306,7 @@ def _fetch_jina():
 def fetch_flows():
     """Fetch ETF flow data from Farside all-data page. Returns (flows_list, cumulative_total_millions)."""
     # Primary: curl_cffi browser-impersonation (beats the Cloudflare 403 on plain requests).
+    PENDING_DATE[0] = None
     out = _fetch_curl_cffi()
     if out is not None and out[0]:
         return out
@@ -336,7 +354,13 @@ def main():
     
     for flow in new_flows:
         existing_by_date[flow['date']] = flow
-    
+
+    # Evict any cached copy of a session Farside is still filling, so a partial
+    # day written while issuers were mid-report does not survive this run.
+    if PENDING_DATE[0] and PENDING_DATE[0] in existing_by_date:
+        del existing_by_date[PENDING_DATE[0]]
+        print(f"[INFO] Evicted pending session {PENDING_DATE[0]} from cache")
+
     # Sort by date
     merged_flows = sorted(existing_by_date.values(), key=lambda f: f['date'])
     
