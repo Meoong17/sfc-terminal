@@ -3065,6 +3065,10 @@ regime, regime_prob, transition_risk = detect_regime(dvol, effective_sfc, news_s
 _hmm_result = {}
 _hmm_module = _get_adv_hmm()
 _hmm_available = False
+# Defaults: when the HMM is unavailable OR its output is suppressed as
+# unreliable, these must still exist — downstream display layers read them.
+_hmm_regime = None
+_hmm_crisis = 0.0
 if _hmm_module:
     try:
         # Build feature vector: [daily_return, dvol/100, m2_yoy/15, rsi_14/100, fng/100]
@@ -5040,6 +5044,78 @@ try:
                                if not _wf.get("accepted") else "")
 except Exception as _cw_e:
     out["calibration_walkforward"] = {"error": str(_cw_e)}
+
+# ── L4 contract objects (blueprint §2): Direction / Conviction / Risk permission ──
+# These RE-PUBLISH existing outputs as separate fields; they add no weight and no
+# threshold to the composite. Each object names its inputs and is labelled
+# "derived_unvalidated" precisely because no direction edge has been demonstrated
+# yet (see docs/MODEL_V2_CONTRACT.md §4 and analysis/calibration_walkforward_results.json).
+try:
+    _zone = out.get("zone")
+    _casc = float(out.get("cascade_risk") or 0.0)
+    _tr = float(out.get("transition_risk") or 0.0)
+    _conf = float(out.get("composite_confidence") or 0.0)
+    _agree = float(out.get("method_agreement") or 0.0)
+    _flqd = out.get("flqd") or {}
+    _st = out.get("structure") or {}
+    _mode = str(_flqd.get("regime_mode") or "")
+    # FLQD publishes a code (R0..R5) plus a human label; map the CODE, because the
+    # label text changes with the engine. Risk-on: Expansion (R0), Repair (R4),
+    # Quality-led expansion (R5). Risk-off: Liquidity divergence (R1),
+    # Credit-funding stress (R2), Deleveraging (R3).
+    _RISK_ON = {"R0", "R4", "R5"}
+    _RISK_OFF = {"R1", "R2", "R3"}
+    _code = _mode.split()[0].upper() if _mode else ""
+
+    _votes, _why = [], []
+    if _code:
+        if _code in _RISK_ON:
+            _votes.append(1); _why.append(f"flqd:{_mode}=risk-on")
+        elif _code in _RISK_OFF:
+            _votes.append(-1); _why.append(f"flqd:{_mode}=risk-off")
+        else:
+            _votes.append(0); _why.append(f"flqd:{_mode}=neutral")
+    _quad = str((_st.get("transition") or {}).get("quadrant") or "").upper()
+    if _quad:
+        if _quad.startswith("MIXED"):
+            _votes.append(0); _why.append("structure:mixed")
+        elif "FRAGILE" in _quad or "DECAY" in _quad:
+            _votes.append(-1); _why.append(f"structure:{_quad.lower()}")
+        elif "STRONG" in _quad or "HEALTHY" in _quad:
+            _votes.append(1); _why.append(f"structure:{_quad.lower()}")
+    _votes.append(-1 if _tr >= 0.5 else 0)
+    _why.append(f"transition_risk={_tr:.2f}")
+    _score = sum(_votes)
+    _dir = "down" if _score < 0 else ("up" if _score > 0 else "flat")
+
+    if _zone in ("CRITICAL", "HIGH") or _casc >= 0.20:
+        _perm = "no_new_risk"
+    elif _zone == "ELEVATED":
+        _perm = "reduced"
+    else:
+        _perm = "normal"
+
+    out["l4"] = {
+        "direction": {
+            "value": _dir, "score": _score, "horizon": "7d",
+            "inputs": _why, "status": "derived_unvalidated", "score_weight": 0,
+        },
+        "conviction": {
+            "value": round(_conf * _agree, 3),
+            "inputs": ["composite_confidence", "method_agreement"],
+            "status": "derived_unvalidated", "score_weight": 0,
+        },
+        "risk_permission": {
+            "value": _perm,
+            "inputs": [f"zone={_zone}", f"cascade_risk={_casc:.3f}"],
+            "status": "derived_unvalidated", "score_weight": 0,
+        },
+        "note": ("Contract objects only: they re-publish existing validated outputs and "
+                 "carry zero weight in the composite. Direction has no demonstrated edge "
+                 "(walk-forward: calibration loses to climatology)."),
+    }
+except Exception as _l4_e:
+    out["l4"] = {"error": str(_l4_e)}
 
 out = _json_safe(out)
 print(json.dumps(out, indent=2, allow_nan=False))

@@ -34,7 +34,8 @@ against a price-vol baseline.** Diagnostics may be published; they may not vote.
 | `calibrated_confidence` | confidence mapped through a calibration curve | **Currently identical to raw**: the map is disabled (§4) |
 | `flqd` | regime distribution R0-R5 + entropy | **Inferred** measurement; documented to lose to the price-vol baseline (Brier 0.260 vs 0.229) |
 | `structure` | PFS / FQ / NDS, SFI, quadrant | **Display-only**; verdict in its own payload: "no index adds reliable information over the price/vol baseline" |
-| `hmm_regime`, `hmm_crisis_prob` | 4-state HMM posterior | **Inferred**, refit 2026-11 on 20,397 snapshots |
+| `hmm_regime`, `hmm_crisis_prob` | 4-state HMM posterior | **Suppressed as of 2026-11**: the refit model saturates (posterior ~1.0 for every input), so it publishes `NORMAL / 0.0` and a reported reason instead of a fake certainty |
+| `l4` | contract objects: direction / conviction / risk_permission | **Derived, unvalidated**: re-publishes existing outputs, `score_weight: 0` |
 | `data_health` | L0 verdict + per-series status | **Observed** (audited facts) |
 | `calibration_walkforward` | walk-forward evidence for the calibration map | **Observed** (measured), verdict may be negative |
 
@@ -103,10 +104,25 @@ before the engines run — daily at 03:15. Without it the structure engine
 silently reverts to stale inputs, which is how it froze at 2026-10-06 for six
 weeks.
 
-## 6. Not implemented (honest list)
+## 6. Implemented as contract, not as signal
 
-- L4 objects `Direction`, `Conviction`, `RiskPermission` as separate validated
-  outputs (blueprint §2). Today only stress/zone/signal/confidence exist.
+`data.json.l4` now carries the three L4 objects (blueprint §2):
+
+```
+direction        {value: up|flat|down, score, horizon: 7d, inputs: [...],
+                  status: derived_unvalidated, score_weight: 0}
+conviction       {value: composite_confidence x method_agreement,
+                  status: derived_unvalidated, score_weight: 0}
+risk_permission  {value: normal|reduced|no_new_risk, inputs: [zone, cascade_risk],
+                  status: derived_unvalidated, score_weight: 0}
+```
+
+They are derived from outputs that already exist, carry zero weight in the
+composite, and name their inputs so anyone can audit the arithmetic. They exist
+so downstream consumers stop inventing their own blend — not because a direction
+edge has been demonstrated.
+
+## 6b. Not implemented (honest list)
 - Cross-layer structural candidates from the blueprint (ACEE, MDRE, APME, QCE,
   TSRE, IMIM, PSI/EPI/LSI/HBI/BDI/ROCM, reaction residual). None are coded; none
   may be coded as a score before the baseline test.

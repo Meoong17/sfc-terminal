@@ -166,6 +166,32 @@ class HMMRegimeDetector:
 
     # ── predict ──
 
+    def _degenerate_share(self) -> float:
+        """Share of plausible inputs won by the single most-dominant state.
+
+        A Gaussian HMM fitted on sparse, clustered snapshots can collapse: one
+        state eats a huge covariance and wins for almost every input. Then
+        "regime CRISIS, p=0.999" is not a market reading, it is the model
+        describing its own widest state. Probe the fitted model on a standardised
+        grid once and cache the answer; >0.85 means the model carries no
+        resolution and its outputs must not be published.
+        """
+        cached = getattr(self, "_degen_share", None)
+        if cached is not None:
+            return float(cached)
+        try:
+            rng = np.random.default_rng(7)
+            n = 400
+            ndim = len(self._scaler_mean) if self._scaler_mean is not None else 5
+            grid = rng.standard_normal((n, ndim)) * 1.5
+            post = self._model.predict_proba(grid)
+            counts = np.bincount(np.argmax(post, axis=1), minlength=self.n_regimes)
+            share = float(counts.max() / n)
+        except Exception:
+            share = 0.0
+        self._degen_share = share
+        return share
+
     def predict(self, features: np.ndarray) -> dict:
         """Predict current regime from a feature vector.
 
@@ -241,12 +267,38 @@ class HMMRegimeDetector:
                 return {"regime": "NORMAL", "crisis_probability": 0.0}
             crisis_prob = float(min(max(crisis_prob, 0.0), 1.0))
 
+            # Reliability gate. A HMM whose posterior saturates (one state at
+            # ~1.0 for wildly different inputs) has collapsed during fit: it is
+            # not describing the market, it is describing its own broadest
+            # covariance. Publishing that as "regime CRISIS" is a fabricated
+            # reading, so the caller is told it is unreliable and must fall back
+            # to the baseline detector.
+            max_post = float(np.max(posterior))
+            degen = self._degenerate_share()
+            # Saturating posteriors mean the model is doing hard classification,
+            # not probability estimation: publishing p(CRISIS)=1.0 would claim a
+            # certainty the model does not have. Treat >=0.999 as "no gradation".
+            reliable = max_post < 0.999
             result = {
                 "regime": regime_name,
                 "regime_label": regime_label,
                 "crisis_probability": round(crisis_prob, 4),
                 "state_probs": [float(p) for p in regime_probs],
+                "reliable": bool(reliable),
             }
+            if not reliable:
+                result["unreliable_reason"] = (
+                    f"posterior saturated ({max_post:.4f}): states are hard labels, not "
+                    f"probabilities; crisis risk cannot be read from this output")
+                log.warning("HMM posterior saturated (%.5f) — output suppressed", max_post)
+                # Neutralise the reading itself. Callers treat "NORMAL" as "no
+                # override" and a 0.0 crisis probability as "no signal", so a
+                # collapsed model cannot rename the regime or inject a 1.0
+                # CRISIS probability into the payload.
+                result["regime"] = "NORMAL"
+                result["regime_label"] = 2
+                result["crisis_probability"] = 0.0
+                result["state_probs"] = [float(p) for p in regime_probs]
             return result
 
         except Exception as exc:
