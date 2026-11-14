@@ -354,8 +354,15 @@ def recalibrate(raw_confidence: float, state: Optional[Dict] = None) -> float:
                              [float(v) for v in isot["knots_y"]])
         return round(max(0.0, min(1.0, v)), 3)
 
+    # 3. Legacy bin-based map. Gated OFF by default since 2026-11: it is
+    #    non-monotonic and analysis/calibration_oos_validate.py showed it makes
+    #    both ECE and Brier WORSE out of sample (ECE 0.47 vs 0.30, Brier 0.37 vs
+    #    0.19 on the held-out set). Serving it as "calibrated confidence" was the
+    #    same class of deception as the frozen payload: a number that looked
+    #    better because nobody checked it. Opt in explicitly with
+    #    "legacy_accepted": true if it is ever re-validated.
     mapping = state.get("mapping_points", {})
-    if not mapping:
+    if not mapping or not state.get("legacy_accepted"):
         return raw_confidence
 
     # Convert string keys back to floats (JSON serialization)

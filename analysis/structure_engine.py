@@ -63,7 +63,33 @@ def load():
     fund = pd.DataFrame.from_dict(json.load(open(f"{ROOT}/data/bitmex_funding_daily.json")), orient="index")
     fund.index = pd.to_datetime(fund.index)
     fcol = next((c for c in fund.columns if "sum" in c.lower() or "fund" in c.lower()), fund.columns[0])
-    df["funding"] = pd.to_numeric(fund[fcol], errors="coerce").reindex(df.index)
+    _fund_bitmex = pd.to_numeric(fund[fcol], errors="coerce").sort_index()
+    # BitMEX's public funding endpoint has returned 403 since 2026-09-16, which
+    # froze this input and (with the basis CSV also frozen) held the whole engine
+    # at 2026-10-06 while the market moved. Splice Binance perp funding for the
+    # tail and record the provenance so a spliced series is never mistaken for a
+    # single-venue one.
+    _fund_source = "bitmex"
+    _fund_splice_from = None
+    try:
+        _bf = json.load(open(f"{ROOT}/data/binance_funding_daily.json"))
+        _bf_ser = pd.Series({pd.Timestamp(k): float(v.get("rate_mean", np.nan))
+                             for k, v in _bf.items() if isinstance(v, dict)}).sort_index()
+        if len(_bf_ser):
+            _cut = _fund_bitmex.last_valid_index()
+            if _cut is None or _bf_ser.index.max() > _cut:
+                _fund_splice_from = str((_cut + pd.Timedelta(days=1)).date()) if _cut is not None else str(_bf_ser.index.min().date())
+                # Splice ONLY after the BitMEX tail — concatenating the full
+                # Binance history over the same dates creates duplicate index
+                # labels and every later .reindex() raises.
+                _head = _fund_bitmex[_fund_bitmex.index <= _cut] if _cut is not None else _fund_bitmex.iloc[0:0]
+                _tail = _bf_ser[_bf_ser.index > _cut] if _cut is not None else _bf_ser
+                _fund_bitmex = pd.concat([_head, _tail]).sort_index()
+                _fund_bitmex = _fund_bitmex[~_fund_bitmex.index.duplicated(keep="last")]
+                _fund_source = "bitmex+binance"
+    except Exception:
+        pass
+    df["funding"] = _fund_bitmex.reindex(df.index)
 
     cm = pd.DataFrame.from_dict(json.load(open(f"{ROOT}/data/coinmetrics_btc_daily.json")), orient="index")
     cm.index = pd.to_datetime(cm.index)
@@ -71,16 +97,40 @@ def load():
         if c in cm:
             df[c] = pd.to_numeric(cm[c], errors="coerce").reindex(df.index, method="ffill")
 
-    # CME front-month futures -> basis vs spot
+    # Basis vs spot. Primary: CME front-month (manual TradingView CSV). That CSV
+    # is a human export and was last refreshed 2026-09-01, so if it is stale we
+    # switch to the automated Binance quarterly basis and say so in the output.
+    _basis_source = "unavailable"
+    raw = None
     try:
         fut = pd.read_csv(f"{ROOT}/data/tradingview_btc1_daily.csv", parse_dates=["datetime"]).set_index("datetime")
         raw = pd.to_numeric(fut["close"], errors="coerce").resample("1D").last()
-        df["fut"] = raw.reindex(df.index, method="ffill")
-        # stale-contract guard: basis is only valid while the futures quote is fresh (<4d)
-        if raw.dropna().empty is False:
-            df.loc[df.index > raw.dropna().index[-1] + pd.Timedelta(days=4), "fut"] = np.nan
+        if not raw.dropna().empty and (df.index.max() - raw.dropna().index[-1]).days <= 4:
+            _basis_source = "cme_front_month"
+        else:
+            raw = None
     except Exception:
-        df["fut"] = np.nan
+        raw = None
+
+    if raw is None:
+        try:
+            _bq = json.load(open(f"{ROOT}/data/binance_futures_basis_daily.json"))
+            _bq = {k: v for k, v in _bq.items() if isinstance(v, dict) and "fut_close" in v}
+            if _bq:
+                _fut_ser = pd.Series({pd.Timestamp(k): float(v["fut_close"]) for k, v in _bq.items()}).sort_index()
+                _fut_ser = _fut_ser[~_fut_ser.index.duplicated(keep="last")]
+                raw = _fut_ser.resample("1D").last()
+                _basis_source = "binance_quarterly"
+        except Exception:
+            raw = None
+
+    df["fut"] = raw.reindex(df.index, method="ffill") if raw is not None else np.nan
+    # stale-contract guard: basis is only valid while the futures quote is fresh (<4d)
+    if raw is not None and not raw.dropna().empty:
+        df.loc[df.index > raw.dropna().index[-1] + pd.Timedelta(days=4), "fut"] = np.nan
+    df.attrs["basis_source"] = _basis_source
+    df.attrs["funding_source"] = _fund_source
+    df.attrs["funding_splice_from"] = _fund_splice_from
 
     # ETF net flow (USD) -> 5d sum
     try:
@@ -327,7 +377,11 @@ def main():
             "FQ": {k.replace("FQ_", ""): round(float(last[k]), 1) for k in last.index if k.startswith("FQ_") and not k.endswith("coverage")},
             "NDS": {k.replace("NDS_", ""): round(float(last[k]), 1) for k in last.index if k.startswith("NDS_") and not k.endswith("coverage")},
         },
-        "context": {"basis_pct": round(float(last["basis_pct"]), 3), "funding_bps": round(float(last["funding_bps"]), 2)},
+        "context": {"basis_pct": round(float(last["basis_pct"]), 3),
+                    "funding_bps": round(float(last["funding_bps"]), 2),
+                    "basis_source": df.attrs.get("basis_source"),
+                    "funding_source": df.attrs.get("funding_source"),
+                    "funding_splice_from": df.attrs.get("funding_splice_from")},
         "transition": transition_layer(out),
         "incremental_test": test,
         "framing": "structure reads are CHANGE DETECTORS: transition.sfi tracks deterioration speed, "

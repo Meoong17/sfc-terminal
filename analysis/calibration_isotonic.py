@@ -270,6 +270,23 @@ def fit_gated(max_count: int = 800, test_frac: float = 0.4) -> Dict:
 
     params = platt_p if chosen == "platt" else (beta_p if chosen == "beta_monotone" else None)
     metrics_chosen = (m_platt if chosen == "platt" else m_beta) if chosen else None
+
+    # Degeneracy guard (2026-11). A map that sends every raw value to ~the base
+    # rate improves ECE/Brier while carrying zero discrimination — it is
+    # climatology, not calibration. The repo already rejects engines that fail to
+    # beat climatology (see FLQD verdict), so apply the same standard here: if the
+    # mapped grid is flat, do not publish it as "confidence".
+    degenerate = False
+    spread = None
+    if params is not None:
+        _dense = np.linspace(0.0, 1.0, 201)
+        _mapped = beta_apply(_dense, params)
+        spread = float(np.nanmax(_mapped) - np.nanmin(_mapped))
+        degenerate = bool(spread < 0.05)
+        if degenerate:
+            chosen = None
+            params = None
+            metrics_chosen = None
     grid = np.round(np.linspace(0, 1, 21), 2)
     base.update({
         "accepted": chosen is not None,
@@ -277,6 +294,10 @@ def fit_gated(max_count: int = 800, test_frac: float = 0.4) -> Dict:
         "params_beta": params,          # nama key dipertahankan (dibaca recalibrate())
         "params_key_note": "params_beta berisi parameter model terpilih (platt/beta_monotone)",
         "monotone_verified": bool(mono_platt if chosen == "platt" else mono_beta) if chosen else False,
+        "degenerate": degenerate,
+        "map_spread": round(spread, 4) if spread is not None else None,
+        "degenerate_note": ("flat map — predicts the base rate, carries no ordinal "
+                            "information; rejected as climatology") if degenerate else None,
         "pre_specified_order": ["platt", "beta_monotone"],
         "gate_each": gates,
         "monotone_each": {"platt": mono_platt, "beta_monotone": mono_beta},
@@ -325,8 +346,11 @@ def main() -> int:
     print(f"  gate per kandidat: {res.get('gate_each')} | monoton: {res.get('monotone_each')}")
     print(f"  metode terpilih: {res.get('chosen_method')} | params: {res.get('params_beta')}")
     print(f"  monoton terverifikasi: {res.get('monotone_verified')}")
-    print(f"  KEPUTUSAN: {'DIPAKAI' if res.get('accepted') else 'DITOLAK'} "
-          f"({res.get('rejected_reason') or 'lolos gate OOS'})")
+    _verdict = ("DIPAKAI (lolos gate OOS)" if res.get("accepted") else
+                ("DITOLAK (peta degenerate: flat, hanya menebak base rate)"
+                 if res.get("degenerate") else
+                 f"DITOLAK ({res.get('rejected_reason') or 'gate OOS gagal'})"))
+    print(f"  KEPUTUSAN: {_verdict}")
     if res.get("map_grid"):
         print("  peta (raw→kalibrasi, tiap 0.1):",
               " ".join(f"{k}:{v}" for k, v in list(res["map_grid"].items())[::2]))

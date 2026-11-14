@@ -1,0 +1,219 @@
+{
+  "generated_at": "2026-11-14T16:34:54.854647+00:00",
+  "health": "degraded",
+  "counts": {
+    "ok": 11,
+    "stale": 0,
+    "gap": 3,
+    "missing": 0,
+    "superseded": 2
+  },
+  "series": [
+    {
+      "path": "data/binance_vision_daily.json",
+      "label": "BTC daily OHLCV (Binance Vision, canonical)",
+      "layer": "L0",
+      "max_lag_days": 3,
+      "fallback": null,
+      "status": "ok",
+      "last": "2026-11-13",
+      "age_days": 2,
+      "gaps_90d": 0,
+      "note": ""
+    },
+    {
+      "path": "data/binance_vision_monthly.json",
+      "label": "BTC monthly OHLCV",
+      "layer": "L0",
+      "max_lag_days": 45,
+      "fallback": null,
+      "status": "ok",
+      "last": "2026-11-01",
+      "age_days": 14,
+      "gaps_90d": null,
+      "note": ""
+    },
+    {
+      "path": "data/binance_vision_weekly.json",
+      "label": "BTC weekly OHLCV",
+      "layer": "L0",
+      "max_lag_days": 21,
+      "fallback": null,
+      "status": "ok",
+      "last": "2026-10-26",
+      "age_days": 20,
+      "gaps_90d": null,
+      "note": ""
+    },
+    {
+      "path": "data/binance_orderflow_daily.json",
+      "label": "Orderflow: taker imbalance / trade size (monthly Vision cadence)",
+      "layer": "L2",
+      "max_lag_days": 40,
+      "fallback": null,
+      "status": "ok",
+      "last": "2026-10-31",
+      "age_days": 15,
+      "gaps_90d": 0,
+      "note": ""
+    },
+    {
+      "path": "data/binance_oi_daily.json",
+      "label": "Open interest (Binance)",
+      "layer": "L2",
+      "max_lag_days": 2,
+      "fallback": null,
+      "status": "ok",
+      "last": "2026-11-14",
+      "age_days": 1,
+      "gaps_90d": 0,
+      "note": ""
+    },
+    {
+      "path": "data/okx_oi_daily.json",
+      "label": "Open interest (OKX)",
+      "layer": "L2",
+      "max_lag_days": 3,
+      "fallback": null,
+      "status": "gap",
+      "last": "2026-11-14",
+      "age_days": 1,
+      "gaps_90d": 2,
+      "note": "2 missing day(s) in 90d: 2026-10-21, 2026-10-22"
+    },
+    {
+      "path": "data/deribit_options_daily.json",
+      "label": "Options OI / put-call / IV (Deribit)",
+      "layer": "L2",
+      "max_lag_days": 2,
+      "fallback": null,
+      "status": "gap",
+      "last": "2026-11-14",
+      "age_days": 1,
+      "gaps_90d": 2,
+      "note": "2 missing day(s) in 90d: 2026-10-21, 2026-10-22"
+    },
+    {
+      "path": "data/bitmex_funding_daily.json",
+      "label": "Funding rate history (BitMEX, 2016+; endpoint 403 since 2026-09-16)",
+      "layer": "L1",
+      "max_lag_days": 3,
+      "fallback": "data/binance_funding_daily.json",
+      "status": "superseded",
+      "last": "2026-09-16",
+      "age_days": 60,
+      "gaps_90d": 0,
+      "note": "replaced by data/binance_funding_daily.json (last 2026-11-14)"
+    },
+    {
+      "path": "data/binance_funding_daily.json",
+      "label": "Funding rate history (Binance perp, 2019+) \u2014 spliced tail",
+      "layer": "L1",
+      "max_lag_days": 3,
+      "fallback": null,
+      "status": "ok",
+      "last": "2026-11-14",
+      "age_days": 1,
+      "gaps_90d": 0,
+      "note": ""
+    },
+    {
+      "path": "data/binance_futures_basis_daily.json",
+      "label": "Futures basis (Binance quarterly vs spot) \u2014 exchange proxy for CME",
+      "layer": "L2",
+      "max_lag_days": 4,
+      "fallback": null,
+      "status": "ok",
+      "last": "2026-11-14",
+      "age_days": 1,
+      "gaps_90d": 0,
+      "note": ""
+    },
+    {
+      "path": "data/coinmetrics_btc_daily.json",
+      "label": "On-chain: active addr / tx / MVRV / hash",
+      "layer": "L3",
+      "max_lag_days": 3,
+      "fallback": null,
+      "status": "ok",
+      "last": "2026-11-13",
+      "age_days": 2,
+      "gaps_90d": 0,
+      "note": ""
+    },
+    {
+      "path": ".etf_cache.json",
+      "label": "Spot ETF net flows (Farside)",
+      "layer": "L2",
+      "max_lag_days": 4,
+      "fallback": null,
+      "status": "gap",
+      "last": "2026-11-13",
+      "age_days": 2,
+      "gaps_90d": 1,
+      "note": "1 missing day(s) in 90d: 2026-09-07"
+    },
+    {
+      "path": "data/tradingview_btc1_daily.csv",
+      "label": "CME front-month futures (manual TV export)",
+      "layer": "L1",
+      "max_lag_days": 5,
+      "fallback": "data/binance_futures_basis_daily.json",
+      "status": "superseded",
+      "last": "2026-09-01",
+      "age_days": 75,
+      "gaps_90d": null,
+      "note": "replaced by data/binance_futures_basis_daily.json (last 2026-11-14)"
+    },
+    {
+      "path": "analysis/flqd_engine_results.json",
+      "label": "FLQD v2 engine output",
+      "layer": "L4",
+      "max_lag_days": 3,
+      "fallback": null,
+      "status": "ok",
+      "last": "2026-11-13",
+      "age_days": 2,
+      "gaps_90d": null,
+      "note": ""
+    },
+    {
+      "path": "analysis/structure_engine_results.json",
+      "label": "Structure engine output (PFS/FQ/NDS)",
+      "layer": "L2",
+      "max_lag_days": 10,
+      "fallback": null,
+      "status": "ok",
+      "last": "2026-11-13",
+      "age_days": 2,
+      "gaps_90d": null,
+      "note": ""
+    },
+    {
+      "path": "models/hmm_regime.pkl",
+      "label": "HMM regime model (fitted)",
+      "layer": "L4",
+      "max_lag_days": 90,
+      "fallback": null,
+      "status": "ok",
+      "last": "2026-11-14",
+      "age_days": 1,
+      "gaps_90d": null,
+      "note": "file modification time"
+    }
+  ],
+  "live_price": {
+    "data_json_btc": 65354.57,
+    "feed_btc": 65312.64,
+    "divergence_pct": 0.06,
+    "feed_age_s": 1,
+    "status": "ok",
+    "note": "",
+    "data_json_age_min": 3.0
+  },
+  "findings": [
+    "Open interest (OKX): gap \u2014 2 missing day(s) in 90d: 2026-10-21, 2026-10-22",
+    "Options OI / put-call / IV (Deribit): gap \u2014 2 missing day(s) in 90d: 2026-10-21, 2026-10-22",
+    "Spot ETF net flows (Farside): gap \u2014 1 missing day(s) in 90d: 2026-09-07"
+  ]
+}

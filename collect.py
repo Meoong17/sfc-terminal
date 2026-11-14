@@ -4240,6 +4240,31 @@ def _json_safe(o):
     return o
 
 
+def _build_data_health_html(rep):
+    """L0 banner: make stale/missing inputs loud instead of silent (display-only)."""
+    if not rep or rep.get("health") in (None, "ok"):
+        return ""
+    c = rep.get("counts") or {}
+    findings = rep.get("findings") or []
+    colour = "#ff4060" if rep.get("health") == "broken" else "#f0b429"
+    items = "".join(
+        '<li style="margin:2px 0">' + str(f).replace("<", "&lt;") + "</li>" for f in findings[:6]
+    )
+    more = (f'<div style="margin-top:4px;color:var(--text-3)">+{len(findings)-6} more</div>'
+            if len(findings) > 6 else "")
+    return (
+        f'<div style="border:1px solid {colour}55;background:{colour}12;border-radius:10px;'
+        f'padding:10px 12px;margin:0 0 14px">'
+        f'<div style="font-size:10px;letter-spacing:.08em;color:{colour};font-weight:700;'
+        f'text-transform:uppercase">Data health: {rep.get("health")}</div>'
+        f'<div style="font-size:10px;color:var(--text-2);margin-top:4px;line-height:1.5">'
+        f'Inputs checked: {c.get("ok",0)} ok · {c.get("stale",0)} stale · {c.get("gap",0)} gap · '
+        f'{c.get("missing",0)} missing. Cards that depend on a stale input describe older data — '
+        f'the reading is not wrong, it is dated.</div>'
+        f'<ul style="margin:6px 0 0 16px;padding:0;font-size:9.5px;color:var(--text-2);'
+        f'line-height:1.5">{items}</ul>{more}</div>'
+    )
+
 def _build_structure_html(st):
     """Pre-render the Structure Shift card body (one simple substitution in the template)."""
     try:
@@ -4966,6 +4991,55 @@ try:
         out["structure_html"] = _build_structure_html(None)
 except Exception as _e:
     out["structure"] = {"available": False, "reason": f"load failed: {_e}"}
+
+# ── L0 Data Integrity & State Engine (V2 blueprint layer L0) ──
+# Runs the integrity audit in-process (cheap file reads) so every payload carries
+# a health verdict: which inputs are stale, gapped or missing, plus a live-price
+# divergence check. Display-only: it never changes a score.
+try:
+    import contextlib as _ctxlib
+    import importlib.util as _ilu
+    _di_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                            "analysis", "data_integrity.py")
+    _di_spec = _ilu.spec_from_file_location("_sfc_data_integrity", _di_path)
+    _di_mod = _ilu.module_from_spec(_di_spec)
+    with _ctxlib.redirect_stdout(sys.stderr):
+        _di_spec.loader.exec_module(_di_mod)
+        _di_mod.main()
+    with open(_di_mod.OUT) as _df:
+        _di_rep = json.load(_df)
+    out["data_health"] = {
+        "health": _di_rep.get("health"),
+        "counts": _di_rep.get("counts"),
+        "findings": _di_rep.get("findings", [])[:12],
+        "live_price": _di_rep.get("live_price"),
+        "generated_at": _di_rep.get("generated_at"),
+    }
+    out["data_health_html"] = _build_data_health_html(_di_rep)
+except Exception as _di_e:
+    out["data_health"] = {"health": "unknown", "error": str(_di_e)}
+    out["data_health_html"] = ""
+
+# ── Calibration evidence (published, not enforced) ──
+# The map is only displayed if it survives walk-forward against BOTH raw
+# confidence and the climatology base rate. As of 2026-11 it does not, so the
+# dashboard must not present a "calibrated" number that is really the base rate.
+try:
+    _wf = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                     "analysis", "calibration_walkforward_results.json")))
+    out["calibration_walkforward"] = {
+        "accepted": _wf.get("accepted"),
+        "verdict": _wf.get("verdict"),
+        "aggregate": _wf.get("aggregate"),
+        "generated_at": _wf.get("generated_at"),
+    }
+    out["calibration_enabled"] = bool(_wf.get("accepted"))
+    out["calibration_note"] = ("calibrated_confidence equals composite_confidence: the "
+                               "calibration map is disabled because it does not beat "
+                               "raw confidence and climatology walk-forward"
+                               if not _wf.get("accepted") else "")
+except Exception as _cw_e:
+    out["calibration_walkforward"] = {"error": str(_cw_e)}
 
 out = _json_safe(out)
 print(json.dumps(out, indent=2, allow_nan=False))

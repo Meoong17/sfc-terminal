@@ -1,0 +1,140 @@
+{
+  "generated_at": "2026-11-14T16:34:23.666213+00:00",
+  "protocol": {
+    "min_train": 50,
+    "test_block": 15,
+    "folds_expanding": true,
+    "label": "price_outcome (confidence_calibration.price_label)"
+  },
+  "aggregate": {
+    "n_labeled": 138,
+    "n_folds": 5,
+    "first_test": "2026-06-29T12:24:05.436258+00:00",
+    "last_test": "2026-07-31T06:03:29.602092+00:00",
+    "mean_raw_ece": 0.2796,
+    "mean_cal_ece": 0.2074,
+    "mean_clim_ece": 0.1581,
+    "mean_raw_brier": 0.2885,
+    "mean_cal_brier": 0.2626,
+    "mean_clim_brier": 0.2544,
+    "folds_cal_beats_raw": 3,
+    "folds_cal_beats_clim": 1,
+    "mean_cal_spread": 0.1013
+  },
+  "frac_folds_cal_beats_raw": 0.6,
+  "frac_folds_cal_beats_clim": 0.2,
+  "accepted": false,
+  "verdict": "REJECT AS CLIMATOLOGY \u2014 map improves on raw only because it predicts the base rate; climatology is just as good",
+  "folds": [
+    {
+      "test_from": "2026-06-29T12:24:05.436258+00:00",
+      "test_to": "2026-07-02T04:15:39.203124+00:00",
+      "n_train": 50,
+      "n_test": 15,
+      "base_rate_train": 0.48,
+      "cal_spread": 0.1195,
+      "raw": {
+        "ece": 0.13993333333333333,
+        "brier": 0.2538422
+      },
+      "cal": {
+        "ece": 0.11831784303521127,
+        "brier": 0.26128217315818814
+      },
+      "clim": {
+        "ece": 0.08000000000000018,
+        "brier": 0.24639999999999998
+      },
+      "cal_beats_raw_brier": false,
+      "cal_beats_clim_brier": false
+    },
+    {
+      "test_from": "2026-07-02T06:45:41.978935+00:00",
+      "test_to": "2026-07-06T17:44:25.332731+00:00",
+      "n_train": 65,
+      "n_test": 15,
+      "base_rate_train": 0.4615,
+      "cal_spread": 0.0527,
+      "raw": {
+        "ece": 0.1966,
+        "brier": 0.21651180000000003
+      },
+      "cal": {
+        "ece": 0.20387131848546491,
+        "brier": 0.24187396694364421
+      },
+      "clim": {
+        "ece": 0.19487179487179496,
+        "brier": 0.23353057199211052
+      },
+      "cal_beats_raw_brier": false,
+      "cal_beats_clim_brier": false
+    },
+    {
+      "test_from": "2026-07-06T23:15:27.132547+00:00",
+      "test_to": "2026-07-09T23:11:26.173340+00:00",
+      "n_train": 80,
+      "n_test": 15,
+      "base_rate_train": 0.425,
+      "cal_spread": 0.0,
+      "raw": {
+        "ece": 0.3151333333333334,
+        "brier": 0.2715962000000001
+      },
+      "cal": {
+        "ece": 0.17499905051682363,
+        "brier": 0.27062466768178983
+      },
+      "clim": {
+        "ece": 0.17500000000000004,
+        "brier": 0.27062499999999995
+      },
+      "cal_beats_raw_brier": true,
+      "cal_beats_clim_brier": true
+    },
+    {
+      "test_from": "2026-07-10T00:31:26.553014+00:00",
+      "test_to": "2026-07-16T15:34:08.478030+00:00",
+      "n_train": 95,
+      "n_test": 15,
+      "base_rate_train": 0.4526,
+      "cal_spread": 0.1934,
+      "raw": {
+        "ece": 0.2576,
+        "brier": 0.27418266666666663
+      },
+      "cal": {
+        "ece": 0.21764778341653307,
+        "brier": 0.24495712347522947
+      },
+      "clim": {
+        "ece": 0.05263157894736842,
+        "brier": 0.24277008310249304
+      },
+      "cal_beats_raw_brier": true,
+      "cal_beats_clim_brier": false
+    },
+    {
+      "test_from": "2026-07-16T23:04:13.992478+00:00",
+      "test_to": "2026-07-31T06:03:29.602092+00:00",
+      "n_train": 110,
+      "n_test": 15,
+      "base_rate_train": 0.4455,
+      "cal_spread": 0.1409,
+      "raw": {
+        "ece": 0.48860000000000003,
+        "brier": 0.42612593333333326
+      },
+      "cal": {
+        "ece": 0.32203694690466234,
+        "brier": 0.2940742674095725
+      },
+      "clim": {
+        "ece": 0.2878787878787879,
+        "brier": 0.27842975206611575
+      },
+      "cal_beats_raw_brier": true,
+      "cal_beats_clim_brier": false
+    }
+  ]
+}

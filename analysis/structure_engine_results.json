@@ -1,91 +1,94 @@
 {
-  "generated_at": "2026-11-14T16:07:01.882808+00:00",
-  "as_of": "2026-10-06",
+  "generated_at": "2026-11-14T16:31:17.049201+00:00",
+  "as_of": "2026-11-13",
   "model": "SFC structure engine: price formation / financing quality / new demand",
   "indices": {
-    "PFS": 68.46,
-    "FQ": 48.14,
-    "NDS": 58.51
+    "PFS": 25.79,
+    "FQ": 93.54,
+    "NDS": 37.32
   },
   "coverage": {
     "PFS": 0.75,
-    "FQ": 0.75,
+    "FQ": 1.0,
     "NDS": 1.0
   },
   "components": {
     "PFS": {
-      "impact_depth": 96.6,
+      "impact_depth": 4.6,
       "flow_stability": null,
-      "close_strength": 63.6,
-      "volume_breadth": 32.3
+      "close_strength": 20.5,
+      "volume_breadth": 64.2
     },
     "FQ": {
-      "funding_level": 13.2,
-      "funding_stability": 99.7,
-      "basis_carry": null,
-      "valuation_premium": 36.0
+      "funding_level": 95.6,
+      "funding_stability": 99.9,
+      "basis_carry": 99.3,
+      "valuation_premium": 75.3
     },
     "NDS": {
-      "etf_demand": 53.2,
-      "active_users": 84.7,
-      "usage": 20.2,
-      "chain_supply_growth": 73.4
+      "etf_demand": 6.9,
+      "active_users": 62.6,
+      "usage": 0.5,
+      "chain_supply_growth": 95.8
     }
   },
   "context": {
-    "basis_pct": null,
-    "funding_bps": null
+    "basis_pct": 0.703,
+    "funding_bps": 0.51,
+    "basis_source": "binance_quarterly",
+    "funding_source": "bitmex+binance",
+    "funding_splice_from": "2026-09-17"
   },
   "transition": {
-    "as_of": "2026-10-06",
-    "sfi": 25.9,
+    "as_of": "2026-11-13",
+    "sfi": 57.4,
     "deltas_20d": {
-      "PFS": 29.3,
-      "FQ": -4.4,
-      "NDS": 33.7
+      "PFS": -10.8,
+      "FQ": 7.0,
+      "NDS": -6.3
     },
-    "quadrant": "MIXED \u2014 layers diverge, no single structural direction",
+    "quadrant": "CARRY BID, THIN MARKET \u2014 funding cheap but price discovery weak",
     "lead_test": {
       "top_quintile_event_rate": 0.375,
-      "base_rate": 0.216,
-      "lift": 1.73,
+      "base_rate": 0.205,
+      "lift": 1.83,
       "n_top": 8,
       "2024plus": {
-        "n": 37,
-        "event_rate": 0.216,
+        "n": 39,
+        "event_rate": 0.205,
         "shift_rate_topq": 0.375
       },
       "spearman_change_vs_fwd20": {
         "dPFS": [
-          0.016,
-          0.37
+          0.014,
+          0.42
         ],
         "dFQ": [
-          -0.017,
-          0.342
+          -0.024,
+          0.181
         ],
         "dNDS": [
-          0.113,
-          0.001
+          0.107,
+          0.002
         ]
       }
     },
-    "direction": "improving"
+    "direction": "stable"
   },
   "incremental_test": {
     "PFS": {
-      "auc_baseline": 0.3373,
-      "auc_with_index": 0.3335,
-      "delta_auc": -0.0039,
-      "perm_p": 0.87,
-      "n_oos": 178
+      "auc_baseline": 0.3549,
+      "auc_with_index": 0.3391,
+      "delta_auc": -0.0158,
+      "perm_p": 0.965,
+      "n_oos": 180
     },
     "FQ": {
-      "auc_baseline": 0.3373,
-      "auc_with_index": 0.2938,
-      "delta_auc": -0.0435,
-      "perm_p": 1.0,
-      "n_oos": 178
+      "auc_baseline": 0.3549,
+      "auc_with_index": 0.3066,
+      "delta_auc": -0.0483,
+      "perm_p": 0.995,
+      "n_oos": 180
     },
     "NDS": {
       "status": "insufficient_oos"

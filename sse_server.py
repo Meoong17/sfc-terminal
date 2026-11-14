@@ -90,7 +90,8 @@ async def event_generator(request: Request):
             return
         payload = {
             "price": price,
-            "change_pct": data.get("btc_24h", 0),
+            # No silent 0: a missing 24h change must not render as "0.00% 24h".
+            "change_pct": data.get("btc_24h"),
             "high_24h": data.get("high_24h", 0),
             "low_24h": data.get("low_24h", 0),
             "volume_24h": data.get("volume_24h", 0),

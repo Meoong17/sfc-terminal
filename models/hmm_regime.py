@@ -191,9 +191,15 @@ class HMMRegimeDetector:
 
             features = np.nan_to_num(features, nan=0.0, posinf=0.0, neginf=0.0)
 
-            # Apply same z-score standardization as during training
+            # Apply same z-score standardization as during training.
+            # A zero / non-finite std in the scaler turns this into inf/NaN, the
+            # emission likelihood becomes NaN, the posterior becomes NaN and
+            # crisis_probability is published as NaN — which then poisons the
+            # whole payload via the circuit breaker. Guard the denominator.
             if self._scaler_mean is not None and self._scaler_std is not None:
-                features = (features - self._scaler_mean) / self._scaler_std
+                _std = np.asarray(self._scaler_std, dtype=np.float64)
+                _std = np.where(np.isfinite(_std) & (_std != 0.0), _std, 1.0)
+                features = (features - self._scaler_mean) / _std
 
             # For single-point prediction, use emission log-likelihood + stationary
             # prior rather than hmmlearn's predict_proba (which uses the learned
@@ -226,8 +232,14 @@ class HMMRegimeDetector:
                 regime_label_idx = int(self._state_order[hmm_idx])
                 regime_probs[regime_label_idx] = float(posterior[hmm_idx])
 
-            # Crisis probability = prob mass of CRISIS regime (label 3)
-            crisis_prob = float(regime_probs[3])
+            # Crisis probability = prob mass of CRISIS regime (label 3).
+            # Guard the index (a 3-state model has no label 3) and the value
+            # (non-finite posterior must never reach data.json).
+            crisis_prob = float(regime_probs[3]) if len(regime_probs) > 3 else 0.0
+            if not np.isfinite(crisis_prob):
+                log.warning("Non-finite posterior — falling back to 0.0 crisis probability")
+                return {"regime": "NORMAL", "crisis_probability": 0.0}
+            crisis_prob = float(min(max(crisis_prob, 0.0), 1.0))
 
             result = {
                 "regime": regime_name,
