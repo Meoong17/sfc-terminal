@@ -8,6 +8,10 @@ LOG="$REPO/logs/flqd_engine.log"
 mkdir -p "$(dirname "$LOG")"
 {
   echo "=== $(date -u +%FT%TZ) start"
+  # Refresh automated engine inputs first (funding splice + basis proxy).
+  # Without this the structure engine silently reverts to stale inputs.
+  "$REPO/scripts/refresh_engine_inputs.sh" 2>&1 | sed 's/^/  [inputs] /'
+
   "$REPO/.venv/bin/python" "$REPO/analysis/flqd_engine.py" 2>&1 | tail -20
   rc=${PIPESTATUS[0]}
   "$REPO/.venv/bin/python" "$REPO/analysis/structure_engine.py" 2>&1 | tail -20
