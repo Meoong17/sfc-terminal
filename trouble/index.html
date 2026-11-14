@@ -526,8 +526,6 @@ body {
         <tr><td class="label">index.html</td><td class="value" id="f-indexhtml">—</td></tr>
         <tr><td class="label">index.html.bak</td><td class="value" id="f-indexbak">—</td></tr>
         <tr><td class="label">app.js</td><td class="value" id="f-appjs">—</td></tr>
-        <tr><td class="label">paper_trades.json</td><td class="value" id="f-papertrades">—</td></tr>
-        <tr><td class="label">paper_history.json</td><td class="value" id="f-paperhist">—</td></tr>
         <tr><td class="label">sfc-pipeline.log</td><td class="value" id="f-pipelinelog">—</td></tr>
         <tr><td class="label">post_process.py</td><td class="value" id="f-postproc">—</td></tr>
         <tr><td class="label">collect.py</td><td class="value" id="f-collect">—</td></tr>
@@ -691,7 +689,6 @@ async function updateOverview() {
   total++; ok += diag('diagSfc', sfc > 0, (sfc || 0).toFixed(2) + '%');
   total++; ok += diag('diagRegime', !!regime, regime || '—');
   total++; ok += diag('diagNews', data.news_headlines && data.news_headlines.length > 0, (data.news_headlines ? data.news_headlines.length : 0) + ' headlines');
-  total++; ok += diag('diagTrades', data.paper_trades_count != null, (data.paper_trades_count || 0) + ' trades');
   total++; ok += diag('diagConf', conf != null && conf > 0, (conf || 0).toFixed(3));
 
   healthBadge(ok, total);
@@ -835,8 +832,6 @@ function setFileInfo() {
     'f-indexhtml': { size: 199520, desc: '~195 KB' },
     'f-indexbak':  { size: 199496, desc: '~195 KB' },
     'f-appjs':     { size: 157622, desc: '~154 KB' },
-    'f-papertrades': { size: 334308, desc: '~327 KB' },
-    'f-paperhist': { size: 84797, desc: '~83 KB' },
     'f-pipelinelog': { size: 91131681, desc: '~87 MB (large)' },
     'f-postproc': { size: 14596, desc: '~14 KB' },
     'f-collect':  { size: 163160, desc: '~159 KB' }

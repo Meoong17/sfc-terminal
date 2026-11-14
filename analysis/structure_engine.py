@@ -294,6 +294,23 @@ def transition_layer(out, horizon=20):
     }
 
 
+
+def _clean(o):
+    """JSON-safe: NaN/Inf -> null. Dashboard JSON.parse rejects NaN literals."""
+    if isinstance(o, dict):
+        return {k: _clean(v) for k, v in o.items()}
+    if isinstance(o, (list, tuple)):
+        return [_clean(v) for v in o]
+    if isinstance(o, float) and (o != o or o in (float("inf"), float("-inf"))):
+        return None
+    if isinstance(o, (np.floating,)):
+        f = float(o)
+        return None if (f != f or abs(f) == float("inf")) else f
+    if isinstance(o, (np.integer,)):
+        return int(o)
+    return o
+
+
 def main():
     df = load()
     out = build(df)
@@ -319,7 +336,7 @@ def main():
                     if all(v.get("perm_p", 1) > 0.05 or v.get("delta_auc", 0) <= 0 for v in test.values())
                     else "at least one index passes the permutation gate; needs full walk-forward before any blend"),
     }
-    json.dump(payload, open(OUT, "w"), indent=2)
+    json.dump(_clean(payload), open(OUT, "w"), indent=2, allow_nan=False)
     print(json.dumps(payload, indent=2))
 
 

@@ -4227,6 +4227,19 @@ def _btc_price_history(n=60):
         return []
 
 
+def _json_safe(o):
+    """Recursively replace NaN/Inf with None so data.json is always valid JSON.
+    A single NaN literal makes JSON.parse throw in the browser -> dashboard stuck
+    on the splash screen (found 2026-11 after the structure engine emitted NaN)."""
+    if isinstance(o, dict):
+        return {k: _json_safe(v) for k, v in o.items()}
+    if isinstance(o, (list, tuple)):
+        return [_json_safe(v) for v in o]
+    if isinstance(o, float):
+        return None if (o != o or o in (float("inf"), float("-inf"))) else o
+    return o
+
+
 def _build_structure_html(st):
     """Pre-render the Structure Shift card body (one simple substitution in the template)."""
     try:
@@ -4949,7 +4962,8 @@ try:
 except Exception as _e:
     out["structure"] = {"available": False, "reason": f"load failed: {_e}"}
 
-print(json.dumps(out, indent=2))
+out = _json_safe(out)
+print(json.dumps(out, indent=2, allow_nan=False))
 btc_str = f"${btc:,.0f}" if btc is not None else "N/A"
 rsi_str = f"{rsi_14m}" if rsi_14m is not None else "N/A"
 sopr_str = f"{sopr_proxy}" if sopr_proxy is not None else "N/A"

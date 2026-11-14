@@ -468,7 +468,21 @@ def main():
         "circuit_breaker": bool(last["FS"] > 85 and scores["FS"].iloc[-2] > 85 or last["SFM"] > 75),
         "validation": val,
     }
-    json.dump(res, open(OUT, "w"), indent=2)
+    def _clean(o):
+        if isinstance(o, dict):
+            return {k: _clean(v) for k, v in o.items()}
+        if isinstance(o, (list, tuple)):
+            return [_clean(v) for v in o]
+        if isinstance(o, float) and (o != o or o in (float("inf"), float("-inf"))):
+            return None
+        if isinstance(o, (np.floating,)):
+            f = float(o)
+            return None if (f != f or abs(f) == float("inf")) else f
+        if isinstance(o, (np.integer,)):
+            return int(o)
+        return o
+
+    json.dump(_clean(res), open(OUT, "w"), indent=2, allow_nan=False)
 
     print(json.dumps({k: res[k] for k in ["as_of", "layers", "coverage", "interactions",
                                           "regime_probs", "regime_mode", "entropy",

@@ -29,7 +29,6 @@ cards = {
     'ML Ensemble':      ['ml_ensemble_score', 'ml_accuracy', 'ml_total_labeled'],
     'Kelly':            ['kelly_fraction', 'kelly_p_win', 'kelly_b_payoff'],
     'Backtest':         ['bt_sharpe', 'bt_win_rate', 'bt_max_dd', 'bt_stability', 'bt_periods'],
-    'Paper Trading':    ['paper_trades'],
     'Regime/State':     ['regime', 'regime_prob', 'transition_risk', 'state', 'dv_sfc', 'phi'],
 }
 
@@ -73,7 +72,6 @@ print(f'  Signal:      {d.get("signal","?")} ({d.get("signal_type","?")})')
 print(f'  Kelly alloc: {d.get("kelly_fraction","?"):.0%} (half: {d.get("kelly_half","?"):.0%})')
 print(f'  Backtest:    Sharpe={d.get("bt_sharpe","?")}  WR={d.get("bt_win_rate","?"):.0%}  DD={d.get("bt_max_dd","?"):.1%}  Stab={d.get("bt_stability","?"):.0%}')
 print(f'  QLSTM:       {d.get("m32_qlstm","?")}  active={d.get("m32_active","?")}')
-print(f'  Paper:       {len(d.get("paper_trades",[]))} trades')
 print(f'  M1-M6 avg:   {d.get("m1_klr","?")}% | {d.get("m2_logit","?")}% | {d.get("m3_bayes","?")}% | {d.get("m4_ewc","?")}% | {d.get("m5_qreg","?")}% | {d.get("m6_regime_score","?")}%')
 print(f'  Consensus:   {d.get("method_agreement","?"):.0%} ({d.get("causal_methods_active","?")} active methods)')
 
