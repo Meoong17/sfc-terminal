@@ -1,0 +1,79 @@
+{
+  "generated_at": "2026-11-14T13:05:39.836971+00:00",
+  "as_of": "2026-09-30",
+  "model": "FLQD v2.0 measurement engine (C/FLQD_Framework_SFC_Methodology_v2)",
+  "layers": {
+    "LA": 50.66,
+    "LT": 24.54,
+    "CS": 41.13,
+    "FS": 21.26,
+    "PF": 73.22,
+    "CE": 50.0,
+    "QD": 75.47
+  },
+  "coverage": {
+    "LA": 1.0,
+    "LT": 1.0,
+    "CS": 1.0,
+    "FS": 1.0,
+    "PF": 0.443,
+    "QD": 1.0
+  },
+  "interactions": {
+    "FLTI": 38.23,
+    "SFM": 30.11,
+    "VD": 0.34,
+    "SC": 47.73,
+    "RE": 49.57
+  },
+  "regime_probs": {
+    "R0": 0.2014,
+    "R1": 0.3033,
+    "R2": 0.1266,
+    "R3": 0.0369,
+    "R4": 0.1235,
+    "R5": 0.2083
+  },
+  "regime_mode": "R1",
+  "entropy": 0.9226,
+  "circuit_breaker": false,
+  "validation": {
+    "n_eval": 124,
+    "base_rate": 0.2903225806451613,
+    "brier_climatology": 0.20603537981269515,
+    "brier_flqd": 0.27412837880095026,
+    "brier_pricevol_baseline": 0.24925575910601,
+    "date_range": [
+      "2024-12-31",
+      "2026-09-07"
+    ],
+    "sojourn_days": 11.017241379310345,
+    "spearman_crisis_vs_fwdvol": [
+      0.1915,
+      0.0331
+    ],
+    "fwd20_by_mode": {
+      "R0": {
+        "n": 751,
+        "fwd20_mean_pct": 3.18
+      },
+      "R1": {
+        "n": 31,
+        "fwd20_mean_pct": -2.43
+      },
+      "R2": {
+        "n": 175,
+        "fwd20_mean_pct": 2.78
+      },
+      "R4": {
+        "n": 155,
+        "fwd20_mean_pct": 1.66
+      },
+      "R5": {
+        "n": 11,
+        "fwd20_mean_pct": -9.17
+      }
+    },
+    "verdict": "FLQD stress probability does not beat price/vol baseline on Brier"
+  }
+}

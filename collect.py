@@ -4854,6 +4854,26 @@ if CB_AVAILABLE and _CIRCUIT_BREAKER is not None:
     out["cb_failures"] = _cb_stats.get("consecutive_failures", 0)
     out["cb_total_failures"] = _cb_stats.get("total_failures", 0)
 
+# ── FLQD v2.0 measurement layer (display-only, NOT blended into sfc_effective) ──
+# analysis/flqd_engine.py writes analysis/flqd_engine_results.json. Loading the
+# cached artifact here keeps the 5-minute pipeline cheap; staleness is exposed to
+# the dashboard so a dead engine can never look fresh.
+try:
+    import time as _time
+    _flqd_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                              "analysis", "flqd_engine_results.json")
+    if os.path.exists(_flqd_path):
+        _flqd_age_h = (_time.time() - os.path.getmtime(_flqd_path)) / 3600.0
+        with open(_flqd_path) as _ff:
+            _flqd = json.load(_ff)
+        _flqd["cache_age_hours"] = round(_flqd_age_h, 1)
+        _flqd["stale"] = _flqd_age_h > 48
+        out["flqd"] = _flqd
+    else:
+        out["flqd"] = {"available": False, "reason": "engine results not found"}
+except Exception as _e:
+    out["flqd"] = {"available": False, "reason": f"load failed: {_e}"}
+
 print(json.dumps(out, indent=2))
 btc_str = f"${btc:,.0f}" if btc is not None else "N/A"
 rsi_str = f"{rsi_14m}" if rsi_14m is not None else "N/A"
