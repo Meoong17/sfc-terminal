@@ -289,7 +289,10 @@ export default {
                   lastBtcKey = key;
                   const payload = {
                     price: data.btc.btc,
-                    change_pct: data.btc.change_pct || 0,
+                    // /snapshot exposes the 24h change as btc_24h; reading
+                    // data.btc.change_pct silently produced 0 and the KPI
+                    // rendered a -5% day as "0.00% 24h".
+                    change_pct: (data.btc.btc_24h != null ? data.btc.btc_24h : null),
                     high_24h: data.btc.high_24h || 0,
                     low_24h: data.btc.low_24h || 0,
                     volume_24h: data.btc.volume_24h || 0,
