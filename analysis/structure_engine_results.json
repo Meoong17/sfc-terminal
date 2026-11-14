@@ -1,11 +1,11 @@
 {
-  "generated_at": "2026-11-14T13:16:17.017213+00:00",
-  "as_of": "2026-09-30",
+  "generated_at": "2026-11-14T16:07:01.882808+00:00",
+  "as_of": "2026-10-06",
   "model": "SFC structure engine: price formation / financing quality / new demand",
   "indices": {
-    "PFS": 59.47,
-    "FQ": 49.99,
-    "NDS": 50.11
+    "PFS": 68.46,
+    "FQ": 48.14,
+    "NDS": 58.51
   },
   "coverage": {
     "PFS": 0.75,
@@ -14,35 +14,35 @@
   },
   "components": {
     "PFS": {
-      "impact_depth": 84.4,
-      "flow_stability": NaN,
-      "close_strength": 51.6,
-      "volume_breadth": 31.9
+      "impact_depth": 96.6,
+      "flow_stability": null,
+      "close_strength": 63.6,
+      "volume_breadth": 32.3
     },
     "FQ": {
-      "funding_level": 17.7,
-      "funding_stability": 95.8,
-      "basis_carry": NaN,
-      "valuation_premium": 41.2
+      "funding_level": 13.2,
+      "funding_stability": 99.7,
+      "basis_carry": null,
+      "valuation_premium": 36.0
     },
     "NDS": {
-      "etf_demand": 39.8,
-      "active_users": 71.8,
-      "usage": 21.5,
-      "chain_supply_growth": 69.7
+      "etf_demand": 53.2,
+      "active_users": 84.7,
+      "usage": 20.2,
+      "chain_supply_growth": 73.4
     }
   },
   "context": {
-    "basis_pct": NaN,
-    "funding_bps": NaN
+    "basis_pct": null,
+    "funding_bps": null
   },
   "transition": {
-    "as_of": "2026-09-30",
-    "sfi": 33.9,
+    "as_of": "2026-10-06",
+    "sfi": 25.9,
     "deltas_20d": {
-      "PFS": 20.8,
-      "FQ": -3.8,
-      "NDS": 9.9
+      "PFS": 29.3,
+      "FQ": -4.4,
+      "NDS": 33.7
     },
     "quadrant": "MIXED \u2014 layers diverge, no single structural direction",
     "lead_test": {
@@ -58,15 +58,15 @@
       "spearman_change_vs_fwd20": {
         "dPFS": [
           0.016,
-          0.367
+          0.37
         ],
         "dFQ": [
-          -0.02,
-          0.269
+          -0.017,
+          0.342
         ],
         "dNDS": [
-          0.12,
-          0.0
+          0.113,
+          0.001
         ]
       }
     },
@@ -74,16 +74,16 @@
   },
   "incremental_test": {
     "PFS": {
-      "auc_baseline": 0.3352,
-      "auc_with_index": 0.3313,
-      "delta_auc": -0.0038,
-      "perm_p": 0.915,
+      "auc_baseline": 0.3373,
+      "auc_with_index": 0.3335,
+      "delta_auc": -0.0039,
+      "perm_p": 0.87,
       "n_oos": 178
     },
     "FQ": {
-      "auc_baseline": 0.3352,
-      "auc_with_index": 0.3045,
-      "delta_auc": -0.0307,
+      "auc_baseline": 0.3373,
+      "auc_with_index": 0.2938,
+      "delta_auc": -0.0435,
       "perm_p": 1.0,
       "n_oos": 178
     },
