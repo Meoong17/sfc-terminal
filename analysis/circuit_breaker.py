@@ -159,9 +159,14 @@ class CircuitBreaker:
             if isinstance(value, float):
                 if math.isnan(value) or math.isinf(value):
                     nan_keys.append(key)
-                    # Replace with last valid or 0.0
+                    # Replace with last valid or 0.0. This is a REPAIR, not a
+                    # failure: the NaN never reaches the published payload, so it
+                    # must not count toward the trip counter. Treating it as a
+                    # failure froze the whole dashboard for days whenever one
+                    # metric went chronically NaN (hmm_crisis_prob reached 462
+                    # consecutive "failures", tripping the breaker and pinning
+                    # btc/sfc to a stale snapshot while the market moved 9%).
                     cleaned[key] = self._last_valid.get(key, 0.0)
-                    all_ok = False
 
         if nan_keys:
             warnings.append(f"NAN/INF detected and replaced: {', '.join(nan_keys[:10])}")

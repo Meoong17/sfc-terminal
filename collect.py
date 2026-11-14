@@ -4896,10 +4896,15 @@ if CB_AVAILABLE and _CIRCUIT_BREAKER is not None:
             # writing bad values to data.json. Restore last-known-good for every
             # field the breaker tracks; untracked fields are left as computed
             # (they were not implicated in the trip).
+            # Market observations are NOT restorable: a stale price is worse
+            # than a visibly missing one (a frozen btc level of 71,914 was served
+            # for two days while spot traded 65,6xx). Only model outputs may come
+            # from last-known-good.
+            _CB_PRICE_KEYS = {"btc", "btc_24h", "dvol", "fng", "dom", "ts"}
             _cb_last = _CIRCUIT_BREAKER.get_last_valid()
             _restored = 0
             for _k, _v in _cb_last.items():
-                if _k in out and _v is not None:
+                if _k in out and _v is not None and _k not in _CB_PRICE_KEYS:
                     out[_k] = _v
                     _restored += 1
             print(f"[CB] Output purged (trip) — restored {_restored} last-known-good tracked fields", file=sys.stderr)
