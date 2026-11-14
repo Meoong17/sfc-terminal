@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 """
-inject_data.py — Inject live data.json into app.js for offline-first serving
+inject_data.py — Inject live data.json into index.html (__EMBEDDED_DATA).
 Uses placeholder comment marker for reliable injection.
-Default: injects into app.js (since JS was extracted from index.html).
-Pass --html to inject into index.html instead (legacy mode).
+app.js was deleted 2026-11 (dead code); index.html is the only template.
 """
 
 import json, re, sys
