@@ -1,0 +1,722 @@
+{
+ "generated": "2026-09-26T12:56:10.904741",
+ "frame": {
+  "start": "2017-08-17",
+  "end": "2026-09-18",
+  "n_sessions": 2265
+ },
+ "sets": {
+  "A_7aset": {
+   "n": 2202,
+   "n_assets": 7,
+   "start": "2017-11-15",
+   "end": "2026-09-18",
+   "teff_mean": 1.152,
+   "teff_median": 0.741,
+   "teff_p95": 3.21,
+   "share_cold": 0.642,
+   "share_warm": 0.235,
+   "share_hot": 0.123,
+   "teff_corr_mean": 1.232,
+   "r_avg_mean": 0.011,
+   "n_eff_mean": 6.81,
+   "regime_disagree_raw_vs_corrPct": 0.102
+  },
+  "B_9aset": {
+   "n": 1373,
+   "n_assets": 9,
+   "start": "2020-11-30",
+   "end": "2026-05-28",
+   "teff_mean": 1.696,
+   "teff_median": 0.668,
+   "teff_p95": 3.77,
+   "share_cold": 0.677,
+   "share_warm": 0.19,
+   "share_hot": 0.133,
+   "teff_corr_mean": 1.567,
+   "r_avg_mean": -0.006,
+   "n_eff_mean": 10.19,
+   "regime_disagree_raw_vs_corrPct": 0.13
+  },
+  "A_exBTC": {
+   "n": 2202,
+   "n_assets": 6,
+   "start": "2017-11-15",
+   "end": "2026-09-18",
+   "teff_mean": 1.142,
+   "teff_median": 0.722,
+   "teff_p95": 3.31,
+   "share_cold": 0.649,
+   "share_warm": 0.222,
+   "share_hot": 0.129,
+   "teff_corr_mean": 1.274,
+   "r_avg_mean": 0.023,
+   "n_eff_mean": 5.59,
+   "regime_disagree_raw_vs_corrPct": 0.103
+  }
+ },
+ "paper_reference_date_2026_09_24": {
+  "paper_teff": 0.45,
+  "paper_regime": "Cold",
+  "paper_btc_share": 0.0035,
+  "replicated_A": {
+   "date": "2026-09-18",
+   "teff": 1.508,
+   "regime": "Warm",
+   "teff_corr": 1.518,
+   "btc_share": 0.5627
+  },
+  "replicated_B": {
+   "date": "2026-05-28",
+   "teff": 0.282,
+   "regime": "Cold",
+   "teff_corr": 0.314,
+   "btc_share": 0.1491
+  },
+  "note": "paper pakai implied vol (VIX/DVOL) + asumsi vol statis utk 6 aset; di sini semua aset pakai EWMA(0.94) realised, vol dilag, grid hari bursa AS."
+ },
+ "episodes": {
+  "2018-02-05": {
+   "date": "2018-02-05",
+   "teff": 16.888,
+   "regime": "Hot",
+   "teff_corr": 16.888,
+   "btc_share": 0.0914,
+   "label": "VIX spike / volmageddon",
+   "btc_ret_1d_pct": -24.57
+  },
+  "2020-03-12": {
+   "date": "2020-03-12",
+   "teff": 30.081,
+   "regime": "Hot",
+   "teff_corr": 34.691,
+   "btc_share": 0.7145,
+   "label": "COVID crash",
+   "btc_ret_1d_pct": -50.26
+  },
+  "2021-05-19": {
+   "date": "2021-05-19",
+   "teff": 1.933,
+   "regime": "Warm",
+   "teff_corr": 1.923,
+   "btc_share": 0.5669,
+   "label": "crypto deleveraging",
+   "btc_ret_1d_pct": -15.52
+  },
+  "2022-06-13": {
+   "date": "2022-06-13",
+   "teff": 9.941,
+   "regime": "Hot",
+   "teff_corr": 8.813,
+   "btc_share": 0.4911,
+   "label": "CPI shock / risk-off",
+   "btc_ret_1d_pct": -25.75
+  },
+  "2023-03-13": {
+   "date": "2023-03-13",
+   "teff": 6.432,
+   "regime": "Hot",
+   "teff_corr": 5.775,
+   "btc_share": 0.7583,
+   "label": "SVB",
+   "btc_ret_1d_pct": 17.95
+  },
+  "2024-08-05": {
+   "date": "2024-08-05",
+   "teff": 8.767,
+   "regime": "Hot",
+   "teff_corr": 11.312,
+   "btc_share": 0.2746,
+   "label": "yen carry unwind",
+   "btc_ret_1d_pct": -12.97
+  },
+  "2025-04-07": {
+   "date": "2025-04-07",
+   "teff": 2.275,
+   "regime": "Hot",
+   "teff_corr": 3.013,
+   "btc_share": 0.2584,
+   "label": "tariff shock (jika ada data)",
+   "btc_ret_1d_pct": -5.8
+  }
+ },
+ "tautology": {
+  "btc_share_mean": 0.1436,
+  "btc_share_median": 0.0536,
+  "corr_teff_btc_rv20": 0.054,
+  "corr_teff_exbtc_btc_rv20": 0.053,
+  "corr_teff_btc_rv20_pearson": 0.068,
+  "corr_teff_exbtc_btc_rv20_pearson": 0.043
+ },
+ "predictive": {
+  "fwd_ret_1d": {
+   "teff_lag1": {
+    "n": 2200,
+    "r2": 0.0004,
+    "beta_teff_lag1": -0.0005,
+    "t_teff_lag1": -0.78,
+    "p_teff_lag1": 0.4383
+   },
+   "teff_corr_lag1": {
+    "n": 2200,
+    "r2": 0.0007,
+    "beta_teff_corr_lag1": -0.0006,
+    "t_teff_corr_lag1": -1.05,
+    "p_teff_corr_lag1": 0.2943
+   },
+   "teff_exbtc_lag1": {
+    "n": 2200,
+    "r2": 0.0,
+    "beta_teff_exbtc_lag1": -0.0001,
+    "t_teff_exbtc_lag1": -0.21,
+    "p_teff_exbtc_lag1": 0.8359
+   },
+   "btc_share_lag1": {
+    "n": 2200,
+    "r2": 0.0001,
+    "beta_btc_share_lag1": -0.0017,
+    "t_btc_share_lag1": -0.39,
+    "p_btc_share_lag1": 0.6929
+   },
+   "rates_share_lag1": {
+    "n": 2200,
+    "r2": 0.0001,
+    "beta_rates_share_lag1": -0.0014,
+    "t_rates_share_lag1": -0.4,
+    "p_rates_share_lag1": 0.6904
+   }
+  },
+  "fwd_ret_5d": {
+   "teff_lag1": {
+    "n": 2196,
+    "r2": 0.0001,
+    "beta_teff_lag1": -0.0006,
+    "t_teff_lag1": -0.33,
+    "p_teff_lag1": 0.7443
+   },
+   "teff_corr_lag1": {
+    "n": 2196,
+    "r2": 0.0001,
+    "beta_teff_corr_lag1": -0.0006,
+    "t_teff_corr_lag1": -0.4,
+    "p_teff_corr_lag1": 0.6874
+   },
+   "teff_exbtc_lag1": {
+    "n": 2196,
+    "r2": 0.0004,
+    "beta_teff_exbtc_lag1": -0.0012,
+    "t_teff_exbtc_lag1": -0.57,
+    "p_teff_exbtc_lag1": 0.5675
+   },
+   "btc_share_lag1": {
+    "n": 2196,
+    "r2": 0.0008,
+    "beta_btc_share_lag1": 0.0139,
+    "t_btc_share_lag1": 1.38,
+    "p_btc_share_lag1": 0.1689
+   },
+   "rates_share_lag1": {
+    "n": 2196,
+    "r2": 0.0009,
+    "beta_rates_share_lag1": -0.0111,
+    "t_rates_share_lag1": -1.43,
+    "p_rates_share_lag1": 0.1525
+   }
+  },
+  "fwd_ret_20d": {
+   "teff_lag1": {
+    "n": 2181,
+    "r2": 0.0,
+    "beta_teff_lag1": 0.0007,
+    "t_teff_lag1": 0.25,
+    "p_teff_lag1": 0.8057
+   },
+   "teff_corr_lag1": {
+    "n": 2181,
+    "r2": 0.0,
+    "beta_teff_corr_lag1": 0.0005,
+    "t_teff_corr_lag1": 0.22,
+    "p_teff_corr_lag1": 0.8225
+   },
+   "teff_exbtc_lag1": {
+    "n": 2181,
+    "r2": 0.0,
+    "beta_teff_exbtc_lag1": 0.0001,
+    "t_teff_exbtc_lag1": 0.03,
+    "p_teff_exbtc_lag1": 0.9763
+   },
+   "btc_share_lag1": {
+    "n": 2181,
+    "r2": 0.0,
+    "beta_btc_share_lag1": 0.0041,
+    "t_btc_share_lag1": 0.17,
+    "p_btc_share_lag1": 0.8654
+   },
+   "rates_share_lag1": {
+    "n": 2181,
+    "r2": 0.0022,
+    "beta_rates_share_lag1": -0.0358,
+    "t_rates_share_lag1": -2.2,
+    "p_rates_share_lag1": 0.0275
+   }
+  },
+  "fwd_rv20": {
+   "teff_lag1": {
+    "n": 2181,
+    "r2": 0.0091,
+    "beta_teff_lag1": 0.0164,
+    "t_teff_lag1": 1.95,
+    "p_teff_lag1": 0.0511
+   },
+   "teff_corr_lag1": {
+    "n": 2181,
+    "r2": 0.0042,
+    "beta_teff_corr_lag1": 0.0098,
+    "t_teff_corr_lag1": 1.34,
+    "p_teff_corr_lag1": 0.1814
+   },
+   "teff_exbtc_lag1": {
+    "n": 2181,
+    "r2": 0.009,
+    "beta_teff_exbtc_lag1": 0.0165,
+    "t_teff_exbtc_lag1": 1.59,
+    "p_teff_exbtc_lag1": 0.1113
+   },
+   "btc_share_lag1": {
+    "n": 2181,
+    "r2": 0.0004,
+    "beta_btc_share_lag1": 0.0294,
+    "t_btc_share_lag1": 0.81,
+    "p_btc_share_lag1": 0.4171
+   },
+   "rates_share_lag1": {
+    "n": 2181,
+    "r2": 0.0007,
+    "beta_rates_share_lag1": -0.0284,
+    "t_rates_share_lag1": -1.27,
+    "p_rates_share_lag1": 0.2051
+   }
+  },
+  "fwd_dlog_rv20": {
+   "teff_lag1": {
+    "n": 2181,
+    "r2": 0.0,
+    "beta_teff_lag1": 0.0017,
+    "t_teff_lag1": 0.19,
+    "p_teff_lag1": 0.8478
+   },
+   "teff_corr_lag1": {
+    "n": 2181,
+    "r2": 0.0001,
+    "beta_teff_corr_lag1": 0.0026,
+    "t_teff_corr_lag1": 0.38,
+    "p_teff_corr_lag1": 0.7061
+   },
+   "teff_exbtc_lag1": {
+    "n": 2181,
+    "r2": 0.0006,
+    "beta_teff_exbtc_lag1": 0.0069,
+    "t_teff_exbtc_lag1": 0.68,
+    "p_teff_exbtc_lag1": 0.4986
+   },
+   "btc_share_lag1": {
+    "n": 2181,
+    "r2": 0.0,
+    "beta_btc_share_lag1": 0.0164,
+    "t_btc_share_lag1": 0.29,
+    "p_btc_share_lag1": 0.7722
+   },
+   "rates_share_lag1": {
+    "n": 2181,
+    "r2": 0.0001,
+    "beta_rates_share_lag1": -0.019,
+    "t_rates_share_lag1": -0.46,
+    "p_rates_share_lag1": 0.645
+   }
+  },
+  "fwd_maxdd20": {
+   "teff_lag1": {
+    "n": 2181,
+    "r2": 0.0017,
+    "beta_teff_lag1": -0.0033,
+    "t_teff_lag1": -1.16,
+    "p_teff_lag1": 0.2445
+   },
+   "teff_corr_lag1": {
+    "n": 2181,
+    "r2": 0.001,
+    "beta_teff_corr_lag1": -0.0023,
+    "t_teff_corr_lag1": -0.99,
+    "p_teff_corr_lag1": 0.3242
+   },
+   "teff_exbtc_lag1": {
+    "n": 2181,
+    "r2": 0.0022,
+    "beta_teff_exbtc_lag1": -0.0039,
+    "t_teff_exbtc_lag1": -1.15,
+    "p_teff_exbtc_lag1": 0.2507
+   },
+   "btc_share_lag1": {
+    "n": 2181,
+    "r2": 0.0001,
+    "beta_btc_share_lag1": 0.008,
+    "t_btc_share_lag1": 0.56,
+    "p_btc_share_lag1": 0.5778
+   },
+   "rates_share_lag1": {
+    "n": 2181,
+    "r2": 0.0013,
+    "beta_rates_share_lag1": -0.0187,
+    "t_rates_share_lag1": -1.69,
+    "p_rates_share_lag1": 0.0907
+   }
+  }
+ },
+ "incumbent": {
+  "fwd_dlog_rv20": {
+   "baseline_ewma_vol_only": {
+    "n": 2181,
+    "r2": 0.1725,
+    "beta_ewma_vol": -12.1321,
+    "t_ewma_vol": -7.49,
+    "p_ewma_vol": 0.0
+   },
+   "plus_teff": {
+    "n": 2181,
+    "r2": 0.1725,
+    "beta_ewma_vol": -12.1332,
+    "t_ewma_vol": -7.49,
+    "p_ewma_vol": 0.0,
+    "beta_teff_lag1": -0.0006,
+    "t_teff_lag1": -0.07,
+    "p_teff_lag1": 0.9442
+   },
+   "delta_r2": 0.0
+  },
+  "fwd_ret_20d": {
+   "baseline_ewma_vol_only": {
+    "n": 2181,
+    "r2": 0.0002,
+    "beta_ewma_vol": -0.1581,
+    "t_ewma_vol": -0.17,
+    "p_ewma_vol": 0.8646
+   },
+   "plus_teff": {
+    "n": 2181,
+    "r2": 0.0002,
+    "beta_ewma_vol": -0.1569,
+    "t_ewma_vol": -0.17,
+    "p_ewma_vol": 0.8657,
+    "beta_teff_lag1": 0.0006,
+    "t_teff_lag1": 0.23,
+    "p_teff_lag1": 0.815
+   },
+   "delta_r2": 0.0
+  },
+  "fwd_maxdd20": {
+   "baseline_ewma_vol_only": {
+    "n": 2181,
+    "r2": 0.0168,
+    "beta_ewma_vol": -1.0856,
+    "t_ewma_vol": -1.46,
+    "p_ewma_vol": 0.144
+   },
+   "plus_teff": {
+    "n": 2181,
+    "r2": 0.0187,
+    "beta_ewma_vol": -1.0926,
+    "t_ewma_vol": -1.47,
+    "p_ewma_vol": 0.1411,
+    "beta_teff_lag1": -0.0035,
+    "t_teff_lag1": -1.23,
+    "p_teff_lag1": 0.2194
+   },
+   "delta_r2": 0.0019
+  },
+  "fwd_dlog_rv20_vs_VIX": {
+   "baseline_vix_only": {
+    "n": 2181,
+    "r2": 0.0113,
+    "beta_vix": -0.1592,
+    "t_vix": -1.36,
+    "p_vix": 0.1734
+   },
+   "plus_teff": {
+    "n": 2181,
+    "r2": 0.012,
+    "beta_vix": -0.1666,
+    "t_vix": -1.41,
+    "p_vix": 0.1586,
+    "beta_teff": 0.0075,
+    "t_teff": 0.84,
+    "p_teff": 0.402
+   },
+   "delta_r2": 0.0007
+  }
+ },
+ "era_stability": {
+  "fwd_dlog_rv20": {
+   "pooled": {
+    "n": 2181,
+    "r2": 0.0,
+    "beta_teff_lag1": 0.0017,
+    "t_teff_lag1": 0.19,
+    "p_teff_lag1": 0.8478
+   },
+   "era1": {
+    "n": 773,
+    "r2": 0.0013,
+    "beta_teff_lag1": 0.0099,
+    "t_teff_lag1": 0.59,
+    "p_teff_lag1": 0.5584
+   },
+   "era2": {
+    "n": 748,
+    "r2": 0.0031,
+    "beta_teff_lag1": -0.0201,
+    "t_teff_lag1": -1.65,
+    "p_teff_lag1": 0.0982
+   },
+   "era3": {
+    "n": 660,
+    "r2": 0.0001,
+    "beta_teff_lag1": 0.002,
+    "t_teff_lag1": 0.27,
+    "p_teff_lag1": 0.7852
+   }
+  },
+  "fwd_ret_20d": {
+   "pooled": {
+    "n": 2181,
+    "r2": 0.0,
+    "beta_teff_lag1": 0.0007,
+    "t_teff_lag1": 0.25,
+    "p_teff_lag1": 0.8057
+   },
+   "era1": {
+    "n": 773,
+    "r2": 0.0006,
+    "beta_teff_lag1": -0.003,
+    "t_teff_lag1": -0.63,
+    "p_teff_lag1": 0.5282
+   },
+   "era2": {
+    "n": 748,
+    "r2": 0.0036,
+    "beta_teff_lag1": 0.0088,
+    "t_teff_lag1": 1.18,
+    "p_teff_lag1": 0.2368
+   },
+   "era3": {
+    "n": 660,
+    "r2": 0.0001,
+    "beta_teff_lag1": 0.001,
+    "t_teff_lag1": 0.28,
+    "p_teff_lag1": 0.7771
+   }
+  },
+  "fwd_maxdd20": {
+   "pooled": {
+    "n": 2181,
+    "r2": 0.0017,
+    "beta_teff_lag1": -0.0033,
+    "t_teff_lag1": -1.16,
+    "p_teff_lag1": 0.2445
+   },
+   "era1": {
+    "n": 773,
+    "r2": 0.0061,
+    "beta_teff_lag1": -0.007,
+    "t_teff_lag1": -1.46,
+    "p_teff_lag1": 0.1438
+   },
+   "era2": {
+    "n": 748,
+    "r2": 0.0013,
+    "beta_teff_lag1": 0.0034,
+    "t_teff_lag1": 0.74,
+    "p_teff_lag1": 0.4571
+   },
+   "era3": {
+    "n": 660,
+    "r2": 0.0007,
+    "beta_teff_lag1": -0.0014,
+    "t_teff_lag1": -0.65,
+    "p_teff_lag1": 0.5186
+   }
+  }
+ },
+ "btc_share_trigger": {
+  "corr_share_rates_share": -0.385,
+  "fwd_dlog_rv20": {
+   "n": 2181,
+   "r2": 0.0,
+   "beta_btc_share_lag1": 0.0164,
+   "t_btc_share_lag1": 0.29,
+   "p_btc_share_lag1": 0.7722
+  },
+  "fwd_ret_20d": {
+   "n": 2181,
+   "r2": 0.0,
+   "beta_btc_share_lag1": 0.0041,
+   "t_btc_share_lag1": 0.17,
+   "p_btc_share_lag1": 0.8654
+  }
+ },
+ "downside_by_regime": {
+  "base_rate": 0.23,
+  "Cold": {
+   "n": 1400,
+   "p_drop10": 0.2314,
+   "mean_fwd_ret_pct": 1.83
+  },
+  "Warm": {
+   "n": 514,
+   "p_drop10": 0.2626,
+   "mean_fwd_ret_pct": 1.13
+  },
+  "Hot": {
+   "n": 268,
+   "p_drop10": 0.2127,
+   "mean_fwd_ret_pct": 2.83
+  }
+ },
+ "watch_condition_warm_hold3": {
+  "n_days": 123,
+  "p_drop10": 0.2131,
+  "mean_fwd_ret_pct": 3.3,
+  "fwd_dlog_rv20_beta": {
+   "n": 2182,
+   "r2": 0.0,
+   "beta_warmH": 0.0052,
+   "t_warmH": 0.06,
+   "p_warmH": 0.951
+  }
+ },
+ "vol_estimator_sensitivity": {
+  "ewma94": {
+   "mean": 1.152,
+   "median": 0.741,
+   "share_hot": 0.123,
+   "share_warm": 0.235,
+   "share_cold": 0.642
+  },
+  "rw30": {
+   "mean": 1.245,
+   "median": 0.767,
+   "share_hot": 0.143,
+   "share_warm": 0.231,
+   "share_cold": 0.627,
+   "spearman_vs_ewma94": 0.986,
+   "label_disagreement_frac": 0.078
+  },
+  "rw60": {
+   "mean": 1.204,
+   "median": 0.737,
+   "share_hot": 0.132,
+   "share_warm": 0.231,
+   "share_cold": 0.638,
+   "spearman_vs_ewma94": 0.966,
+   "label_disagreement_frac": 0.112
+  },
+  "rw252": {
+   "mean": 1.197,
+   "median": 0.683,
+   "share_hot": 0.134,
+   "share_warm": 0.201,
+   "share_cold": 0.665,
+   "spearman_vs_ewma94": 0.883,
+   "label_disagreement_frac": 0.212
+  }
+ },
+ "chi_benchmark": {
+  "n_assets": 7,
+  "sqrt_n": 2.646,
+  "E_chi_n_approx": 2.457,
+  "obs_mean_S": 2.527,
+  "obs_median_S": 2.277,
+  "frac_days_S_above_sqrt_n": 0.358
+ },
+ "n_eff_correction": {
+  "n_assets": 7,
+  "r_avg_raw_returns_mean": 0.01,
+  "r_avg_standardized_z_mean": 0.011,
+  "n_eff_from_raw_mean": 6.85,
+  "n_eff_from_z_mean": 6.81,
+  "teff_neff_raw_mean": 1.201,
+  "teff_neff_raw_share_hot": 0.139,
+  "teff_raw_mean_same_window": 1.122,
+  "teff_raw_share_hot_same_window": 0.12
+ },
+ "btc_rate_elasticity": {
+  "contemporaneous": {
+   "n": 2202,
+   "r2": 0.0,
+   "beta_dy_bp": -0.0,
+   "t_dy_bp": -0.06,
+   "p_dy_bp": 0.9555
+  },
+  "lagged_1d": {
+   "n": 2201,
+   "r2": 0.0001,
+   "beta_dy_bp_lag1": -0.0001,
+   "t_dy_bp_lag1": -0.49,
+   "p_dy_bp_lag1": 0.6231
+  },
+  "cov_type": "HAC",
+  "era1": {
+   "n": 774,
+   "r2": 0.0009,
+   "beta_dy_bp": 0.0003,
+   "t_dy_bp": 0.94,
+   "p_dy_bp": 0.3474
+  },
+  "era2": {
+   "n": 748,
+   "r2": 0.0041,
+   "beta_dy_bp": -0.0004,
+   "t_dy_bp": -1.38,
+   "p_dy_bp": 0.1683
+  },
+  "era3": {
+   "n": 680,
+   "r2": 0.0053,
+   "beta_dy_bp": 0.0004,
+   "t_dy_bp": 1.42,
+   "p_dy_bp": 0.1543
+  },
+  "implied_pct_for_plus17bp": -0.0,
+  "paper_claim_range_pct": [
+   -1.36,
+   -0.51
+  ],
+  "paper_window_btc": {
+   "dates": [
+    "2026-09-16",
+    "2026-09-17",
+    "2026-09-18"
+   ],
+   "ret_3d_pct": 6.14
+  }
+ },
+ "state_descriptor_by_regime": {
+  "Cold": {
+   "n": 1414,
+   "pct_below_ma200": 0.355,
+   "median_drawdown_from_1y_high_pct": -23.2,
+   "median_btc_rv20_ann_pct": 53.9
+  },
+  "Warm": {
+   "n": 517,
+   "pct_below_ma200": 0.369,
+   "median_drawdown_from_1y_high_pct": -24.8,
+   "median_btc_rv20_ann_pct": 53.3
+  },
+  "Hot": {
+   "n": 271,
+   "pct_below_ma200": 0.402,
+   "median_drawdown_from_1y_high_pct": -28.7,
+   "median_btc_rv20_ann_pct": 55.3
+  }
+ }
+}
