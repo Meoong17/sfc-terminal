@@ -1,0 +1,96 @@
+{
+  "generated_at": "2026-11-14T13:16:17.017213+00:00",
+  "as_of": "2026-09-30",
+  "model": "SFC structure engine: price formation / financing quality / new demand",
+  "indices": {
+    "PFS": 59.47,
+    "FQ": 49.99,
+    "NDS": 50.11
+  },
+  "coverage": {
+    "PFS": 0.75,
+    "FQ": 0.75,
+    "NDS": 1.0
+  },
+  "components": {
+    "PFS": {
+      "impact_depth": 84.4,
+      "flow_stability": NaN,
+      "close_strength": 51.6,
+      "volume_breadth": 31.9
+    },
+    "FQ": {
+      "funding_level": 17.7,
+      "funding_stability": 95.8,
+      "basis_carry": NaN,
+      "valuation_premium": 41.2
+    },
+    "NDS": {
+      "etf_demand": 39.8,
+      "active_users": 71.8,
+      "usage": 21.5,
+      "chain_supply_growth": 69.7
+    }
+  },
+  "context": {
+    "basis_pct": NaN,
+    "funding_bps": NaN
+  },
+  "transition": {
+    "as_of": "2026-09-30",
+    "sfi": 33.9,
+    "deltas_20d": {
+      "PFS": 20.8,
+      "FQ": -3.8,
+      "NDS": 9.9
+    },
+    "quadrant": "MIXED \u2014 layers diverge, no single structural direction",
+    "lead_test": {
+      "top_quintile_event_rate": 0.375,
+      "base_rate": 0.216,
+      "lift": 1.73,
+      "n_top": 8,
+      "2024plus": {
+        "n": 37,
+        "event_rate": 0.216,
+        "shift_rate_topq": 0.375
+      },
+      "spearman_change_vs_fwd20": {
+        "dPFS": [
+          0.016,
+          0.367
+        ],
+        "dFQ": [
+          -0.02,
+          0.269
+        ],
+        "dNDS": [
+          0.12,
+          0.0
+        ]
+      }
+    },
+    "direction": "improving"
+  },
+  "incremental_test": {
+    "PFS": {
+      "auc_baseline": 0.3352,
+      "auc_with_index": 0.3313,
+      "delta_auc": -0.0038,
+      "perm_p": 0.915,
+      "n_oos": 178
+    },
+    "FQ": {
+      "auc_baseline": 0.3352,
+      "auc_with_index": 0.3045,
+      "delta_auc": -0.0307,
+      "perm_p": 1.0,
+      "n_oos": 178
+    },
+    "NDS": {
+      "status": "insufficient_oos"
+    }
+  },
+  "framing": "structure reads are CHANGE DETECTORS: transition.sfi tracks deterioration speed, transition.quadrant names which layer moves first. Level indices alone are context.",
+  "verdict": "no index adds reliable information over the price/vol baseline"
+}

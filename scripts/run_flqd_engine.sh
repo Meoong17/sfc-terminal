@@ -8,7 +8,10 @@ LOG="$REPO/logs/flqd_engine.log"
 mkdir -p "$(dirname "$LOG")"
 {
   echo "=== $(date -u +%FT%TZ) start"
-  "$REPO/.venv/bin/python" "$REPO/analysis/flqd_engine.py" 2>&1 | tail -40
+  "$REPO/.venv/bin/python" "$REPO/analysis/flqd_engine.py" 2>&1 | tail -20
   rc=${PIPESTATUS[0]}
+  "$REPO/.venv/bin/python" "$REPO/analysis/structure_engine.py" 2>&1 | tail -20
+  rc2=${PIPESTATUS[0]}
+  [ "$rc" -eq 0 ] && [ "$rc2" -eq 0 ] || rc=1
   echo "=== $(date -u +%FT%TZ) exit=$rc"
 } >> "$LOG" 2>&1

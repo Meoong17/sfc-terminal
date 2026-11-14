@@ -4227,6 +4227,60 @@ def _btc_price_history(n=60):
         return []
 
 
+def _build_structure_html(st):
+    """Pre-render the Structure Shift card body (one simple substitution in the template)."""
+    try:
+        if not st or not st.get("indices"):
+            return '<div class="text-xs" style="color:var(--text-3)">Structure engine output unavailable.</div>'
+        idx = st["indices"]; tr = st.get("transition") or {}; cov = st.get("coverage") or {}
+        lt = tr.get("lead_test") or {}; inc = (st.get("incremental_test") or {}).get("PFS") or {}
+        rows = []
+        for k, lab in (("PFS", "Price formation"), ("FQ", "Financing quality"), ("NDS", "New demand")):
+            v = float(idx.get(k) or 0)
+            dv = (tr.get("deltas_20d") or {}).get(k)
+            cls = "green" if v >= 60 else "amber" if v >= 40 else "red"
+            delta = "" if dv is None else (("▲" if dv > 1 else "▼" if dv < -1 else "▬") + f"{dv:+.1f}/20d")
+            rows.append(
+                f'<div class="info-row"><span class="info-k">{lab}</span>'
+                f'<span class="info-v" style="color:var(--{cls})">{v:.0f} '
+                f'<span style="font-size:9px;color:var(--text-3)">{delta}</span></span></div>'
+                f'<div class="prog-track" style="margin:2px 0 8px"><div class="prog-fill pf-{cls}" '
+                f'style="width:{min(v, 100):.0f}%"></div></div>')
+        if lt.get("lift"):
+            lead = (f'<div class="info-row"><span class="info-k">Top-quintile SFI</span>'
+                    f'<span class="info-v">{(lt.get("top_quintile_event_rate") or 0) * 100:.0f}% vs '
+                    f'{(lt.get("base_rate") or 0) * 100:.0f}% base</span></div>'
+                    f'<div class="info-row"><span class="info-k">Lift</span>'
+                    f'<span class="info-v">{lt.get("lift")}× · n={lt.get("n_top")}</span></div>')
+        else:
+            lead = '<div style="font-size:9px;color:var(--text-3)">Lead test unavailable.</div>'
+        caveat = ""
+        if inc.get("delta_auc") is not None:
+            caveat = (f'PFS alone: ΔAUC {inc["delta_auc"]:.3f}, perm p={inc.get("perm_p")}. '
+                      f'n={lt.get("n_top")} is too small — hypothesis, not signal.')
+        sfi = tr.get("sfi")
+        sfi_txt = "—" if sfi is None else f"{sfi:.0f}"
+        sfi_col = "red" if (sfi or 0) >= 60 else "amber" if (sfi or 0) >= 40 else "green"
+        c1 = (cov.get("PFS") or 0) * 100; c2 = (cov.get("FQ") or 0) * 100; c3 = (cov.get("NDS") or 0) * 100
+        return (
+            '<div class="grid-3" style="gap:14px"><div>'
+            '<div style="font-size:9px;color:var(--text-3);letter-spacing:.06em;margin-bottom:6px">STRUCTURAL READS (0-100, higher = healthier)</div>'
+            + "".join(rows) +
+            f'<div style="font-size:8px;color:var(--text-3);line-height:1.5">Coverage PFS {c1:.0f}% · FQ {c2:.0f}% · NDS {c3:.0f}%</div></div>'
+            '<div><div style="font-size:9px;color:var(--text-3);letter-spacing:.06em;margin-bottom:6px">SHIFT INTENSITY (SFI)</div>'
+            f'<div style="font-size:26px;font-weight:600;color:var(--{sfi_col})">{sfi_txt}'
+            '<span style="font-size:11px;color:var(--text-3)"> /100</span></div>'
+            f'<div style="font-size:10px;color:var(--text-2);margin:4px 0 8px;line-height:1.4">{tr.get("quadrant") or "—"}</div>'
+            '<div style="font-size:9px;color:var(--text-3);line-height:1.5">Which layer moves first. Financing tightening + thinner book = early deleverage; new demand into a thin book = absorption risk.</div></div>'
+            '<div><div style="font-size:9px;color:var(--text-3);letter-spacing:.06em;margin-bottom:6px">DOES A SHIFT LEAD STRESS?</div>'
+            + lead +
+            f'<div style="font-size:8px;color:var(--amber);line-height:1.5;margin-top:6px">{caveat}</div>'
+            f'<div style="font-size:8px;color:var(--text-3);line-height:1.5;margin-top:8px">as of {st.get("as_of") or "—"} · display-only, not in SFC score</div></div></div>')
+    except Exception as e:
+        return f'<div class="text-xs" style="color:var(--text-3)">structure render failed: {e}</div>'
+
+
+
 out = {
     "ts": datetime.now(timezone.utc).isoformat(),
     "model_version": MODEL_VERSION,
@@ -4873,6 +4927,27 @@ try:
         out["flqd"] = {"available": False, "reason": "engine results not found"}
 except Exception as _e:
     out["flqd"] = {"available": False, "reason": f"load failed: {_e}"}
+
+# ── SFC structure engine (price formation / financing quality / new demand) ──
+# Same contract as FLQD: cached artifact, staleness exposed, display-only.
+try:
+    import time as _time
+    _st_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                            "analysis", "structure_engine_results.json")
+    if os.path.exists(_st_path):
+        _st_age_h = (_time.time() - os.path.getmtime(_st_path)) / 3600.0
+        with open(_st_path) as _sf:
+            _st = json.load(_sf)
+        _st["cache_age_hours"] = round(_st_age_h, 1)
+        _st["stale"] = _st_age_h > 48
+        _st["html"] = _build_structure_html(_st)
+        out["structure"] = _st
+        out["structure_html"] = _st["html"]
+    else:
+        out["structure"] = {"available": False, "reason": "engine results not found"}
+        out["structure_html"] = _build_structure_html(None)
+except Exception as _e:
+    out["structure"] = {"available": False, "reason": f"load failed: {_e}"}
 
 print(json.dumps(out, indent=2))
 btc_str = f"${btc:,.0f}" if btc is not None else "N/A"
