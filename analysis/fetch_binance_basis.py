@@ -49,10 +49,32 @@ def main():
     if not fut_sym:
         print("[basis] no current-quarter BTCUSDT contract listed", file=sys.stderr)
         return
-    fut = {datetime.fromtimestamp(k[0] / 1000, tz=timezone.utc).date().isoformat(): float(k[4])
-           for k in klines(fut_sym)}
-    spot = {datetime.fromtimestamp(k[0] / 1000, tz=timezone.utc).date().isoformat(): float(k[4])
-            for k in klines("BTCUSDT", endpoint="spot")}
+    # Spot closes come from the canonical Binance Vision series (2017+), so the
+    # basis history is not limited by the 1500-candle klines window.
+    try:
+        vis = json.load(open(ROOT / "data" / "binance_vision_daily.json"))
+        spot = {k: float(v["close"]) for k, v in vis.items()
+                if isinstance(v, dict) and v.get("close")}
+    except Exception:
+        spot = {datetime.fromtimestamp(k[0] / 1000, tz=timezone.utc).date().isoformat(): float(k[4])
+                for k in klines("BTCUSDT", endpoint="spot")}
+
+    # Expired quarterly contracts are still queryable and carry their whole life,
+    # so scan past quarter-ends to build a multi-year basis history instead of the
+    # ~140 days the CURRENT_QUARTER contract alone can offer.
+    fut = {}
+    symbols = [fut_sym]
+    for year in range(2023, datetime.now(timezone.utc).year + 1):
+        for month, day in ((3, 29), (6, 28), (9, 27), (12, 26)):
+            symbols.append(f"BTCUSDT_{str(year)[2:]}{month:02d}{day:02d}")
+    for sym in symbols:
+        try:
+            rows = klines(sym, limit=400)
+        except Exception:
+            continue
+        for k in rows:
+            d_ = datetime.fromtimestamp(k[0] / 1000, tz=timezone.utc).date().isoformat()
+            fut.setdefault(d_, float(k[4]))
     merged = {}
     for day in sorted(set(fut) & set(spot)):
         if spot[day] <= 0:

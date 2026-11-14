@@ -1,28 +1,28 @@
 {
-  "generated_at": "2026-11-14T16:48:06.858688+00:00",
+  "generated_at": "2026-11-14T17:26:03.279820+00:00",
   "as_of": "2026-11-13",
   "model": "SFC structure engine: price formation / financing quality / new demand",
   "indices": {
-    "PFS": 25.79,
-    "FQ": 93.54,
+    "PFS": 19.78,
+    "FQ": 88.22,
     "NDS": 37.32
   },
   "coverage": {
-    "PFS": 0.75,
+    "PFS": 1.0,
     "FQ": 1.0,
     "NDS": 1.0
   },
   "components": {
     "PFS": {
       "impact_depth": 4.6,
-      "flow_stability": null,
+      "flow_stability": 1.7,
       "close_strength": 20.5,
       "volume_breadth": 64.2
     },
     "FQ": {
       "funding_level": 95.6,
       "funding_stability": 99.9,
-      "basis_carry": 99.3,
+      "basis_carry": 78.0,
       "valuation_premium": 75.3
     },
     "NDS": {
@@ -41,22 +41,22 @@
   },
   "transition": {
     "as_of": "2026-11-13",
-    "sfi": 57.4,
+    "sfi": 63.1,
     "deltas_20d": {
-      "PFS": -10.8,
-      "FQ": 7.0,
+      "PFS": -16.8,
+      "FQ": 4.7,
       "NDS": -6.3
     },
     "quadrant": "CARRY BID, THIN MARKET \u2014 funding cheap but price discovery weak",
     "lead_test": {
-      "top_quintile_event_rate": 0.375,
+      "top_quintile_event_rate": 0.5,
       "base_rate": 0.205,
-      "lift": 1.83,
+      "lift": 2.44,
       "n_top": 8,
       "2024plus": {
         "n": 39,
         "event_rate": 0.205,
-        "shift_rate_topq": 0.375
+        "shift_rate_topq": 0.5
       },
       "spearman_change_vs_fwd20": {
         "dPFS": [
@@ -64,8 +64,8 @@
           0.42
         ],
         "dFQ": [
-          -0.024,
-          0.181
+          -0.029,
+          0.1
         ],
         "dNDS": [
           0.107,
@@ -73,20 +73,20 @@
         ]
       }
     },
-    "direction": "stable"
+    "direction": "deteriorating"
   },
   "incremental_test": {
     "PFS": {
       "auc_baseline": 0.3549,
-      "auc_with_index": 0.3391,
-      "delta_auc": -0.0158,
-      "perm_p": 0.965,
+      "auc_with_index": 0.3415,
+      "delta_auc": -0.0134,
+      "perm_p": 0.945,
       "n_oos": 180
     },
     "FQ": {
       "auc_baseline": 0.3549,
-      "auc_with_index": 0.3066,
-      "delta_auc": -0.0483,
+      "auc_with_index": 0.3088,
+      "delta_auc": -0.0462,
       "perm_p": 0.995,
       "n_oos": 180
     },

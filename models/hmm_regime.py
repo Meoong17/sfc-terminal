@@ -132,15 +132,25 @@ class HMMRegimeDetector:
         features_std = np.clip((features - self._scaler_mean) / self._scaler_std, -3.0, 3.0)
 
         # Train Gaussian HMM with diagonal covariance (more stable than full)
+        # min_covar is the variance FLOOR (hmmlearn's name for reg_covar). Without
+        # it the states end up with variances near zero, every emission likelihood
+        # becomes a delta and the posterior saturates at 1.0 — a hard label sold as
+        # a probability. 0.1 (in standardised space) keeps states from collapsing.
         self.model = hmm.GaussianHMM(
             n_components=self.n_regimes,
             covariance_type="diag",
+            min_covar=0.1,
             n_iter=1000,
             random_state=42,
             tol=1e-4,
             verbose=False,
         )
         self.model.fit(features_std)
+        # Belt and braces: floor the fitted variances too (fit can still shrink them).
+        try:
+            self.model.covars_ = np.maximum(self.model.covars_, 0.1)
+        except Exception:
+            pass
 
         # Label regimes by mean daily_return (first feature, column 0)
         means = self.model.means_  # (n_regimes, n_features)

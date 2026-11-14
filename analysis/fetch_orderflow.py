@@ -170,6 +170,77 @@ class Reservoir:
         return s[min(len(s) - 1, int(len(s) * p))]
 
 
+DAILY_BASE = f"{BASE}/spot/daily/aggTrades/{SYMBOL}/{SYMBOL}-aggTrades-{{d}}.zip"
+
+
+def daily_tail(out_path=None, max_days=45):
+    """Extend the orderflow series with DAILY aggTrades for the days after the
+    last monthly-covered date.
+
+    Vision publishes aggTrades monthly AND daily. The monthly cadence capped PFS
+    coverage at 0.75 because the newest complete month is always ~1 month old;
+    daily zips (~16-24 MB for BTCUSDT) close that gap with a 1-day lag.
+    """
+    import json as _json
+    import urllib.request
+    out_path = out_path or OUT
+    data = _json.load(open(out_path))
+    have = sorted(data)
+    last = have[-1]
+    start = _dt.date.fromisoformat(last) + _dt.timedelta(days=1)
+    end = _dt.datetime.now(_dt.timezone.utc).date() - _dt.timedelta(days=1)
+    days = []
+    d = start
+    while d <= end and len(days) < max_days:
+        days.append(d)
+        d += _dt.timedelta(days=1)
+    if not days:
+        print(f"orderflow daily tail: already current (last {last})")
+        return 0
+    os.makedirs(CACHE_DIR, exist_ok=True)
+    added = 0
+    for d in days:
+        ds = d.isoformat()
+        url = DAILY_BASE.format(d=ds)
+        dest = os.path.join(CACHE_DIR, os.path.basename(url))
+        if not os.path.exists(dest):
+            try:
+                with urllib.request.urlopen(url, timeout=180) as r, open(dest, "wb") as f:
+                    while True:
+                        chunk = r.read(1 << 20)
+                        if not chunk:
+                            break
+                        f.write(chunk)
+            except Exception as exc:
+                print(f"  {ds}: fetch failed ({exc}) — stop tail here")
+                break
+        try:
+            aggs = parse_month(dest)
+        except Exception as exc:
+            print(f"  {ds}: parse failed ({exc})")
+            os.remove(dest) if os.path.exists(dest) else None
+            break
+        got = 0
+        for day_key, rec in aggs.items():
+            # parse_month keys can be ISO date strings or epoch-day ints depending
+            # on the file vintage — normalise both.
+            if isinstance(day_key, str):
+                key = day_key[:10]
+            else:
+                key = _dt.datetime.fromtimestamp(int(day_key) * 86400,
+                                                 tz=_dt.timezone.utc).date().isoformat()
+            if key not in data:
+                data[key] = rec
+                got += 1
+        added += got
+        print(f"  {ds}: +{got} day(s)")
+        if got:
+            with open(out_path, "w") as f:
+                _json.dump(dict(sorted(data.items())), f)
+    print(f"orderflow daily tail: {added} day(s) added, series now {sorted(data)[0]} .. {sorted(data)[-1]}")
+    return 0
+
+
 def parse_month(path):
     """Return dict day -> orderflow aggregates for one monthly aggTrades zip.
 
@@ -296,6 +367,8 @@ def _disk_free_gb():
 
 def main():
     ap = argparse.ArgumentParser()
+    ap.add_argument("--daily-tail", action="store_true",
+                    help="extend the series with daily aggTrades after the last monthly day")
     ap.add_argument("--start", default="2017-08")
     ap.add_argument("--end", default=last_complete_month())
     ap.add_argument("--workers", type=int, default=N_WORKERS)
@@ -303,6 +376,9 @@ def main():
                     help="process months sequentially (download->parse->delete zip) to "
                          "keep raw-disk usage to ~one month; merge into existing output")
     args = ap.parse_args()
+
+    if getattr(args, "daily_tail", False):
+        return daily_tail()
 
     yms = months(args.start, args.end)
 

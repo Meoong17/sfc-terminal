@@ -47,7 +47,7 @@ REGISTRY = [
     ("data/binance_vision_weekly.json",  "BTC weekly OHLCV",                            "L0", 21, "keys",   False),
     # Binance Vision publishes aggTrades monthly, so this input is inherently up
     # to ~31 days behind; the allowance says so instead of crying "stale" daily.
-    ("data/binance_orderflow_daily.json", "Orderflow: taker imbalance / trade size (monthly Vision cadence)", "L2", 40, "keys"),
+    ("data/binance_orderflow_daily.json", "Orderflow: taker imbalance / trade size (monthly + daily tail)", "L2", 3, "keys"),
     ("data/binance_oi_daily.json",       "Open interest (Binance)",                     "L2", 2,  "keys"),
     ("data/okx_oi_daily.json",           "Open interest (OKX)",                          "L2", 3,  "keys"),
     ("data/deribit_options_daily.json",  "Options OI / put-call / IV (Deribit)",         "L2", 2,  "keys"),
