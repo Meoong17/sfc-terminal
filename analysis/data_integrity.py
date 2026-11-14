@@ -63,6 +63,7 @@ REGISTRY = [
 ]
 
 GAP_WINDOW_DAYS = 90
+RECENT_GAP_DAYS = 7
 
 
 def _is_date_key(k):
@@ -187,9 +188,16 @@ def check_series(path_str, label, layer, max_lag, date_source, gap_check=True, f
         return row
 
     age = (date.today() - date.fromisoformat(last)).days
+    # A gap that sits far in the past does not affect today's reading: a missing
+    # 2026-10-21 print is history, not a live blind spot. Only a gap inside the
+    # recent window means a component is reading the wrong thing right now.
+    recent_gaps = []
+    if gaps:
+        cutoff = date.today() - timedelta(days=RECENT_GAP_DAYS)
+        recent_gaps = [g for g in gaps if date.fromisoformat(g) >= cutoff]
     if age > max_lag:
         status = "stale"
-    elif gaps:
+    elif recent_gaps:
         status = "gap"
     else:
         status = "ok"
@@ -208,10 +216,15 @@ def check_series(path_str, label, layer, max_lag, date_source, gap_check=True, f
         except Exception:
             pass
     row.update(status=status, last=last, age_days=age,
-               gaps_90d=len(gaps) if gaps is not None else None)
+               gaps_90d=len(gaps) if gaps is not None else None,
+               recent_gaps=len(recent_gaps) if gaps is not None else None)
     if gaps:
         shown = ", ".join(gaps[:4]) + ("..." if len(gaps) > 4 else "")
-        note = f"{len(gaps)} missing day(s) in {GAP_WINDOW_DAYS}d: {shown}"
+        if recent_gaps:
+            note = f"{len(recent_gaps)} recent missing day(s) in the last {RECENT_GAP_DAYS}d: " \
+                   + ", ".join(recent_gaps[:4])
+        else:
+            note = f"{len(gaps)} historical missing day(s), newest {gaps[-1]} (outside {RECENT_GAP_DAYS}d window)"
     row["note"] = note
     return row
 

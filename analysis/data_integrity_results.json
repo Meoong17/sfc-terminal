@@ -1,10 +1,10 @@
 {
-  "generated_at": "2026-11-14T16:34:54.854647+00:00",
-  "health": "degraded",
+  "generated_at": "2026-11-14T16:45:27.820653+00:00",
+  "health": "ok",
   "counts": {
-    "ok": 11,
+    "ok": 14,
     "stale": 0,
-    "gap": 3,
+    "gap": 0,
     "missing": 0,
     "superseded": 2
   },
@@ -19,6 +19,7 @@
       "last": "2026-11-13",
       "age_days": 2,
       "gaps_90d": 0,
+      "recent_gaps": 0,
       "note": ""
     },
     {
@@ -31,6 +32,7 @@
       "last": "2026-11-01",
       "age_days": 14,
       "gaps_90d": null,
+      "recent_gaps": null,
       "note": ""
     },
     {
@@ -43,6 +45,7 @@
       "last": "2026-10-26",
       "age_days": 20,
       "gaps_90d": null,
+      "recent_gaps": null,
       "note": ""
     },
     {
@@ -55,6 +58,7 @@
       "last": "2026-10-31",
       "age_days": 15,
       "gaps_90d": 0,
+      "recent_gaps": 0,
       "note": ""
     },
     {
@@ -67,6 +71,7 @@
       "last": "2026-11-14",
       "age_days": 1,
       "gaps_90d": 0,
+      "recent_gaps": 0,
       "note": ""
     },
     {
@@ -75,11 +80,12 @@
       "layer": "L2",
       "max_lag_days": 3,
       "fallback": null,
-      "status": "gap",
+      "status": "ok",
       "last": "2026-11-14",
       "age_days": 1,
       "gaps_90d": 2,
-      "note": "2 missing day(s) in 90d: 2026-10-21, 2026-10-22"
+      "recent_gaps": 0,
+      "note": "2 historical missing day(s), newest 2026-10-22 (outside 7d window)"
     },
     {
       "path": "data/deribit_options_daily.json",
@@ -87,11 +93,12 @@
       "layer": "L2",
       "max_lag_days": 2,
       "fallback": null,
-      "status": "gap",
+      "status": "ok",
       "last": "2026-11-14",
       "age_days": 1,
       "gaps_90d": 2,
-      "note": "2 missing day(s) in 90d: 2026-10-21, 2026-10-22"
+      "recent_gaps": 0,
+      "note": "2 historical missing day(s), newest 2026-10-22 (outside 7d window)"
     },
     {
       "path": "data/bitmex_funding_daily.json",
@@ -103,6 +110,7 @@
       "last": "2026-09-16",
       "age_days": 60,
       "gaps_90d": 0,
+      "recent_gaps": 0,
       "note": "replaced by data/binance_funding_daily.json (last 2026-11-14)"
     },
     {
@@ -115,6 +123,7 @@
       "last": "2026-11-14",
       "age_days": 1,
       "gaps_90d": 0,
+      "recent_gaps": 0,
       "note": ""
     },
     {
@@ -127,6 +136,7 @@
       "last": "2026-11-14",
       "age_days": 1,
       "gaps_90d": 0,
+      "recent_gaps": 0,
       "note": ""
     },
     {
@@ -139,6 +149,7 @@
       "last": "2026-11-13",
       "age_days": 2,
       "gaps_90d": 0,
+      "recent_gaps": 0,
       "note": ""
     },
     {
@@ -147,11 +158,12 @@
       "layer": "L2",
       "max_lag_days": 4,
       "fallback": null,
-      "status": "gap",
+      "status": "ok",
       "last": "2026-11-13",
       "age_days": 2,
       "gaps_90d": 1,
-      "note": "1 missing day(s) in 90d: 2026-09-07"
+      "recent_gaps": 0,
+      "note": "1 historical missing day(s), newest 2026-09-07 (outside 7d window)"
     },
     {
       "path": "data/tradingview_btc1_daily.csv",
@@ -163,6 +175,7 @@
       "last": "2026-09-01",
       "age_days": 75,
       "gaps_90d": null,
+      "recent_gaps": null,
       "note": "replaced by data/binance_futures_basis_daily.json (last 2026-11-14)"
     },
     {
@@ -175,6 +188,7 @@
       "last": "2026-11-13",
       "age_days": 2,
       "gaps_90d": null,
+      "recent_gaps": null,
       "note": ""
     },
     {
@@ -187,6 +201,7 @@
       "last": "2026-11-13",
       "age_days": 2,
       "gaps_90d": null,
+      "recent_gaps": null,
       "note": ""
     },
     {
@@ -199,21 +214,18 @@
       "last": "2026-11-14",
       "age_days": 1,
       "gaps_90d": null,
+      "recent_gaps": null,
       "note": "file modification time"
     }
   ],
   "live_price": {
-    "data_json_btc": 65354.57,
-    "feed_btc": 65312.64,
-    "divergence_pct": 0.06,
+    "data_json_btc": 65462.56,
+    "feed_btc": 65277.79,
+    "divergence_pct": 0.28,
     "feed_age_s": 1,
     "status": "ok",
     "note": "",
-    "data_json_age_min": 3.0
+    "data_json_age_min": 1.7
   },
-  "findings": [
-    "Open interest (OKX): gap \u2014 2 missing day(s) in 90d: 2026-10-21, 2026-10-22",
-    "Options OI / put-call / IV (Deribit): gap \u2014 2 missing day(s) in 90d: 2026-10-21, 2026-10-22",
-    "Spot ETF net flows (Farside): gap \u2014 1 missing day(s) in 90d: 2026-09-07"
-  ]
+  "findings": []
 }

@@ -1,7 +1,7 @@
 {
-  "ts": "2026-11-14T16:37:32.091471+00:00",
+  "ts": "2026-11-14T16:45:27.724869+00:00",
   "model_version": "4.0.0",
-  "btc": 65374.56,
+  "btc": 65352.48,
   "btc_price_history": [
     {
       "t": 1789430400000,
@@ -244,15 +244,15 @@
       "btc": 68314.0
     }
   ],
-  "btc_24h": -4.921,
-  "btc_mcap": 1313434495665.3623,
+  "btc_24h": -4.822,
+  "btc_mcap": 1313732885394.3625,
   "fng": 15,
   "fng_cls": "Extreme Fear",
   "dom": 59.6,
   "dvol": 39.31,
   "dvol_is_fallback": false,
-  "sfc_base": 33.98020779891843,
-  "sfc_effective": 36.01902026685354,
+  "sfc_base": 33.71892384980404,
+  "sfc_effective": 35.74205928079228,
   "news_stress": 1.0,
   "news_headlines": [
     "\ud83d\udd34[Lt][Investing.co] Fed\u2019s Collins says gradual rate hikes best to manage economic risks",
@@ -277,30 +277,30 @@
   "liq_long_vol": 65905523.94,
   "liq_short_vol": 24221928.9,
   "zone": "HIGH",
-  "floor_buffer": 13329,
-  "floor_total": 52045,
+  "floor_buffer": 13222,
+  "floor_total": 52130,
   "regime": "STRESS",
   "regime_zone_divergence": false,
   "regime_zone_divergence_note": null,
   "regime_prob": 0.408,
-  "transition_risk": 0.301,
+  "transition_risk": 0.3,
   "dxy": 103.31,
   "pc_oi": 0.73,
   "pc_vol": 0.96,
-  "dv_sfc": 0.204,
+  "dv_sfc": 0.202,
   "phi": 1.0,
   "state": "DISSIPATIVE SLIDE",
   "signal": "STAY IN CASH / GOLD",
   "factors": {
-    "Lt": -0.4474650062960771,
-    "St": -0.3289479125469883,
+    "Lt": -0.4467241486834673,
+    "St": -0.32886044882564014,
     "Rt": -1.4895141519179902,
-    "Ft": 0.5589043351061656,
+    "Ft": 0.5590960517315171,
     "Sc": -0.299185030012868
   },
   "ath": 126080,
   "ath_date": "2025-10-06T10:57:42.000Z",
-  "rsi_14": 46.41,
+  "rsi_14": 46.4,
   "rsi_regime": "NEUTRAL",
   "sopr_proxy": 0.9963,
   "sopr_signal": "BREAKEVEN",
@@ -311,7 +311,7 @@
   "composite_confidence": 0.373,
   "confidence_components": {
     "method_agree": 0.66,
-    "low_stress_boost": 0.0512,
+    "low_stress_boost": 0.0514,
     "rsi": 0.03,
     "sopr": 0.0,
     "dvol": 0.05,
@@ -367,8 +367,8 @@
   "m14_skew": 0.1,
   "m14_detail": {
     "skew": 0.0,
-    "put_iv": 54.3,
-    "call_iv": 54.3
+    "put_iv": 54.24,
+    "call_iv": 54.24
   },
   "m15_concentration": 0.1,
   "m15_detail": {
@@ -399,17 +399,17 @@
   "new_methods_active": 3,
   "new_methods_avg": 0.16,
   "inst_methods_active": 8,
-  "inst_methods_avg": 0.353,
+  "inst_methods_avg": 0.293,
   "sc_methods_active": 5,
   "total_methods_active": 31,
-  "m20_obi": 0.75,
+  "m20_obi": 0.35,
   "m20_detail": {
-    "obi_change": "SELL_SURGE",
-    "obi_delta": -0.6341,
-    "obi": -0.6693,
-    "obi_norm": 0.1654,
-    "bid_vol": 1.28,
-    "ask_vol": 6.46
+    "obi_change": "STABLE",
+    "obi_delta": 0.0404,
+    "obi": 0.877,
+    "obi_norm": 0.9385,
+    "bid_vol": 5.17,
+    "ask_vol": 0.34
   },
   "m21_trade_flow": 0.3,
   "m21_detail": {
@@ -422,34 +422,34 @@
   "m22_spread": 0.25,
   "m22_detail": {
     "spread_bps": 0.0015,
-    "range_bps": 622.11,
-    "bid": 65380.14,
-    "ask": 65380.15,
-    "mid": 65380.14,
+    "range_bps": 622.43,
+    "bid": 65346.43,
+    "ask": 65346.44,
+    "mid": 65346.43,
     "spread_change": "STABLE",
     "spread_delta": 0.0
   },
   "m23_liquidity": 0.8,
   "m23_detail": {
-    "slippage_pct": 2.507,
-    "levels_used_buy": 80,
+    "slippage_pct": 5.0,
+    "levels_used_buy": 999,
     "levels_used_sell": 999,
-    "mid_price": 65380.15,
-    "liq_change": "STABLE",
-    "slippage_delta": 0.002
+    "mid_price": 65346.43,
+    "liq_change": "THINNING_FAST",
+    "slippage_delta": 2.497
   },
   "m24_cape": 0.1,
   "m24_detail": {
-    "cape": 0.8598,
-    "current_price": 65380.15,
-    "sma_1y_realized": 76037.72
+    "cape": 0.8594,
+    "current_price": 65346.43,
+    "sma_1y_realized": 76037.63
   },
   "m25_minsky": 0.15,
   "m25_detail": {
     "funding_rate": 0,
     "funding_8h": 0.0,
     "accel": 3e-06,
-    "oi_futures": 1274443390,
+    "oi_futures": 1274950060,
     "minsky_stage": "NORMAL"
   },
   "m26_kahneman": 0.325,
@@ -457,17 +457,17 @@
     "loss_aversion": 0.55,
     "anchoring": 0.15,
     "fear": 0.2,
-    "realized_price": 77912.99,
+    "realized_price": 77911.86,
     "ath": 96951.78,
-    "pl_pct": -16.09
+    "pl_pct": -16.12
   },
   "m27_taleb": 0.432,
   "m27_detail": {
-    "dvol": 53.02,
-    "skewness": 0.8753,
-    "max_drawdown": 0.2452,
-    "vol_7d_ann": 0.4307,
-    "vol_90d_ann": 0.5302,
+    "dvol": 52.93,
+    "skewness": 0.8722,
+    "max_drawdown": 0.2456,
+    "vol_7d_ann": 0.4324,
+    "vol_90d_ann": 0.5293,
     "term": "3M>1W",
     "tail_danger": "NORMAL"
   },
@@ -488,7 +488,7 @@
     "fsi_score": 0.15,
     "components": {
       "credit_growth": 5.71,
-      "asset_vol": 54.3,
+      "asset_vol": 54.24,
       "yield_curve": 0.24,
       "hy_spread": 3.2,
       "top3_concentration": 0.059,
@@ -498,12 +498,12 @@
   },
   "m31_altman": 0.15,
   "m31_detail": {
-    "z_score": 7.301,
-    "x1_liquidity": 0.002,
+    "z_score": 7.28,
+    "x1_liquidity": 0.001,
     "x2_network": 4.0,
     "x3_efficiency": 0.895,
-    "x4_oi_ratio": 9.733,
-    "x5_turnover": 0.205,
+    "x4_oi_ratio": 9.664,
+    "x5_turnover": 0.207,
     "zone": "SAFE"
   },
   "m76_supply_growth": 0.064,
@@ -518,7 +518,7 @@
   "m77_detail": {
     "ssr": 5.27,
     "stablecoin_mcap": 249372620258.0,
-    "btc_mcap": 1313434495665.0,
+    "btc_mcap": 1313732885394.0,
     "label": "MODERATE",
     "status": "ok"
   },
@@ -541,9 +541,9 @@
   },
   "m80_dominance": 0.95,
   "m80_detail": {
-    "dominance_pct": 11.31,
+    "dominance_pct": 11.3,
     "stablecoin_mcap": 249372620258.0,
-    "total_crypto_mcap": 2205034533786.0,
+    "total_crypto_mcap": 2205948891833.0,
     "dom_change_30d": -0.56,
     "trend": "FALLING",
     "status": "ok"
@@ -598,18 +598,18 @@
   "treasury_per_asset": null,
   "treasury_available": false,
   "micro_change_flags": {
-    "obi": "SELL_SURGE"
+    "liq": "THINNING_FAST"
   },
   "micro_trend_score": 0.333,
   "micro_deteriorating": true,
-  "m32_qlstm": 0.1256,
+  "m32_qlstm": 0.125,
   "m32_active": true,
-  "m32_adjustment_pp": -1.1273,
-  "m32_garch_residual": 3.4374,
-  "m32_garch_volatility": 6.9068,
-  "m32_hybrid_pred": 15.999,
+  "m32_adjustment_pp": -1.1169,
+  "m32_garch_residual": 3.5638,
+  "m32_garch_volatility": 5.9717,
+  "m32_hybrid_pred": 16.0615,
   "m32_proadapt_weight": 0.5,
-  "m32_proadapt_final": 15.999,
+  "m32_proadapt_final": 16.0615,
   "m32_mamba": null,
   "m32_mamba_active": false,
   "m32_mamba_short": null,
@@ -757,12 +757,12 @@
   "dxy_btc_corr": 0.063,
   "dxy_gate_regime": "MIXED",
   "xai_top_features": null,
-  "ml_ensemble_score": 0.139,
-  "ml_ensemble_confidence": 0.722,
-  "ml_ensemble_msg": "ML=0.139 (CALM)",
-  "ml_accuracy": 0.9681,
-  "ml_total_labeled": 1878,
-  "ml_correct": 1818,
+  "ml_ensemble_score": 0.136,
+  "ml_ensemble_confidence": 0.728,
+  "ml_ensemble_msg": "ML=0.136 (CALM)",
+  "ml_accuracy": 0.968,
+  "ml_total_labeled": 1876,
+  "ml_correct": 1816,
   "ml_accuracy_reliable": true,
   "ml_stress_events": 60,
   "m1_m6_weight_pct": 92.6,
@@ -918,7 +918,7 @@
   "reflexivity_divergence_detail": {
     "status": "ok",
     "experimental": true,
-    "price_roc": -0.0036,
+    "price_roc": -0.0044,
     "leverage_roc": 0.0,
     "mvrv_gap_now": 0.2678,
     "mvrv_gap_widening": 0.0,
@@ -931,7 +931,7 @@
     "regime": "NO_DIVERGENCE",
     "flow_direction_score": -0.088,
     "price_direction": -1,
-    "btc_24h": -4.921,
+    "btc_24h": -4.822,
     "components_used": [
       "etf_flow",
       "whale_pressure",
@@ -997,7 +997,7 @@
         "growth_divergence": 0.1493,
         "reserve_ratio": 0.2986,
         "ssr": 0.0127,
-        "supply_growth": 0.017,
+        "supply_growth": 0.0169,
         "velocity": 0.1493
       },
       "detail": {
@@ -1034,11 +1034,11 @@
     },
     "MPI": {
       "recommended_weights": {
-        "funding_rate": 0.2694,
-        "put_call": 0.2156,
-        "liquidation": 0.1767,
-        "basis": 0.1767,
-        "open_interest": 0.1617
+        "funding_rate": 0.2705,
+        "put_call": 0.2164,
+        "liquidation": 0.1754,
+        "basis": 0.1754,
+        "open_interest": 0.1623
       },
       "detail": {
         "status": "ok",
@@ -1046,15 +1046,15 @@
         "avg_abs_correlation": {
           "funding_rate": 0.0,
           "put_call": 0.0,
-          "liquidation": 0.18,
-          "basis": 0.18,
+          "liquidation": 0.189,
+          "basis": 0.189,
           "open_interest": 0.0
         },
         "independence_score": {
           "funding_rate": 1.0,
           "put_call": 1.0,
-          "liquidation": 0.82,
-          "basis": 0.82,
+          "liquidation": 0.811,
+          "basis": 0.811,
           "open_interest": 1.0
         },
         "original_weights": {
@@ -1067,17 +1067,17 @@
       }
     }
   },
-  "afe_macd_signal": -0.4967,
-  "afe_bb_width": 0.0063,
+  "afe_macd_signal": -0.4968,
+  "afe_bb_width": 0.0064,
   "afe_vwap": 0.0,
-  "afe_obv_norm": 0.0277,
+  "afe_obv_norm": 0.0274,
   "afe_available": true,
   "xgb_meta_prediction": 2.91,
   "xgb_meta_confidence": 0.993,
   "xgb_blend_weight": 0.0,
   "xgb_available": true,
   "hmm_regime": "CRISIS",
-  "hmm_crisis_prob": 0.999,
+  "hmm_crisis_prob": 1.0,
   "hmm_available": true,
   "dw_regime": "CRISIS",
   "dw_z_score": 0.517,
@@ -1089,7 +1089,7 @@
     "Sc": 0.25
   },
   "dw_factors": {
-    "Lt": 0.575,
+    "Lt": 0.574,
     "St": 0.555,
     "Rt": 0.748,
     "Ft": 0.407,
@@ -1097,7 +1097,7 @@
   },
   "dw_sfc_adjustment": 2.0,
   "dw_available": true,
-  "mpi_score": 50.0,
+  "mpi_score": 55.0,
   "mpi_stress": 0.5,
   "mpi_label": "CAUTIOUS",
   "mpi_available": true,
@@ -1118,9 +1118,9 @@
       "contribution": 0.01
     },
     "basis": {
-      "score": 0.65,
+      "score": 0.4,
       "weight": 0.2,
-      "contribution": 0.03
+      "contribution": -0.02
     },
     "open_interest": {
       "score": 0.3,
@@ -1166,7 +1166,7 @@
   "adv_regime_reliable": false,
   "adv_regime_fit_rows": 102,
   "adv_regime_note": "insufficient daily history for k-means+Markov regime (102 rows < 250); label/probabilities not published",
-  "adv_uncertainty": 0.356,
+  "adv_uncertainty": 0.296,
   "adv_confidence": "LOW_CONFIDENCE",
   "adv_trends_recession": 0.87,
   "adv_trends_crash": 0.87,
@@ -1181,7 +1181,7 @@
   "bt_win_rate_low": 0.821,
   "bt_win_rate_high": 0.854,
   "bt_return": 0.5,
-  "bt_periods": 1878,
+  "bt_periods": 1876,
   "bt_stability": 0.691,
   "bt_calibration_note": "Limited stress events in training window \u2014 metrics are upper-bound estimates",
   "bt_label": "ESTIMATED (heuristic formula, not walk-forward validated)",
@@ -1223,14 +1223,14 @@
   "signal_decision": "CASH",
   "signal_threshold_mult": 0.7,
   "signal_type": "STRESS",
-  "signal_strength": 0.72,
+  "signal_strength": 0.715,
   "calibrated_confidence": 0.373,
   "reliability": "MEDIUM",
   "reliability_reason": "Adequate agreement",
   "timing_precision": "MEDIUM",
   "alert_window_days": 25.8,
   "timeframe": "MONTHLY",
-  "readiness_score": 0.239,
+  "readiness_score": 0.24,
   "shock_factor": 0.0,
   "shock_event": null,
   "shock_severity": "NONE",
@@ -1312,29 +1312,29 @@
   "m71_lime_top_1_pct": 18.0,
   "m71_lime_top_3": "M1_KLR, M20_OBI, M25_Minsky",
   "prob_dist_available": true,
-  "predicted_mean": 36.02,
+  "predicted_mean": 35.74,
   "predicted_std": 10.32,
-  "var_95": 19.05,
-  "es_975": 11.9,
-  "ci_90_lower": 19.05,
-  "ci_90_upper": 52.99,
-  "prob_stress": 0.8572,
-  "prob_critical": 0.0877,
-  "prob_crash_10pct": 0.0101,
-  "prob_calm": 0.0208,
+  "var_95": 18.77,
+  "es_975": 11.62,
+  "ci_90_lower": 18.77,
+  "ci_90_upper": 52.71,
+  "prob_stress": 0.8511,
+  "prob_critical": 0.0835,
+  "prob_crash_10pct": 0.0094,
+  "prob_calm": 0.0222,
   "prob_quantiles": {
-    "q_01": 12.02,
-    "q_05": 19.05,
-    "q_10": 22.79,
-    "q_25": 29.06,
-    "q_50": 36.02,
-    "q_75": 42.97,
-    "q_90": 49.25,
-    "q_95": 52.99,
-    "q_99": 60.02
+    "q_01": 11.74,
+    "q_05": 18.77,
+    "q_10": 22.51,
+    "q_25": 28.79,
+    "q_50": 35.74,
+    "q_75": 42.7,
+    "q_90": 48.97,
+    "q_95": 52.71,
+    "q_99": 59.74
   },
-  "prob_sharpe": 1.355,
-  "prob_sortino": 2.033,
+  "prob_sharpe": 1.382,
+  "prob_sortino": 2.073,
   "prob_uncertainty_breakdown": {
     "method_disagreement_sigma": 3.0,
     "confidence_sigma": 9.4,
@@ -1550,7 +1550,7 @@
       },
       "verdict": "FLQD stress probability does not beat price/vol baseline on Brier"
     },
-    "cache_age_hours": 0.5,
+    "cache_age_hours": 0.6,
     "stale": false
   },
   "structure": {
@@ -1651,37 +1651,33 @@
     },
     "framing": "structure reads are CHANGE DETECTORS: transition.sfi tracks deterioration speed, transition.quadrant names which layer moves first. Level indices alone are context.",
     "verdict": "no index adds reliable information over the price/vol baseline",
-    "cache_age_hours": 0.1,
+    "cache_age_hours": 0.2,
     "stale": false,
     "html": "<div class=\"grid-3\" style=\"gap:14px\"><div><div style=\"font-size:9px;color:var(--text-3);letter-spacing:.06em;margin-bottom:6px\">STRUCTURAL READS (0-100, higher = healthier)</div><div class=\"info-row\"><span class=\"info-k\">Price formation</span><span class=\"info-v\" style=\"color:var(--red)\">26 <span style=\"font-size:9px;color:var(--text-3)\">\u25bc-10.8/20d</span></span></div><div class=\"prog-track\" style=\"margin:2px 0 8px\"><div class=\"prog-fill pf-red\" style=\"width:26%\"></div></div><div class=\"info-row\"><span class=\"info-k\">Financing quality</span><span class=\"info-v\" style=\"color:var(--green)\">94 <span style=\"font-size:9px;color:var(--text-3)\">\u25b2+7.0/20d</span></span></div><div class=\"prog-track\" style=\"margin:2px 0 8px\"><div class=\"prog-fill pf-green\" style=\"width:94%\"></div></div><div class=\"info-row\"><span class=\"info-k\">New demand</span><span class=\"info-v\" style=\"color:var(--red)\">37 <span style=\"font-size:9px;color:var(--text-3)\">\u25bc-6.3/20d</span></span></div><div class=\"prog-track\" style=\"margin:2px 0 8px\"><div class=\"prog-fill pf-red\" style=\"width:37%\"></div></div><div style=\"font-size:8px;color:var(--text-3);line-height:1.5\">Coverage PFS 75% \u00b7 FQ 100% \u00b7 NDS 100%</div></div><div><div style=\"font-size:9px;color:var(--text-3);letter-spacing:.06em;margin-bottom:6px\">SHIFT INTENSITY (SFI)</div><div style=\"font-size:26px;font-weight:600;color:var(--amber)\">57<span style=\"font-size:11px;color:var(--text-3)\"> /100</span></div><div style=\"font-size:10px;color:var(--text-2);margin:4px 0 8px;line-height:1.4\">CARRY BID, THIN MARKET \u2014 funding cheap but price discovery weak</div><div style=\"font-size:9px;color:var(--text-3);line-height:1.5\">Which layer moves first. Financing tightening + thinner book = early deleverage; new demand into a thin book = absorption risk.</div></div><div><div style=\"font-size:9px;color:var(--text-3);letter-spacing:.06em;margin-bottom:6px\">DOES A SHIFT LEAD STRESS?</div><div class=\"info-row\"><span class=\"info-k\">Top-quintile SFI</span><span class=\"info-v\">38% vs 20% base</span></div><div class=\"info-row\"><span class=\"info-k\">Lift</span><span class=\"info-v\">1.83\u00d7 \u00b7 n=8</span></div><div style=\"font-size:8px;color:var(--amber);line-height:1.5;margin-top:6px\">PFS alone: \u0394AUC -0.016, perm p=0.965. n=8 is too small \u2014 hypothesis, not signal.</div><div style=\"font-size:8px;color:var(--text-3);line-height:1.5;margin-top:8px\">as of 2026-11-13 \u00b7 display-only, not in SFC score</div></div></div>"
   },
   "structure_html": "<div class=\"grid-3\" style=\"gap:14px\"><div><div style=\"font-size:9px;color:var(--text-3);letter-spacing:.06em;margin-bottom:6px\">STRUCTURAL READS (0-100, higher = healthier)</div><div class=\"info-row\"><span class=\"info-k\">Price formation</span><span class=\"info-v\" style=\"color:var(--red)\">26 <span style=\"font-size:9px;color:var(--text-3)\">\u25bc-10.8/20d</span></span></div><div class=\"prog-track\" style=\"margin:2px 0 8px\"><div class=\"prog-fill pf-red\" style=\"width:26%\"></div></div><div class=\"info-row\"><span class=\"info-k\">Financing quality</span><span class=\"info-v\" style=\"color:var(--green)\">94 <span style=\"font-size:9px;color:var(--text-3)\">\u25b2+7.0/20d</span></span></div><div class=\"prog-track\" style=\"margin:2px 0 8px\"><div class=\"prog-fill pf-green\" style=\"width:94%\"></div></div><div class=\"info-row\"><span class=\"info-k\">New demand</span><span class=\"info-v\" style=\"color:var(--red)\">37 <span style=\"font-size:9px;color:var(--text-3)\">\u25bc-6.3/20d</span></span></div><div class=\"prog-track\" style=\"margin:2px 0 8px\"><div class=\"prog-fill pf-red\" style=\"width:37%\"></div></div><div style=\"font-size:8px;color:var(--text-3);line-height:1.5\">Coverage PFS 75% \u00b7 FQ 100% \u00b7 NDS 100%</div></div><div><div style=\"font-size:9px;color:var(--text-3);letter-spacing:.06em;margin-bottom:6px\">SHIFT INTENSITY (SFI)</div><div style=\"font-size:26px;font-weight:600;color:var(--amber)\">57<span style=\"font-size:11px;color:var(--text-3)\"> /100</span></div><div style=\"font-size:10px;color:var(--text-2);margin:4px 0 8px;line-height:1.4\">CARRY BID, THIN MARKET \u2014 funding cheap but price discovery weak</div><div style=\"font-size:9px;color:var(--text-3);line-height:1.5\">Which layer moves first. Financing tightening + thinner book = early deleverage; new demand into a thin book = absorption risk.</div></div><div><div style=\"font-size:9px;color:var(--text-3);letter-spacing:.06em;margin-bottom:6px\">DOES A SHIFT LEAD STRESS?</div><div class=\"info-row\"><span class=\"info-k\">Top-quintile SFI</span><span class=\"info-v\">38% vs 20% base</span></div><div class=\"info-row\"><span class=\"info-k\">Lift</span><span class=\"info-v\">1.83\u00d7 \u00b7 n=8</span></div><div style=\"font-size:8px;color:var(--amber);line-height:1.5;margin-top:6px\">PFS alone: \u0394AUC -0.016, perm p=0.965. n=8 is too small \u2014 hypothesis, not signal.</div><div style=\"font-size:8px;color:var(--text-3);line-height:1.5;margin-top:8px\">as of 2026-11-13 \u00b7 display-only, not in SFC score</div></div></div>",
   "data_health": {
-    "health": "degraded",
+    "health": "ok",
     "counts": {
-      "ok": 11,
+      "ok": 14,
       "stale": 0,
-      "gap": 3,
+      "gap": 0,
       "missing": 0,
       "superseded": 2
     },
-    "findings": [
-      "Open interest (OKX): gap \u2014 2 missing day(s) in 90d: 2026-10-21, 2026-10-22",
-      "Options OI / put-call / IV (Deribit): gap \u2014 2 missing day(s) in 90d: 2026-10-21, 2026-10-22",
-      "Spot ETF net flows (Farside): gap \u2014 1 missing day(s) in 90d: 2026-09-07"
-    ],
+    "findings": [],
     "live_price": {
-      "data_json_btc": 65277.55,
-      "feed_btc": 65432.34,
-      "divergence_pct": -0.24,
-      "feed_age_s": 0,
+      "data_json_btc": 65462.56,
+      "feed_btc": 65277.79,
+      "divergence_pct": 0.28,
+      "feed_age_s": 1,
       "status": "ok",
       "note": "",
-      "data_json_age_min": 2.6
+      "data_json_age_min": 1.7
     },
-    "generated_at": "2026-11-14T16:37:32.188999+00:00"
+    "generated_at": "2026-11-14T16:45:27.820653+00:00"
   },
-  "data_health_html": "<div style=\"border:1px solid #f0b42955;background:#f0b42912;border-radius:10px;padding:10px 12px;margin:0 0 14px\"><div style=\"font-size:10px;letter-spacing:.08em;color:#f0b429;font-weight:700;text-transform:uppercase\">Data health: degraded</div><div style=\"font-size:10px;color:var(--text-2);margin-top:4px;line-height:1.5\">Inputs checked: 11 ok \u00b7 0 stale \u00b7 3 gap \u00b7 0 missing. Cards that depend on a stale input describe older data \u2014 the reading is not wrong, it is dated.</div><ul style=\"margin:6px 0 0 16px;padding:0;font-size:9.5px;color:var(--text-2);line-height:1.5\"><li style=\"margin:2px 0\">Open interest (OKX): gap \u2014 2 missing day(s) in 90d: 2026-10-21, 2026-10-22</li><li style=\"margin:2px 0\">Options OI / put-call / IV (Deribit): gap \u2014 2 missing day(s) in 90d: 2026-10-21, 2026-10-22</li><li style=\"margin:2px 0\">Spot ETF net flows (Farside): gap \u2014 1 missing day(s) in 90d: 2026-09-07</li></ul></div>",
+  "data_health_html": "",
   "calibration_walkforward": {
     "accepted": false,
     "verdict": "REJECT AS CLIMATOLOGY \u2014 map improves on raw only because it predicts the base rate; climatology is just as good",
