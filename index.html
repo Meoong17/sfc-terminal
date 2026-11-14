@@ -2033,6 +2033,31 @@ function toggleAdv(btn){
 // One-line plain-language takeaway for the overview banner (display-only).
 // L0 data-health banner: renders the pre-built HTML from the payload at runtime,
 // so the injector cannot swallow it and a stale input is always visible.
+// L4 contract objects (direction / conviction / risk permission). Display-only:
+// these re-publish existing outputs with score_weight 0, and the badge says so.
+function l4Card(d){
+  const l = (d && d.l4) || null;
+  if (!l || l.error) return '';
+  const dir = l.direction || {}, con = l.conviction || {}, per = l.risk_permission || {};
+  const dirCol = dir.value === 'down' ? 'var(--red)' : dir.value === 'up' ? 'var(--green)' : 'var(--text-2)';
+  const perCol = per.value === 'no_new_risk' ? 'var(--red)' : per.value === 'reduced' ? 'var(--amber)' : 'var(--green)';
+  const cell = (label, val, col, sub) =>
+    '<div style="flex:1;min-width:120px;padding:8px 10px;border:1px solid var(--border);border-radius:8px">' +
+      '<div style="font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-3)">' + label + '</div>' +
+      '<div style="font-size:15px;font-weight:600;color:' + col + ';margin-top:2px">' + val + '</div>' +
+      '<div style="font-size:9px;color:var(--text-3);margin-top:2px;line-height:1.4">' + (sub || '') + '</div>' +
+    '</div>';
+  return '<div class="card span-full mb-16"><div class="card-head"><div class="card-title">Model contract (L4)' +
+    '<span class="card-badge" style="color:var(--text-3)">derived · weight 0</span></div></div>' +
+    '<div class="card-body"><div style="display:flex;gap:10px;flex-wrap:wrap">' +
+      cell('Direction (7d)', String(dir.value || '—').toUpperCase(), dirCol, (dir.inputs || []).join(' · ')) +
+      cell('Conviction', ((con.value != null) ? Math.round(con.value * 100) + '%' : '—'), 'var(--text-1)', 'confidence × method agreement') +
+      cell('Risk permission', String(per.value || '—').replace(/_/g, ' '), perCol, (per.inputs || []).join(' · ')) +
+    '</div><div style="font-size:9px;color:var(--text-3);margin-top:8px;line-height:1.5">' +
+      'These objects re-publish the stress, regime and agreement outputs; they add no weight to the composite and no direction edge has been demonstrated.' +
+    '</div></div></div>';
+}
+
 function dataHealthBanner(d){
   const raw = d && d.data_health_html;
   return (typeof raw === 'string' && raw.length) ? raw : '';
@@ -3031,6 +3056,7 @@ function render(d) {
             ${d.structure_html || '<div class="text-xs" style="color:var(--text-3)">Structure engine output unavailable.</div>'}
           </div>
         </div>
+        ${l4Card(d)}
     </div><!-- /tab-panel overview -->
     <div class="tab-panel" data-tab="market">
     <!-- TAB: MARKET ================= -->

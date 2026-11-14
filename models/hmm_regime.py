@@ -124,7 +124,12 @@ class HMMRegimeDetector:
         self._scaler_mean = features.mean(axis=0)
         self._scaler_std = features.std(axis=0)
         self._scaler_std[self._scaler_std < 1e-8] = 1.0  # avoid div-by-zero
-        features_std = (features - self._scaler_mean) / self._scaler_std
+        # CLIP. One feature here (m2_yoy) is nearly constant (std ~0.003), so its
+        # z-score exploded to tens of sigmas and dominated every emission
+        # likelihood — which is why every posterior came out ~1.0 (hard labels
+        # masquerading as probabilities). Bound every standardised feature to
+        # +/-3 sigma; the same clip is applied at predict time.
+        features_std = np.clip((features - self._scaler_mean) / self._scaler_std, -3.0, 3.0)
 
         # Train Gaussian HMM with diagonal covariance (more stable than full)
         self.model = hmm.GaussianHMM(
@@ -225,7 +230,7 @@ class HMMRegimeDetector:
             if self._scaler_mean is not None and self._scaler_std is not None:
                 _std = np.asarray(self._scaler_std, dtype=np.float64)
                 _std = np.where(np.isfinite(_std) & (_std != 0.0), _std, 1.0)
-                features = (features - self._scaler_mean) / _std
+                features = np.clip((features - self._scaler_mean) / _std, -3.0, 3.0)
 
             # For single-point prediction, use emission log-likelihood + stationary
             # prior rather than hmmlearn's predict_proba (which uses the learned
