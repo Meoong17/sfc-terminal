@@ -3956,7 +3956,13 @@ function render(d) {
           <!-- 4. SIGNAL & ACTION PILL -->
           <div class="help-card">
             <div class="help-card-title" style="color:var(--amber)">Signal &amp; Action Pill</div>
-            <div class="help-body"><strong>The coloured signal pill (in the sidebar and the Signal card) shows the recommended action.</strong><ul><li><span style="color:var(--green)">BUY</span> &mdash; positive edge, Kelly &gt; 0</li><li><span style="color:var(--amber)">WATCH</span> &mdash; neutral zone, no strong signal</li><li><span style="color:var(--red)">CASH</span> &mdash; Kelly &le; 0 or negative edge, stay out</li></ul>Underlying metrics: <strong>Transition Risk</strong> (&gt;50% = regime shift likely), <strong>Readiness Score</strong> (how favourable conditions are for entry/exit), and <strong>BTC vs Floor %</strong> (distance from dynamic floor &mdash; closer = safer entry zone).</div>
+            <div class="help-body"><strong>The coloured signal pill (in the sidebar) shows the recommended action. The old Overview 'Signal &amp; Action' card was retired in Nov 2026; sizing math still lives in Kelly Position Sizing.</strong><ul><li><span style="color:var(--green)">BUY</span> &mdash; positive edge, Kelly &gt; 0</li><li><span style="color:var(--amber)">WATCH</span> &mdash; neutral zone, no strong signal</li><li><span style="color:var(--red)">CASH</span> &mdash; Kelly &le; 0 or negative edge, stay out</li></ul>Underlying metrics: <strong>Transition Risk</strong> (&gt;50% = regime shift likely), <strong>Readiness Score</strong> (how favourable conditions are for entry/exit), and <strong>BTC vs Floor %</strong> (distance from dynamic floor &mdash; closer = safer entry zone).</div>
+          </div>
+
+          <!-- 4b. REGIME DISTRIBUTION / STRUCTURE SHIFT -->
+          <div class="help-card">
+            <div class="help-card-title" style="color:var(--cyan)">Regime Distribution &amp; Structure Shift</div>
+            <div class="help-body"><strong>Regime Distribution</strong> is a measurement layer (FLQD v2), not a forecast: seven structural scores are mapped onto six regimes (Expansion, Liquidity Divergence, Credit/Funding Stress, Deleveraging, Repair, Quality-Led Expansion) and shown as a band. <em>Entropy</em> near 1 means no regime dominates, so read the band instead of a single label. It does not beat a price/volume baseline on Brier score, so it is context only.<br><br><strong>Structure Shift</strong> tracks the 20-day <em>change</em> of three layers &mdash; price formation (PFS), financing quality (FQ) and new demand (NDS) &mdash; plus SFI, the speed of deterioration. Direction and the mechanism quadrant matter more than the level. Its leading-edge test is underpowered (n=8), so it is a change detector, not a signal, and is not blended into the SFC score.</div>
           </div>
 
           <!-- 5. BTC PRICE & DYNAMIC FLOOR -->
@@ -4840,7 +4846,7 @@ var SUM = {
     'Allocation Guide':'Panduan Alokasi','Composite Stress Probability':'Probabilitas Stres Komposit',
     // card titles
     'SFC Stress Index':'Indeks Stres SFC','Momentum':'Momentum','Liquidation':'Likuidasi',
-    'Signal & Action':'Sinyal & Tindakan','BTC vs On-Chain Floor (Realized Price)':'BTC vs Lantai On-Chain (Realized Price)',
+    'Regime Distribution':'Distribusi Rezim','Structure Shift':'Pergeseran Struktur','BTC vs On-Chain Floor (Realized Price)':'BTC vs Lantai On-Chain (Realized Price)',
     'Liquidity Intelligence':'Intelejen Likuiditas','Macro Liquidity':'Likuiditas Makro',
     'Stablecoin Liquidity':'Likuiditas Stablecoin','Macro Context':'Konteks Makro',
     'On-Chain':'On-Chain','Behavioral':'Perilaku','Advanced ML Signals':'Sinyal ML Lanjutan',
@@ -5293,6 +5299,7 @@ var SUM = {
   };
 
   var pop = null;
+  var __openedAt = 0;
   function ensurePop() {
     if (pop) return pop;
     pop = document.createElement('div');
@@ -5312,6 +5319,7 @@ var SUM = {
     p.innerHTML = '<h6>' + title + '</h6><p>' + spec.how + '</p>' +
       (read ? '<p class="ex-read">Now: ' + read + '</p>' : '');
     p.style.display = 'block';
+    __openedAt = Date.now();
     var r = el.getBoundingClientRect();
     var w = Math.min(330, window.innerWidth - 24);
     p.style.width = w + 'px';
@@ -5357,7 +5365,12 @@ var SUM = {
     if (pop && !ev.target.closest('.explain-pop')) closePop();
   });
   window.addEventListener('resize', closePop);
-  window.addEventListener('scroll', closePop, true);
+  // A tap scrolls the page slightly on mobile; ignore scrolls in the first 400ms
+  // after opening so the popover is not closed by the same gesture that opened it.
+  window.addEventListener('scroll', function () {
+    if (Date.now() - __openedAt < 400) return;
+    closePop();
+  }, true);
 
   setInterval(decorate, 800);   // works regardless of when render() lands
   window.__decorateCards = decorate;
