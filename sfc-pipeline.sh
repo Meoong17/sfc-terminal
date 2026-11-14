@@ -61,16 +61,21 @@ collect_with_retry
 # ── Make git ignore index.html ──
 git update-index --skip-worktree index.html 2>/dev/null || true
 
-# ── Restore index.html from authoritative source ──
-log "Restoring index.html from /home/ubuntu/index.html..."
-if [ -f /home/ubuntu/index.html ] && [ "$(wc -c < /home/ubuntu/index.html)" -gt 50000 ]; then
-  cp /home/ubuntu/index.html index.html
-  log "Restored from /home/ubuntu/index.html ($(wc -c < index.html) bytes)"
-elif [ -f index.html.bak ] && [ "$(wc -c < index.html.bak)" -gt 50000 ]; then
-  cp index.html.bak index.html
-  log "Restored from .bak fallback ($(wc -c < index.html) bytes)"
+# ── Restore index.html from the COMMITTED template ──
+# 2026-11: this used to copy the loose master file /home/ubuntu/index.html (then a
+# stale index.html.bak). That file is not versioned, so any dashboard edit made in
+# the repo was silently reverted within five minutes and nobody noticed — exactly
+# the class of deception this pipeline is supposed to prevent. The single
+# authoritative source is now the index.html in git HEAD; the working copy is
+# regenerated from it and then has data injected.
+log "Restoring index.html template from git HEAD..."
+if git show HEAD:index.html > index.html.tmp 2>/dev/null && [ "$(wc -c < index.html.tmp)" -gt 50000 ]; then
+  mv -f index.html.tmp index.html
+  log "Restored from git HEAD ($(wc -c < index.html) bytes)"
+  rm -f index.html.bak
 else
-  log "⚠ No valid restore source found — keeping current index.html"
+  rm -f index.html.tmp
+  log "⚠ git HEAD restore failed — keeping current index.html"
 fi
 
 log "Injecting data into index.html..."
