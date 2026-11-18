@@ -1,77 +1,77 @@
 {
-  "generated_at": "2026-11-14T16:06:54.342112+00:00",
-  "as_of": "2026-11-13",
+  "generated_at": "2026-11-18T15:18:59.313048+00:00",
+  "as_of": "2026-11-17",
   "model": "FLQD v2.0 measurement engine (C/FLQD_Framework_SFC_Methodology_v2)",
   "layers": {
-    "LA": 52.47,
-    "LT": 21.35,
-    "CS": 41.51,
-    "FS": 23.78,
-    "PF": 97.37,
-    "CE": 50.0,
-    "QD": 33.26
+    "LA": 52.19,
+    "LT": 21.64,
+    "CS": 42.08,
+    "FS": 23.89,
+    "PF": 58.5,
+    "CE": 17.16,
+    "QD": 29.48
   },
   "coverage": {
     "LA": 1.0,
     "LT": 1.0,
     "CS": 1.0,
     "FS": 1.0,
-    "PF": 0.429,
+    "PF": 0.643,
     "QD": 1.0
   },
   "interactions": {
-    "FLTI": 41.27,
-    "SFM": 40.42,
+    "FLTI": 40.9,
+    "SFM": 24.62,
     "VD": 0.45,
-    "SC": 53.82,
-    "RE": 45.89
+    "SC": 46.26,
+    "RE": 40.83
   },
   "regime_probs": {
-    "R0": 0.2881,
-    "R1": 0.2134,
-    "R2": 0.133,
-    "R3": 0.0476,
-    "R4": 0.1891,
-    "R5": 0.1287
+    "R0": 0.3368,
+    "R1": 0.2391,
+    "R2": 0.1437,
+    "R3": 0.0395,
+    "R4": 0.1165,
+    "R5": 0.1244
   },
   "regime_mode": "R0",
-  "entropy": 0.9378,
+  "entropy": 0.9068,
   "circuit_breaker": false,
   "validation": {
-    "n_eval": 133,
-    "base_rate": 0.2706766917293233,
-    "brier_climatology": 0.19741082028379223,
-    "brier_flqd": 0.2578858123871465,
-    "brier_pricevol_baseline": 0.22677012914891612,
+    "n_eval": 134,
+    "base_rate": 0.27611940298507465,
+    "brier_climatology": 0.1998774782802406,
+    "brier_flqd": 0.26132883568492454,
+    "brier_pricevol_baseline": 0.23070375071169605,
     "date_range": [
       "2024-12-31",
-      "2026-10-22"
+      "2026-10-27"
     ],
-    "sojourn_days": 10.507692307692308,
+    "sojourn_days": 10.253731343283581,
     "spearman_crisis_vs_fwdvol": [
-      0.2078,
-      0.0164
+      0.2014,
+      0.0196
     ],
     "fwd20_by_mode": {
       "R0": {
-        "n": 759,
-        "fwd20_mean_pct": 3.24
+        "n": 771,
+        "fwd20_mean_pct": 3.12
       },
       "R1": {
-        "n": 53,
-        "fwd20_mean_pct": -2.53
+        "n": 48,
+        "fwd20_mean_pct": -2.39
       },
       "R2": {
-        "n": 175,
-        "fwd20_mean_pct": 2.78
+        "n": 176,
+        "fwd20_mean_pct": 2.89
       },
       "R4": {
-        "n": 162,
-        "fwd20_mean_pct": 1.15
+        "n": 151,
+        "fwd20_mean_pct": 1.06
       },
       "R5": {
-        "n": 18,
-        "fwd20_mean_pct": -7.83
+        "n": 25,
+        "fwd20_mean_pct": -7.42
       }
     },
     "verdict": "FLQD stress probability does not beat price/vol baseline on Brier"

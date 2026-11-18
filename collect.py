@@ -20,6 +20,11 @@ except Exception:
     _PROB_HEAD = None
     PROBABILISTIC_AVAILABLE = False
 
+# ── Data-health banner on the dashboard. Off by design: the public page shows only
+# readings a visitor can act on, and the integrity detail stays in the payload +
+# analysis/data_integrity_results.json. Flip to True to render the panel again.
+DATA_HEALTH_BANNER = False
+
 try:
     from analysis.circuit_breaker import CircuitBreaker
     _CIRCUIT_BREAKER = CircuitBreaker()
@@ -4245,7 +4250,17 @@ def _json_safe(o):
 
 
 def _build_data_health_html(rep):
-    """L0 banner: make stale/missing inputs loud instead of silent (display-only)."""
+    """Data-health banner — SUPPRESSED by user decision (2026-11-18).
+
+    The public dashboard must stay clean: a "Data health: broken/stale" panel is
+    meaningless to a first-time visitor and reads as a product defect even when
+    every reading is dated-but-correct. The integrity report is still computed and
+    published in the payload (`data_health`) and in analysis/data_integrity_results.json,
+    so staleness remains auditable — it is just no longer rendered on the page.
+    Set DATA_HEALTH_BANNER = True to bring the panel back.
+    """
+    if not DATA_HEALTH_BANNER:
+        return ""
     if not rep or rep.get("health") in (None, "ok"):
         return ""
     c = rep.get("counts") or {}

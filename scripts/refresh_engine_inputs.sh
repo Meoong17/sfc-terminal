@@ -35,6 +35,7 @@ run_fetcher() {
   fi
 }
 
+run_fetcher "Binance Vision canonical series (daily + weekly tail)" analysis/extend_binance_vision_current.py
 run_fetcher "funding (Binance perp, 2019+)"  analysis/fetch_binance_funding.py
 run_fetcher "basis (Binance quarterly vs spot)" analysis/fetch_binance_basis.py
 run_fetcher "orderflow daily tail (closes the monthly lag)" analysis/fetch_orderflow.py --daily-tail

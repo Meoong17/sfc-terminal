@@ -16,6 +16,7 @@ import os, json, io, zipfile, sys, datetime as dt
 
 REPO = "/home/ubuntu/sfc"
 DAILY_OUT = os.path.join(REPO, "data", "binance_vision_daily.json")
+WEEKLY_OUT = os.path.join(REPO, "data", "binance_vision_weekly.json")
 MONTHLY_OUT = os.path.join(REPO, "data", "binance_vision_monthly.json")
 BASE = "https://data.binance.vision/data"
 SYMBOL = "BTCUSDT"
@@ -88,6 +89,43 @@ def main():
     with open(DAILY_OUT, "w") as f:
         json.dump(daily, f)
 
+    # ── Weekly: rebuilt from the daily series instead of waiting for the monthly
+    # 1w zips. Verified identical to Binance's own 1w candles (same Monday-start
+    # weeks, same OHLC/volume) — so this keeps weekly as fresh as daily without
+    # touching the source of truth. The trailing (in-progress) week is skipped:
+    # a partial bar published as if it were a completed week would be a false read.
+    today_d = today.date()
+    this_monday = today_d - dt.timedelta(days=today_d.weekday())
+    weeks = {}
+    cur_wk = None
+    acc = None
+    for day in sorted(daily):
+        d0 = dt.date.fromisoformat(day)
+        mon = (d0 - dt.timedelta(days=d0.weekday())).isoformat()
+        if mon >= this_monday.isoformat():
+            break  # current week still open — never publish it as closed
+        r = daily[day]
+        if acc is None or mon != cur_wk:
+            if acc is not None and cur_wk is not None:
+                weeks[cur_wk] = acc
+            cur_wk = mon
+            acc = {"open": r.get("open"), "high": r.get("high"), "low": r.get("low"),
+                   "close": r.get("close"), "volume": 0.0, "quote_vol": 0.0,
+                   "taker_base": 0.0, "taker_quote": 0.0}
+        acc["high"] = max(acc["high"], r["high"])
+        acc["low"] = min(acc["low"], r["low"])
+        acc["close"] = r.get("close")
+        for k in ("volume", "quote_vol", "taker_base", "taker_quote"):
+            acc[k] = acc[k] + (r.get(k) or 0.0)
+    if acc is not None and cur_wk is not None:
+        weeks[cur_wk] = acc
+    # round the summed fields so identical inputs always serialise identically
+    for w in weeks.values():
+        for k in ("volume", "quote_vol", "taker_base", "taker_quote"):
+            w[k] = round(w[k], 8)
+    with open(WEEKLY_OUT, "w") as f:
+        json.dump({k: weeks[k] for k in sorted(weeks)}, f)
+
     # refresh monthly aggregation for current month
     monthly = json.load(open(MONTHLY_OUT))
     ym = f"{y:04d}-{m:02d}"
@@ -109,6 +147,7 @@ def main():
     print(f"added {len(added)} current-month day(s): {added}")
     print(f"failed (not yet published): {failed}")
     print(f"daily range now: {ks[0]} -> {ks[-1]} | n={len(ks)}")
+    print(f"weekly range now: {min(weeks)} -> {max(weeks)} | n={len(weeks)} (open week excluded)")
     print(f"last close: {daily[ks[-1]].get('close')}")
 
 

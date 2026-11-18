@@ -1,11 +1,11 @@
 {
-  "generated_at": "2026-11-14T17:26:03.279820+00:00",
-  "as_of": "2026-11-13",
+  "generated_at": "2026-11-18T15:19:06.642471+00:00",
+  "as_of": "2026-11-17",
   "model": "SFC structure engine: price formation / financing quality / new demand",
   "indices": {
-    "PFS": 19.78,
-    "FQ": 88.22,
-    "NDS": 37.32
+    "PFS": 21.32,
+    "FQ": 90.69,
+    "NDS": 58.97
   },
   "coverage": {
     "PFS": 1.0,
@@ -14,40 +14,40 @@
   },
   "components": {
     "PFS": {
-      "impact_depth": 4.6,
-      "flow_stability": 1.7,
-      "close_strength": 20.5,
-      "volume_breadth": 64.2
+      "impact_depth": 4.1,
+      "flow_stability": 6.2,
+      "close_strength": 23.0,
+      "volume_breadth": 63.9
     },
     "FQ": {
-      "funding_level": 95.6,
-      "funding_stability": 99.9,
-      "basis_carry": 78.0,
-      "valuation_premium": 75.3
+      "funding_level": 96.0,
+      "funding_stability": 98.3,
+      "basis_carry": 79.7,
+      "valuation_premium": 86.9
     },
     "NDS": {
-      "etf_demand": 6.9,
-      "active_users": 62.6,
-      "usage": 0.5,
-      "chain_supply_growth": 95.8
+      "etf_demand": 24.9,
+      "active_users": 78.1,
+      "usage": 79.7,
+      "chain_supply_growth": 74.0
     }
   },
   "context": {
-    "basis_pct": 0.703,
-    "funding_bps": 0.51,
+    "basis_pct": 0.586,
+    "funding_bps": 0.1,
     "basis_source": "binance_quarterly",
     "funding_source": "bitmex+binance",
     "funding_splice_from": "2026-09-17"
   },
   "transition": {
-    "as_of": "2026-11-13",
-    "sfi": 63.1,
+    "as_of": "2026-11-17",
+    "sfi": 54.3,
     "deltas_20d": {
-      "PFS": -16.8,
-      "FQ": 4.7,
-      "NDS": -6.3
+      "PFS": -22.4,
+      "FQ": 8.0,
+      "NDS": 21.9
     },
-    "quadrant": "CARRY BID, THIN MARKET \u2014 funding cheap but price discovery weak",
+    "quadrant": "ABSORPTION RISK \u2014 new demand arriving into a thinning book",
     "lead_test": {
       "top_quintile_event_rate": 0.5,
       "base_rate": 0.205,
@@ -60,20 +60,20 @@
       },
       "spearman_change_vs_fwd20": {
         "dPFS": [
-          0.014,
-          0.42
+          0.017,
+          0.345
         ],
         "dFQ": [
-          -0.029,
-          0.1
+          -0.03,
+          0.088
         ],
         "dNDS": [
-          0.107,
-          0.002
+          0.109,
+          0.001
         ]
       }
     },
-    "direction": "deteriorating"
+    "direction": "stable"
   },
   "incremental_test": {
     "PFS": {
