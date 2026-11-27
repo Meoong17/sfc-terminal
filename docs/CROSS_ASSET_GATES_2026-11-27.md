@@ -82,11 +82,45 @@ https://sfcterminal.xyz/data.json
   -> 200, ts 08:31:34Z, cross_asset: CONTRACTION_LOCK / 0 of 4 / CAPITAL_PRESERVATION_&_RENTALS
 ```
 
-## 5. Langkah berikutnya (belum dikerjakan)
+## 5. Panel UI (dikerjakan)
 
-1. Panel UI: kartu "Cross-Asset" di dashboard (saat ini hanya tersedia di `data.json`;
-   UI belum dirender karena perubahan `index.html` perlu desain terpisah).
-2. Uji gerbang pada riwayat: HY OAS 1997+, ETF 2024+, OI/CVD 2026+ — untuk melihat apakah
-   gerbang ini punya nilai sebelum dipakai sebagai klaim; gerbang 3 (CVD) baru punya
-   ~14 hari data sehingga belum bisa diuji.
-3. ACBI menunggu sumber CDS/bond; sampai itu tetap `UNAVAILABLE`.
+Kartu **CROSS-ASSET REGIME** (badge `context · not in score`) dirender di tab Overview,
+tepat setelah kartu Structure Shift, dari `cross_asset_html` yang dihasilkan `collect.py`.
+Isinya: status ML-PT Gate, trap/f2q, catatan ACBI `UNAVAILABLE`, 4 gerbang BIM dengan
+PASS/FAIL + angka, mode alokasi + rentang, dan catatan validasi.
+Verifikasi: render nyata di `sfcterminal.xyz` (kartu tampil, status merah
+CONTRACTION_LOCK, gates 0/4, Gate 1 FAIL dengan angka flow).
+
+Catatan teknis: `index.html` di-restore dari git HEAD tiap siklus pipeline (skip-worktree),
+jadi perubahan template harus di-commit — kalau tidak, ia hilang pada siklus berikutnya.
+
+## 6. Uji historis gerbang (dikerjakan)
+
+`analysis/cross_asset_validation.py`: return forward 30/90 hari, moving-block bootstrap
+30 hari (label tumpang tindih), era split era1 2017-19 / era2 2020-21 / era3 2022-26,
+dengan **pembanding dibatasi era yang sama** saat flag hanya punya riwayat pendek.
+
+| Sinyal (state ON) | n ON | fwd 30d ON vs OFF | gap | Verdict |
+|---|---|---|---|---|
+| 1a policy trap | 332 | (lihat json) | **−6,13 pp** | EDGE — risiko turun |
+| 1b flight-to-quality | 220 | −0,94% vs +5,18% | **−6,12 pp** [−10,7, −1,1] | EDGE — risiko turun |
+| 1c CONTRACTION_LOCK | 173 | −1,46% vs +5,12% | **−6,57 pp** [−11,6, −1,2] | EDGE — risiko turun |
+| Gate 1 ETF exhaustion | 790 | +3,90% vs −2,21% | **+6,11 pp** [1,0, 13,1] | EDGE — bottom valid |
+| Gate 3 spot absorption | 315 | +0,84% vs +5,19% | −4,34 pp [−8,5, 3,6] | arah konsisten, tidak signifikan |
+| Gate 4 di atas 200W SMA | 2333 | +2,51% vs +9,94% | **−7,43 pp** [−14,2, −0,2] | signifikan — **bukan buy trigger** |
+
+Bacaan:
+1. Model 1 tervalidasi sebagai **filter risiko** (tiga varian, ~−6 s/d −6,6 pp, era-konsisten).
+2. Gate 1 tervalidasi, tetapi hanya setelah pembanding dibatasi ke era ETF. Versi pertama
+   (hari 2024+ vs hari 2017–2023) memberi gap −1,15 pp yang menyesatkan — bukti kenapa
+   era-matching wajib.
+3. Gate 3 tidak lulus uji (tidak signifikan); definisi CVD historis perlu disamakan dulu.
+4. Gate 4 berlawanan dengan pembacaan naif: di atas 200W SMA return 30d **lebih rendah**
+   (−7,43 pp) daripada di bawahnya. Gerbang ini = deskriptor rezim, bukan sinyal beli.
+5. Gate 2 belum diuji: OI lokal mulai 2026-08 (~118 hari), kurang untuk horizon 30/90.
+
+## 7. Sisa pekerjaan
+
+1. Gate 2 (OI flush) bisa diuji setelah ~6 bulan akumulasi OI.
+2. Samakan definisi CVD live dengan orderflow historis, lalu uji ulang Gate 3.
+3. ACBI menunggu sumber CDS/bond berbayar; sampai itu tetap `UNAVAILABLE`.
