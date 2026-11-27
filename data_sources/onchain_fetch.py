@@ -229,11 +229,31 @@ def _load_cache():
     return {"cached_at": 0, "raw": {}, "scores": {}}
 
 
-def _save_cache(cache):
-    """Save on-chain cache."""
-    cache["cached_at"] = time.time()
-    with open(ONCHAIN_CACHE_FILE, "w") as f:
-        json.dump(cache, f)
+def _save_cache(cache, refresh_ttl=True):
+    """Save on-chain cache atomically.
+
+    FIX (audit 2026-11-27):
+      * `cached_at` was stamped on EVERY save, including the path where all
+        metric fetches failed and the previous cache was simply reused — so a
+        frozen 20-hour-old snapshot was served as "fresh" for another 24h and
+        no staleness was ever visible. Callers now pass refresh_ttl=False when
+        nothing was actually fetched.
+      * Written via tmp + os.replace so a pipeline timeout (150s) can no longer
+        leave a truncated JSON cache behind.
+    """
+    if refresh_ttl:
+        cache["cached_at"] = time.time()
+    tmp = ONCHAIN_CACHE_FILE + ".tmp"
+    try:
+        with open(tmp, "w") as f:
+            json.dump(cache, f)
+        os.replace(tmp, ONCHAIN_CACHE_FILE)
+    except OSError as e:
+        print(f"[OnChain] cache save failed: {e}", file=sys.stderr)
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
 
 
 def _fetch_single(url):
@@ -452,11 +472,19 @@ def fetch_all_onchain(force_refresh=False):
 
     print(f"[OnChain] Fetched {success_count}/{len(METRICS)} metrics", file=sys.stderr)
 
-    # Cache and compute
-    cache["raw"] = raw
-    _save_cache(cache)
+    # Cache and compute. Only refresh the TTL (and overwrite `raw`) when at
+    # least one metric was actually fetched; a total outage must leave the old
+    # timestamp in place so the data visibly ages.
+    if success_count > 0:
+        cache["raw"] = raw
+        _save_cache(cache, refresh_ttl=True)
+    else:
+        print("[OnChain] 0 metrics fetched — keeping previous cache and cached_at "
+              "(no fake TTL refresh)", file=sys.stderr)
+        cache["last_failed_at"] = int(now)
+        _save_cache(cache, refresh_ttl=False)
 
-    return compute_onchain_scores(raw)
+    return compute_onchain_scores(raw or cache.get("raw", {}))
 
 
 if __name__ == "__main__":

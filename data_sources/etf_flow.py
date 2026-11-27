@@ -159,11 +159,28 @@ def compute_etf_metrics(btc_price=None):
     #      though, so total_btc is reconstructed as sum(etfs.values())
     #      rather than silently discarding every entry as "no usable data."
     def _entry_total_btc(f):
+        """Net flow for one entry, expressed in BTC.
+
+        FIX (audit 2026-11-27): the per-ETF breakdown (`etfs`) is quoted in
+        MILLIONS OF USD, not BTC — verified on the live cache: 2026-11-24
+        etfs sum = -231.4 while that row's total_usd = -231,400,000 (ratio
+        exactly 1e6). Summing it directly and then comparing against the
+        BTC-denominated thresholds below understated every flow by ~28x at a
+        $61.8k BTC price (a -3,744 BTC day was read as -231 "BTC" → m81=0.60
+        instead of 0.85), and the detail field published "-231.4 BTC".
+        Convert with the BTC price that compute_etf_metrics() already receives.
+        """
         if f.get("total_btc") is not None:
             return f["total_btc"]
         etfs = f.get("etfs")
         if isinstance(etfs, dict) and etfs:
-            return sum(v for v in etfs.values() if v is not None)
+            total_usd_m = f.get("total_usd")
+            if total_usd_m is None:
+                total_usd_m = sum(v for v in etfs.values() if v is not None) * 1e6
+            # total_usd is stored in USD (not millions) in the live cache.
+            if btc_price and btc_price > 0:
+                return total_usd_m / btc_price
+            return None
         return None
 
     sorted_flows = sorted(flows, key=lambda f: f.get("date", ""), reverse=True)
@@ -226,7 +243,7 @@ def compute_etf_metrics(btc_price=None):
     # Compare cumulative BTC holdings change over last 20 trading days
     # (about 1 month)
     cum = cache.get("cumulative_btc")
-    if cum is None or cum == 0:
+    if cum is None:  # FIX (audit 2026-11-27): 0 is a valid holding level
         # Reconstruct from flow entries if cache summary is missing
         cum = 0
         for f in flows:

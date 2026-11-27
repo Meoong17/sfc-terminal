@@ -153,6 +153,55 @@ def _fetch_supply_from_defillama():
             history[date_str] = round(total, 2)
     return history
 
+def _fetch_history_from_defillama(days=365):
+    """Full daily stablecoin supply history from DefiLlama (free, no key).
+
+    Audit 2026-11-27: CoinGecko is currently answering 429 for every coin
+    (verified live: 0/4 series), so the only continuously available series is
+    DefiLlama's `stablecoincharts/all` endpoint, which returns the TOTAL
+    circulating supply for every stablecoin, daily, back to 2017. The previous
+    fallback synthesised three points (today / -7d / -30d) and threw away the
+    rest of the history, which made M76 growth and M77 SSR meaningless.
+
+    IMPORTANT — level, not just shape: this series covers ALL stablecoins
+    (~$282B) while the CoinGecko path sums four coins (~$248B). Merging the two
+    raw levels would inject a fake ~14% one-day jump, so the caller harmonises
+    the level (see fetch_stablecoin_supply_history) instead of pasting it in.
+
+    Returns {date_str: total_usd} or {} on failure.
+    """
+    try:
+        r = requests.get("https://stablecoins.llama.fi/stablecoincharts/all", timeout=30)
+        if r.status_code != 200:
+            print(f"[SC] DefiLlama history HTTP {r.status_code}", file=sys.stderr)
+            return {}
+        rows = r.json()
+    except Exception as e:
+        print(f"[SC] DefiLlama history failed: {e}", file=sys.stderr)
+        return {}
+
+    cutoff = time.time() - days * 86400
+    out = {}
+    for row in rows:
+        try:
+            ts = int(row["date"])
+            if ts < cutoff:
+                continue
+            usd = (row.get("totalCirculatingUSD") or {}).get("peggedUSD")
+            if usd is None:
+                usd = (row.get("totalCirculating") or {}).get("peggedUSD")
+            if usd is None or usd <= 0:
+                continue
+            day = datetime.fromtimestamp(ts, tz=timezone.utc).strftime("%Y-%m-%d")
+            out[day] = round(float(usd), 2)
+        except (KeyError, TypeError, ValueError):
+            continue
+    if out:
+        print(f"[SC] DefiLlama history: {len(out)} days "
+              f"({min(out)} .. {max(out)})", file=sys.stderr)
+    return dict(sorted(out.items()))
+
+
 def fetch_stablecoin_supply_history(force_refresh=False):
     """Fetch total stablecoin market cap history (daily, 365d).
     
@@ -189,20 +238,57 @@ def fetch_stablecoin_supply_history(force_refresh=False):
         missing = [sid for sid in STABLECOIN_IDS if sid not in all_series]
         print(f"[SC] CoinGecko partial ({len(all_series)}/{len(STABLECOIN_IDS)}) — "
               f"missing {missing}. Falling back to DefiLlama...", file=sys.stderr)
+        # Prefer DefiLlama's FULL daily series (2017->today) over the 3-point
+        # snapshot: it keeps M76 growth / M77 SSR measurable through a CG
+        # outage. Levels are harmonised to the most recent real CG reading so
+        # the switch does not fabricate a step change.
+        dl_full = _fetch_history_from_defillama(days=400)
+        _existing = dict(cache.get("supply_history") or {})
+        if dl_full and _existing:
+            _anchor_date = max(_existing)
+            _anchor_val = _existing[_anchor_date]
+            _dl_at_anchor = dl_full.get(_anchor_date) or dl_full[max(dl_full)]
+            _scale = (_anchor_val / _dl_at_anchor) if _dl_at_anchor else 1.0
+            _merged = {d: round(v * _scale, 2) for d, v in dl_full.items() if d not in _existing}
+            _merged.update(_existing)
+            cache["supply_history"] = dict(sorted(_merged.items()))
+            cache["raw"]["n_stablecoins"] = len(STABLECOIN_IDS)
+            cache["raw"]["source"] = "defillama_full_history"
+            cache["raw"]["level_scale"] = round(_scale, 6)
+            _save_cache(cache)
+            print(f"[SC] DefiLlama full history merged: {len(cache['supply_history'])} days, "
+                  f"level scale={_scale:.4f} (anchored to {_anchor_date})", file=sys.stderr)
+            return cache["supply_history"]
+
         dl_hist = _fetch_supply_from_defillama()
         if dl_hist:
-            cache["supply_history"] = dl_hist
+            # FIX (audit 2026-11-27): this used to ASSIGN dl_hist over
+            # cache["supply_history"], destroying up to 365 days of real CG
+            # history and replacing it with 3 synthetic points (verified live:
+            # supply_history went from a year of dailies to exactly 3 keys).
+            # M76 growth / M77 SSR then measured growth against a 30-day-old
+            # synthetic anchor. Merge instead: real points win, DefiLlama only
+            # fills days that are missing, and the older history is preserved.
+            _merged = dict(cache.get("supply_history") or {})
+            for _d, _v in dl_hist.items():
+                _merged.setdefault(_d, _v)
+            cache["supply_history"] = dict(sorted(_merged.items()))
             cache["raw"]["n_stablecoins"] = len(STABLECOIN_IDS)
-            cache["raw"]["source"] = "defillama"
+            cache["raw"]["source"] = "defillama+history"
             _save_cache(cache)
-            print(f"[SC] DefiLlama fallback: {len(dl_hist)} synthetic day-points, "
-                  f"{len(STABLECOIN_IDS)} stablecoins", file=sys.stderr)
-            return dl_hist
+            print(f"[SC] DefiLlama fallback: {len(dl_hist)} synthetic day-points merged "
+                  f"into {len(cache['supply_history'])} days of history", file=sys.stderr)
+            return cache["supply_history"]
         print("[SC] DefiLlama fallback also failed — using partial CoinGecko data", file=sys.stderr)
     
     if not all_series:
-        print("[SC] WARNING: No stablecoin data fetched, using fallback estimates", file=sys.stderr)
-        cache["cached_at"] = now
+        # FIX (audit 2026-11-27): this branch used to stamp cached_at = now even
+        # though nothing was fetched, so a total outage looked like a fresh
+        # 12-hour cache and staleness was invisible. Leave cached_at untouched
+        # (it must keep ageing) and report the failure instead.
+        print("[SC] WARNING: No stablecoin data fetched — keeping previous history "
+              "(cached_at NOT refreshed)", file=sys.stderr)
+        cache["raw"]["last_fetch_failed_at"] = int(now)
         _save_cache(cache)
         return cache.get("supply_history", {})
     

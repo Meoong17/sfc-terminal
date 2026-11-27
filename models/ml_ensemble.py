@@ -35,9 +35,27 @@ def load_collection():
         return {"features": [], "labels": [], "predictions": [], "dates": [], "price_log": []}
 
 def save_collection(data):
-    """Save training data."""
-    with open(COLLECTION_FILE, "w") as f:
-        json.dump(data, f)
+    """Save training data ATOMICALLY.
+
+    FIX (audit 2026-11-27): this wrote straight to COLLECTION_FILE. The file is
+    ~2.7 MB (2000 x 30 floats + 8.6k price points) and is rewritten every
+    pipeline cycle; sfc-pipeline.sh wraps collect.py in `timeout 150`, so a
+    truncated write leaves the ONLY training set for ml_ensemble / QLSTM /
+    XGBoost / causal filter unparseable (load_collection then silently returns
+    empty lists, and the next add_observation() starts the history from zero).
+    Write to a tmp file and rename, so readers always see a complete file.
+    """
+    tmp = COLLECTION_FILE + ".tmp"
+    try:
+        with open(tmp, "w") as f:
+            json.dump(data, f)
+        os.replace(tmp, COLLECTION_FILE)
+    except OSError as e:
+        print(f"[ML] save_collection failed: {e}", file=sys.stderr)
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
 
 # ──────────────────────────────────────────────────────
 # DAILY REGIME COLLECTION — 1 row per calendar day
@@ -767,17 +785,38 @@ def evaluate_accuracy():
     # number is a class-imbalance artifact, not evidence of skill. Expose the
     # class balance + a reliability flag so callers never read the raw
     # accuracy as predictive ability.
-    accuracy_reliable = stress_events > 0
+    # FIX (audit 2026-11-27): the flag only required stress_events > 0, so a
+    # model that never predicted a single stress period (live recall 0/65) was
+    # still published as reliable with accuracy 0.9263 — which is WORSE than the
+    # trivial always-calm baseline of 0.9648. Reliability now requires a usable
+    # number of stress observations AND at least some recall, and the trivial
+    # baseline is reported alongside so the number can never be read as skill
+    # without a comparison.
+    recall_stress = (stress_correct / stress_events) if stress_events else None
+    recall_calm = (calm_correct / calm_events) if calm_events else None
+    balanced_accuracy = (
+        (recall_stress + recall_calm) / 2
+        if (recall_stress is not None and recall_calm is not None) else None
+    )
+    majority_baseline = max(calm_events, stress_events) / total
+    skill_vs_baseline = round(accuracy - majority_baseline, 4)
+    accuracy_reliable = bool(stress_events >= 30 and (recall_stress or 0) > 0)
     note = ""
     if not accuracy_reliable:
-        note = (" — NO stress events in labeled window: accuracy reflects "
-                "calm-majority only, NOT skill")
+        note = (" — NOT reliable as a skill measure (stress_events="
+                f"{stress_events}, recall_stress={recall_stress}); compare with "
+                f"majority baseline {majority_baseline:.4f}")
 
     return {
         "accuracy": round(accuracy, 4),
         "total": total,
         "correct": correct,
         "stress_events": stress_events,
+        "recall_stress": round(recall_stress, 4) if recall_stress is not None else None,
+        "recall_calm": round(recall_calm, 4) if recall_calm is not None else None,
+        "balanced_accuracy": round(balanced_accuracy, 4) if balanced_accuracy is not None else None,
+        "majority_baseline": round(majority_baseline, 4),
+        "skill_vs_baseline": skill_vs_baseline,
         "accuracy_reliable": accuracy_reliable,
         "by_class": {
             "stress": {"total": stress_events, "correct": stress_correct,

@@ -1441,13 +1441,27 @@ def calculate_m8_yield_curve():
     vals_hy = _fred("BAMLH0A0HYM2", 1)
     if not vals_10y or not vals_2y: return None, None
     slope = vals_10y[0] - vals_2y[0]
-    spread = vals_hy[0] if vals_hy else 300
+    # FIX (audit 2026-11-27): FRED BAMLH0A0HYM2 is quoted in PERCENT (live 3.7),
+    # but the thresholds below are in BASIS POINTS (200/300/400). The credit
+    # component was therefore dead: cred_s was 0.15 for every observation in
+    # history (HY OAS range 2.59-4.61 %; even the 2008 peak ~10.9 % stays 18x
+    # below "200"). Converted to bps so the 40% credit weight actually reads.
+    # Also removed `else 300`: a missing HY series used to INVENT 300bps (=
+    # cred_s 0.65, i.e. more stress when data is absent). Missing data now
+    # removes the credit component instead of fabricating it.
+    _has_hy = bool(vals_hy)
+    spread_pct = vals_hy[0] if _has_hy else None
+    spread = (spread_pct * 100.0) if _has_hy else None
     if slope < 0: slope_s = 0.80
     elif slope < 0.5: slope_s = 0.65
     elif slope < 1.0: slope_s = 0.40
     elif slope > 2.0: slope_s = 0.15
     else: slope_s = 0.25
 
+    if spread is None:
+        score = slope_s
+        return score, {"slope": round(slope, 2), "spread_bps": None,
+                       "note": "HY OAS unavailable — credit component omitted"}
     if spread > 400: cred_s = 0.85
     elif spread > 300: cred_s = 0.65
     elif spread > 200: cred_s = 0.40
@@ -1458,7 +1472,12 @@ def calculate_m8_yield_curve():
 def calculate_m9_liquidity():
     """M9: Liquidity Aggregates — M2/MB multiplier"""
     vals_m2 = _fred("M2SL", 1)
-    vals_mb = _fred("MBCURSL", 1)
+    # FIX (audit 2026-11-27): MBCURSL does not exist on FRED (HTTP 400 "The
+    # series does not exist"), so this method returned (None, None) every cycle
+    # and was then silently filled with 0.5 in the ensemble and in the ML
+    # feature vector — a constant masquerading as a measurement. BOGMBASE
+    # ("Monetary Base; Total") is the real series and is what M2/MB intends.
+    vals_mb = _fred("BOGMBASE", 1)
     if not vals_m2 or not vals_mb: return None, None
     m2 = vals_m2[0]
     mb = vals_mb[0]
@@ -1489,10 +1508,16 @@ def calculate_m10_garch(closes):
         hist.append(sigma2)
     curr_vol = np.sqrt(hist[-1])
     persist = alpha + beta
-    if persist > 0.98 and curr_vol > 0.03: score = 0.85
-    elif persist > 0.95 and curr_vol > 0.02: score = 0.65
-    elif curr_vol > 0.02: score = 0.45
-    elif curr_vol > 0.01: score = 0.25
+    # FIX (audit 2026-11-27): `closes` here are MONTHLY candles (112 months of
+    # history), but these thresholds were written for DAILY returns. Monthly
+    # vol runs ~sqrt(21)=4.58x the daily figure, so 0.03 became unreachable and
+    # the method returned 0.85 in 83 of 83 historical windows — a constant
+    # dressed up as a measurement. Thresholds are scaled to the data cadence.
+    _cad = 21.0 ** 0.5  # daily -> monthly vol scaling
+    if persist > 0.98 and curr_vol > 0.03 * _cad: score = 0.85
+    elif persist > 0.95 and curr_vol > 0.02 * _cad: score = 0.65
+    elif curr_vol > 0.02 * _cad: score = 0.45
+    elif curr_vol > 0.01 * _cad: score = 0.25
     else: score = 0.10
     return score, {"garch_vol": round(curr_vol,4), "persistence": round(persist,3)}
 
@@ -1504,9 +1529,13 @@ def calculate_m11_var(rets):
     var_95 = np.percentile(arr, 5)
     tail = arr[arr <= var_95]
     es = np.mean(tail) if len(tail) > 0 else var_95
-    if es < -0.15: score = 0.85
-    elif es < -0.10: score = 0.65
-    elif es < -0.05: score = 0.45
+    # FIX (audit 2026-11-27): same cadence error as M10 — `rets` are monthly,
+    # thresholds were daily. Unscaled, ES monthly (-0.2055 live) always cleared
+    # -0.15 and the method was pinned at 0.85 (82/82 windows).
+    _cad = 21.0 ** 0.5
+    if es < -0.15 * _cad: score = 0.85
+    elif es < -0.10 * _cad: score = 0.65
+    elif es < -0.05 * _cad: score = 0.45
     elif es < 0: score = 0.25
     else: score = 0.10
     return score, {"var_95": round(var_95,4), "es_95": round(es,4)}
@@ -1535,9 +1564,23 @@ def calculate_m12_jump(ohlcv):
 def calculate_m13_funding():
     """M13: Funding Rate Acceleration — leverage cascade detection"""
     try:
-        r = requests.get("https://www.deribit.com/api/v2/public/get_funding_rate_history?currency=BTC&start_timestamp=0&end_timestamp=" + str(int(time.time()*1000)), timeout=10)
+        # FIX (audit 2026-11-27): the request had no instrument_name and
+        # start_timestamp=0, which Deribit rejects with HTTP 400 ("value
+        # required: instrument_name") — so M13 never produced a value (filled
+        # with 0.5) while still receiving a causal weight of 0.3. Use the
+        # perpetual instrument and a 7-day window (168 8h points).
+        _now_ms = int(time.time() * 1000)
+        _week_ms = _now_ms - 7 * 24 * 3600 * 1000
+        r = requests.get(
+            "https://www.deribit.com/api/v2/public/get_funding_rate_history"
+            "?instrument_name=BTC-PERPETUAL"
+            f"&start_timestamp={_week_ms}&end_timestamp={_now_ms}",
+            timeout=10,
+        )
         data = r.json().get("result", [])
         if len(data) < 3: return None, None
+        # API returns oldest-first; the newest point must drive "now".
+        data = list(reversed(data))
         rates = [d["interest_8h"] for d in data[:8]]
         if len(rates) < 3: return None, None
         fr_now = rates[0]
@@ -1567,13 +1610,42 @@ def calculate_m14_skew():
     try:
         r = requests.get("https://www.deribit.com/api/v2/public/get_book_summary_by_currency?currency=BTC&kind=option", timeout=10)
         opts = r.json().get("result", [])
-        puts = [o["mark_iv"] for o in opts if o.get("instrument_name","").endswith("-P") and o.get("mark_iv")]
-        calls = [o["mark_iv"] for o in opts if o.get("instrument_name","").endswith("-C") and o.get("mark_iv")]
-        all_iv = [o["mark_iv"] for o in opts if o.get("mark_iv")]
-        if not puts or not calls or not all_iv: return None, None
-        put_iv = sum(puts)/len(puts)
-        call_iv = sum(calls)/len(calls)
-        atm = sum(all_iv)/len(all_iv)
+        # FIX (audit 2026-11-27): comparing the MEAN IV of all puts against the
+        # MEAN IV of all calls is structurally zero on Deribit, because each
+        # strike carries one mark_iv for both sides (verified live: 523 puts and
+        # 523 calls, both means 62.064 to 3 decimals) — the method returned 0.10
+        # on every cycle. Skew is a MONEYNESS effect: OTM puts (strike below
+        # spot) vs OTM calls (strike above spot), normalised by ATM IV.
+        _spot = None
+        try:
+            _idx = requests.get("https://www.deribit.com/api/v2/public/get_index_price?index_name=btc_usd", timeout=10)
+            _spot = float(_idx.json()["result"]["index_price"])
+        except Exception:
+            _spot = None
+        if not _spot or _spot <= 0:
+            return None, None
+        _otm_put, _otm_call, _atm_iv = [], [], []
+        for _o in opts:
+            _iv = _o.get("mark_iv")
+            _nm = _o.get("instrument_name", "")
+            if not _iv or not _nm:
+                continue
+            try:
+                _strike = float(_nm.split("-")[2])
+            except (IndexError, ValueError):
+                continue
+            _is_put = _nm.endswith("-P")
+            if abs(_strike - _spot) / _spot <= 0.05:
+                _atm_iv.append(_iv)
+            elif _strike < _spot and _is_put and 0.10 <= (_spot - _strike) / _spot <= 0.30:
+                _otm_put.append(_iv)
+            elif _strike > _spot and (not _is_put) and 0.10 <= (_strike - _spot) / _spot <= 0.30:
+                _otm_call.append(_iv)
+        if not _otm_put or not _otm_call or not _atm_iv:
+            return None, None
+        put_iv = sum(_otm_put) / len(_otm_put)
+        call_iv = sum(_otm_call) / len(_otm_call)
+        atm = sum(_atm_iv) / len(_atm_iv)
         if atm <= 0: return None, None
         skew = (put_iv - call_iv) / atm
         if skew > 0.20: score = 0.80
@@ -1596,7 +1668,16 @@ def calculate_m15_concentration():
         shares = [o/total for o in sorted(ois, reverse=True)]
         hhi = sum(s**2 for s in shares)
         top3 = sum(shares[:3])
-        if hhi > 0.25: score = 0.80
+        # FIX (audit 2026-11-27): HHI is bounded below by 1/N; with ~858 live
+        # option instruments it cannot exceed ~0.05, so thresholds 0.15-0.25
+        # ("concentrated") were mathematically unreachable and the method was a
+        # constant 0.10. Use the top-3 OI share, which is interpretable and
+        # spans the real range (live top3 = 0.049 = very dispersed).
+        if top3 > 0.60: score = 0.80
+        elif top3 > 0.50: score = 0.65
+        elif top3 > 0.40: score = 0.45
+        elif top3 > 0.30: score = 0.25
+        elif hhi > 0.25: score = 0.80
         elif hhi > 0.20: score = 0.65
         elif hhi > 0.15: score = 0.45
         elif hhi > 0.10: score = 0.25
@@ -1613,9 +1694,13 @@ def calculate_m16_regime_switch(rets):
     recent = rets[-30:]
     r_mean = np.mean(recent)
     r_std = np.std(recent)
-    if r_mean < -0.005 and r_std > 0.03: p_crisis = 0.75
-    elif r_std > 0.025: p_crisis = 0.45
-    elif r_mean > 0.01: p_crisis = 0.10
+    # FIX (audit 2026-11-27): monthly inputs, daily thresholds. r_mean scales
+    # linearly with 21 trading days per month, r_std with sqrt(21); unscaled the
+    # method sat at 0.45 in 81 of 82 windows.
+    _cad = 21.0 ** 0.5
+    if r_mean < -0.005 * 21 and r_std > 0.03 * _cad: p_crisis = 0.75
+    elif r_std > 0.025 * _cad: p_crisis = 0.45
+    elif r_mean > 0.01 * 21: p_crisis = 0.10
     else: p_crisis = 0.20
     return p_crisis, {"p_crisis": round(p_crisis,3), "recent_mean": round(r_mean,4), "recent_std": round(r_std,4)}
 
@@ -2729,9 +2814,47 @@ m20m31_active = [s for n, s in zip(["m20_obi","m21_trade_flow","m22_spread","m23
 new_active = len(m7m19_active)
 inst_active_count = len(m20m31_active)
 
-m1m6_avg = sum(m1m6_active) / len(m1m6_active) if m1m6_active else sum(m1m6_scores) / 6
-new_avg = sum(m7m19_active) / len(m7m19_active) if m7m19_active else 0.5
-inst_avg_value = sum(m20m31_active) / len(m20m31_active) if m20m31_active else 0.5
+# FIX (audit 2026-11-27) — WEIGHTS WERE SCALING THE SCORE, NOT AVERAGING IT.
+# `apply_filter()` returns score * weight (clamped to 1.0), and the old code
+# then took a plain mean of those products:
+#     group_avg = mean(score_i * w_i)  ==  mean(score_i) * mean(w_i)
+# For M1-M6 (protected weights 1.0-1.5) every score above 1/w saturated at 1.0,
+# inflating the group from 0.366 to 0.550 in a live reconstruction; for M7-M19 /
+# M20-M31 (weights ~0.5-0.7) it shrank their groups instead. Net effect: the
+# nominal 85/10/5 (live 91.8/4.2/4.0) blend behaved like ~98.1/0.94/0.94, i.e.
+# the "enrichment" groups contributed almost nothing and the headline score was
+# biased upward by ~13 pp.
+# A weight belongs in the DENOMINATOR: weighted mean = sum(s*w)/sum(w). Scores
+# keep their real level, weights only decide influence.
+_CORE_M1M6 = ["m1_klr","m2_logit","m3_bayes","m4_ewc","m5_qreg","m6_regime"]
+_CORE_M7M19 = ["m7_fisher","m8_yield","m9_liquidity","m10_garch","m11_var","m12_jump",
+               "m13_funding","m14_skew","m15_concentration","m16_regime_ml","m17_granger",
+               "m18_entropy","m19_mutual_info"]
+_CORE_M20M31 = ["m20_obi","m21_trade_flow","m22_spread","m23_liquidity","m24_cape",
+                "m25_minsky","m26_kahneman","m27_taleb","m28_summers","m29_debt",
+                "m30_rajan","m31_altman"]
+
+def _group_weighted_avg(names, min_weight=0.2):
+    """Weighted mean of raw method scores over methods the causal filter keeps."""
+    num = 0.0
+    den = 0.0
+    for _n in names:
+        _s = method_scores_dict.get(_n)
+        if _s is None:
+            continue
+        _w = float(causal_weights.get(_n, 1.0)) if causal_weights else 1.0
+        if _w < min_weight:
+            continue
+        num += float(_s) * _w
+        den += _w
+    return (num / den) if den > 0 else None
+
+m1m6_avg = _group_weighted_avg(_CORE_M1M6)
+m1m6_avg = m1m6_avg if m1m6_avg is not None else (sum(m1m6_scores) / 6)
+new_avg = _group_weighted_avg(_CORE_M7M19)
+new_avg = new_avg if new_avg is not None else 0.5
+inst_avg_value = _group_weighted_avg(_CORE_M20M31)
+inst_avg_value = inst_avg_value if inst_avg_value is not None else 0.5
 
 # Dynamic blend weights from causal analysis
 causal_p1 = causal_adjustment.get("m1_m6_pct", 85.0) / 100.0
@@ -2765,16 +2888,25 @@ print(f"[SFC] Ensemble: {sfc_pct:.1f}% | Zone: {zone}", file=sys.stderr)
 # ── QLSTM ENSEMBLE ADJUSTMENT (M32 + Hybrid + ProAdapt) ──
 # QLSTM has temporal memory (8-day sequence) — use it to nudge the ensemble
 # Now enhanced with GARCH residual correction and ProAdapt online learning
+# ── QLSTM nudge: DISABLED (audit 2026-11-27) ──
+# The checkpoint in production (qlstm_model.pt, mtime 2026-07-16) was trained
+# against the CIRCULAR target (a linear combination of the same M1-M6 features
+# fed to the network); its val_loss of 8.11e-08 on a 0-100 target is proof it
+# reproduces its own input formula rather than predicting price. It still nudged
+# the headline score by 5% of the gap every cycle (live: -1.01 pp), i.e. a
+# self-referential target was moving the published number. Per the "no
+# unvalidated/circular blend" rule the nudge is gated OFF until the model is
+# retrained on realized price outcomes and passes walk-forward validation.
 qlstm_adjustment = 0
+qlstm_display_adjustment = 0.0
 if qlstm_ok and qlstm_pred is not None:
     qlstm_sfc = qlstm_pred * 100
     qlstm_diff = qlstm_sfc - sfc_pct
-    qlstm_adjustment = qlstm_diff * 0.05  # 5% nudge
-    sfc_pct += qlstm_adjustment
-    zone = "CRITICAL" if sfc_pct/100 > 0.75 else "HIGH" if sfc_pct/100 > 0.5 else "ELEVATED" if sfc_pct/100 > 0.25 else "NORMAL"
-    print(f"[SFC] QLSTM enhanced: raw={qlstm_sfc:.1f} garch+{_GARCH_RESIDUAL:.3f} "
-          f"adapt={_PROADAPT_FINAL:.1f} adj={qlstm_adjustment:+.2f}pp "
-          f"→ {sfc_pct:.1f}%", file=sys.stderr)
+    qlstm_display_adjustment = round(qlstm_diff * 0.05, 4)  # display-only
+    print(f"[SFC] QLSTM display-only: raw={qlstm_sfc:.1f} garch+{_GARCH_RESIDUAL:.3f} "
+          f"adapt={_PROADAPT_FINAL if _PROADAPT_FINAL is not None else float('nan'):.1f} "
+          f"would-be adj={qlstm_display_adjustment:+.2f}pp NOT applied "
+          f"(circular checkpoint — see comment)", file=sys.stderr)
 
 # ── MAMBA INFERENCE & ENSEMBLE ADJUSTMENT (M32 Enhanced — State-Space Model) ──
 # Mamba runs HERE (after all variables computed) so feature vector is complete
@@ -2937,11 +3069,11 @@ if ADVANCED_AVAILABLE is None or ADVANCED_AVAILABLE:
             _mq_scores = [s for s in _mq_scores if s is not None]
             _method_disagreement = float(np.std(_mq_scores)) if len(_mq_scores) >= 2 else 0.5
             _uq_features = np.array([
-                sfc_pct / 100.0 if sfc_pct else 0.5,           # primary SFC stress
+                (sfc_pct / 100.0) if sfc_pct is not None else 0.5,   # primary SFC stress
                 adv_regime.get('crisis_probability', 0.0),      # regime crisis prob
                 min(1.0, _method_disagreement),                  # method disagreement (std)
-                (dvol / 100.0) if dvol else 0.5,                # volume stress
-                1.0 - (fng / 100.0) if fng else 0.5,            # inverted FNG (low fear = high stress)
+                (dvol / 100.0) if dvol is not None else 0.5,     # volume stress
+                1.0 - (fng / 100.0) if fng is not None else 0.5, # inverted FNG (low fear = high stress)
             ], dtype=float)
             uq_result = uq.predict_with_uncertainty(_uq_features, regime_info=adv_regime)
             adv_uncertainty = uq_result
@@ -3059,7 +3191,12 @@ print(f"[SFC] Total active methods: {total_active_methods} (M1-M6+M7-M19+M20-M31
 # GLF + liq_mod + HMM feature → 2-3x same signal; this removes the direct term.)
 liq_mod = 0.0
 effective_sfc = min(sfc_pct + liq_mod, 100.0) if sfc_pct is not None else None
-effective_sfc = max(effective_sfc, 0.0) if effective_sfc else None
+# FIX (audit 2026-11-27): the old form `max(effective_sfc, 0.0) if effective_sfc
+# else None` treated a legitimate 0.0 (calm market) as "no value" and published
+# None, which then wiped zone/signal/confidence for that cycle. Test for None
+# explicitly instead of relying on truthiness.
+if effective_sfc is not None:
+    effective_sfc = max(effective_sfc, 0.0)
 
 # Floor (dynamic ATH) — uses pre-boost SFC because drawdown is a real market metric
 fb, ft, dv_sfc, phi = compute_floor_v2(btc, effective_sfc)
@@ -3092,8 +3229,21 @@ if _hmm_module:
             (fng or 50) / 100.0,
         ]], dtype=np.float32)
         _hmm_result = _hmm_module.predict_regime(_hmm_feat)
-        if _hmm_result and _hmm_result.get('regime') != 'NORMAL':
-            _hmm_regime = _hmm_result['regime']
+        # FIX (audit 2026-11-27): availability and the regime override must be
+        # gated on the model's OWN reliability flag, not on the label it happens
+        # to emit. Two live defects before this fix:
+        #   (a) `_hmm_available = True` only when regime != NORMAL, so a working
+        #       HMM reading NORMAL was published as "hmm_available: false"
+        #       (dashboard claimed the model was down when it was fine);
+        #   (b) the `reliable` flag was never read, so a posterior-saturated
+        #       model (max posterior 1.000, covars collapsed to 1e-6) could
+        #       still overwrite `regime`/`transition_risk`, which drive
+        #       _REGIME_DRIVER_MULT and therefore the zone thresholds — i.e. an
+        #       unreliable reading was moving the headline score.
+        _hmm_reliable = bool(_hmm_result.get('reliable', False)) if _hmm_result else False
+        _hmm_available = _hmm_reliable
+        if _hmm_result and _hmm_reliable:
+            _hmm_regime = _hmm_result.get('regime')
             _hmm_crisis = _hmm_result.get('crisis_probability', 0)
             _hmm_available = True
             # ════════════════════════════════════════════════════════════════
@@ -3216,23 +3366,34 @@ if _xgb_pred is not None:
     print(f"[XGB] Blend DISABLED — effective_sfc stays {_old_sfc:.1f}% "
           f"(xgb_pred={_xgb_pred:.1f}% display-only, conf={_xgb_confidence:.2f})", file=sys.stderr)
 
-# ── ONLINE LEARNING EWMA (Peningkatan 5: adaptive correction) ──
+# ── ONLINE LEARNING EWMA — DISPLAY-ONLY (audit 2026-11-27) ──
+# Three defects found in this block, all fixed here:
+#  1. `composite_confidence if 'composite_confidence' in dir() else 0.5` — the
+#     variable is only defined ~430 lines LATER (line ~3655), so the correction
+#     was always fed a hard-coded 0.5 confidence. A guard that cannot be true at
+#     that point is not a guard, it is a constant.
+#  2. The correction was loaded into one instance (`_ewma`) but applied by
+#     `correct_stress()` on the module singleton (`_default_ewma`), then
+#     `save_ewma(_ewma)` persisted the *unused* instance — so the baseline never
+#     accumulated (models/ewma_state.json stayed {"baseline": 0.0, "history":
+#     []}), the "correction" was a no-op, and data.json still advertised
+#     ewma_corrected: true.
+#  3. Enabling a lagged EWMA damper would change the headline score with no
+#     walk-forward validation — not allowed without evidence.
+# Resolution: compute the correction for DISPLAY, do not apply it, and report
+# the truth (`_ewma_applied = False`). Re-enable only after a walk-forward test
+# shows the damped score beats the raw score out-of-sample.
 _online_module = _get_adv_online()
+_ewma_display = None
+_ewma_applied = False
 if _online_module and effective_sfc is not None:
     try:
-        _ewma = _online_module.load_ewma()
-        if _ewma:
-            _corrected = _online_module.correct_stress(
-                effective_sfc / 100.0,
-                composite_confidence if 'composite_confidence' in dir() else 0.5,
-                transition_risk if 'transition_risk' in dir() else 0.0
-            )
-            _old_sfc = effective_sfc
-            effective_sfc = _corrected * 100.0
-            effective_sfc = max(0.0, min(100.0, effective_sfc))
-            zone = "CRITICAL" if effective_sfc/100 > 0.75 * _REGIME_DRIVER_MULT else "HIGH" if effective_sfc/100 > 0.50 * _REGIME_DRIVER_MULT else "ELEVATED" if effective_sfc/100 > 0.25 * _REGIME_DRIVER_MULT else "NORMAL"
-            _online_module.save_ewma(_ewma)
-            print(f"[EWMA] Corrected: {_old_sfc:.1f}% → {effective_sfc:.1f}%", file=sys.stderr)
+        _ewma_candidate = _online_module.correct_stress(
+            effective_sfc / 100.0, 0.5, transition_risk if 'transition_risk' in dir() else 0.0
+        )
+        _ewma_display = round(max(0.0, min(100.0, _ewma_candidate * 100.0)), 2)
+        print(f"[EWMA] Display-only: raw={effective_sfc:.1f}% ewma_candidate={_ewma_display:.1f}% "
+              f"(not applied — no walk-forward validation)", file=sys.stderr)
     except Exception as _ewma_e:
         print(f"[EWMA] Error: {_ewma_e}", file=sys.stderr)
 
@@ -3730,7 +3891,9 @@ _m65_pattern = "DISABLED"
 # get_trading_signal() ran every cycle for zero score impact. Compute removed to
 # save CPU; keep neutral output fields.
 _drl_market_state = {
-    "stress": effective_sfc / 100.0 if effective_sfc else 0.5,
+    # FIX (audit 2026-11-27): 0.0 is a valid stress reading; truthiness test
+    # replaced so calm markets report 0.0 instead of a fabricated mid-scale 0.5.
+    "stress": (effective_sfc / 100.0) if effective_sfc is not None else 0.5,
     "rsi": rsi_14m or 50,
     "price": btc or 60000,
     "momentum": (chg or 0) / 100.0,
@@ -4524,6 +4687,8 @@ out = {
     "m32_qlstm": round(qlstm_pred, 4) if qlstm_pred is not None else None,
     "m32_active": qlstm_ok,
     "m32_adjustment_pp": round(qlstm_adjustment, 4),
+    "m32_adjustment_display_pp": qlstm_display_adjustment,
+    "m32_note": "QLSTM nudge disabled 2026-11-27: production checkpoint was trained on a circular target (val_loss 8e-08); display-only until retrained + walk-forward validated",
     # GARCH residual correction
     "m32_garch_residual": round(_GARCH_RESIDUAL, 4),
     "m32_garch_volatility": round(_GARCH_VOL, 4),
@@ -4588,6 +4753,10 @@ out = {
     # Class-balance honesty (2026-09-09 audit): a bare ml_accuracy=1.0 with zero
     # stress events in the labeled window is a calm-majority artifact, not skill.
     "ml_accuracy_reliable": bool(ml_metrics.get("accuracy_reliable")),
+    "ml_majority_baseline": ml_metrics.get("majority_baseline"),
+    "ml_skill_vs_baseline": ml_metrics.get("skill_vs_baseline"),
+    "ml_recall_stress": ml_metrics.get("recall_stress"),
+    "ml_balanced_accuracy": ml_metrics.get("balanced_accuracy"),
     "ml_stress_events": ml_metrics.get("stress_events", 0),
     # Blend info
     "m1_m6_weight_pct": round(p1 * 100, 1) if causal_filter else 85.0,
@@ -4658,8 +4827,13 @@ out = {
     "mtf_divergence": bool(_mtf_result.get('divergence_detected', False)) if _mtf_result else None,
     "mtf_available": bool(_mtf_result),
     # ── Online Learning EWMA (Peningkatan 5) ──
-    "ewma_corrected": bool(True) if '_ewma' in dir() else False,
-    "ewma_available": bool(_get_adv_online() is not None),
+    # FIX (audit 2026-11-27): these used to claim `true` whenever the module
+    # imported, even though the correction was a verified no-op. Now they report
+    # what actually happened.
+    "ewma_corrected": bool(_ewma_applied),
+    "ewma_available": bool(_ewma_applied),
+    "ewma_display_value": _ewma_display,
+    "ewma_note": "display-only: correction computed but NOT applied (unvalidated damper)",
     # Advanced modules: Regime Detection (P2), Uncertainty (P4), Alt Data (P6)
     # Detektor regime k-means+Markov: terbitkan label/probabilitas HANYA bila lolos
     # guard riwayat minimum; jika tidak → None + alasan (jangan tampilkan label
@@ -4750,8 +4924,8 @@ out = {
                   and effective_sfc < 25 * _REGIME_DRIVER_MULT) else "WATCH"),
     # — Signal Timing (alert window estimation, monthly timeframe) —
     "signal_threshold_mult": _REGIME_DRIVER_MULT,
-    "signal_type": "STRESS_TRANSITION" if transition_risk > 0.60 else "STRESS" if effective_sfc and effective_sfc > 25 * _REGIME_DRIVER_MULT else "CALM",
-    "signal_strength": round(min(effective_sfc / 50.0 if effective_sfc else 0, 1.0), 3),
+    "signal_type": "STRESS_TRANSITION" if transition_risk > 0.60 else "STRESS" if (effective_sfc is not None and effective_sfc > 25 * _REGIME_DRIVER_MULT) else "CALM",
+    "signal_strength": round(min((effective_sfc / 50.0) if effective_sfc is not None else 0, 1.0), 3),
     "calibrated_confidence": _CALIBRATED_CONF,
     "reliability": _RELIABILITY,
     "reliability_reason": ("HIGH agreement (>0.85) — possible groupthink" if _RELIABILITY == "LOW" and _METHOD_AGREE > 0.85 else
@@ -4761,7 +4935,7 @@ out = {
     "timing_precision": "LOW" if composite_confidence < 0.3 else "MEDIUM" if composite_confidence < 0.6 else "HIGH",
     "alert_window_days": round(7 + 30 * (1 - composite_confidence), 1),  # wider window = lower confidence (monthly TF)
     "timeframe": "MONTHLY",
-    "readiness_score": round(composite_confidence * (1.0 - min(effective_sfc/100 if effective_sfc else 0, 0.5)), 3),
+    "readiness_score": round(composite_confidence * (1.0 - min((effective_sfc/100) if effective_sfc is not None else 0, 0.5)), 3),
     "shock_factor": shock_factor,
     "shock_event": shock_event,
     "shock_severity": shock_severity,

@@ -26,9 +26,27 @@ from scipy import stats as sp_stats
 
 COLLECTION_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data_collection.json")
 
+# FIX (audit 2026-11-27): this list is a POSITIONAL CONTRACT with the feature
+# rows written by collect.py -> ml_ensemble.add_observation(). collect.py builds
+# that vector as
+#     [m1..m4, m5/100, m6/100, m7, m9, m10, ... m19] + [m20 ... m31]
+# i.e. 18 + 12 = 30 columns, with **m8_yield deliberately absent** (M8 yield-curve
+# is computed for display only and never entered the ML feature vector).
+# The old list here had 31 names in numeric order (m8 included), so every column
+# from index 7 onward was attributed to the WRONG method: column 7 (really
+# m9_liquidity) was reported as m8_yield, column 18 (really m20_obi) was reported
+# as m19_mutual_info (leaking an institutional method into the M7-M19 group), and
+# m31_altman never had data at all (index 30 does not exist). Those mislabelled
+# Granger results are what `get_blend_adjustment()` turns into the live
+# 85/10/5-style blend weights, so the blend was computed from misattributed
+# causality. Verified against 2000 real rows (row length 30) and the
+# .causal_cache.json built from them.
+# If the collect.py vector ever changes shape, change BOTH sides and bump this
+# version; `analyze_all()` now refuses to run on a length mismatch.
+FEATURE_ORDER_VERSION = "2026-11-27"
 METHOD_NAMES = [
     "m1_klr", "m2_logit", "m3_bayes", "m4_ewc", "m5_qreg", "m6_regime",
-    "m7_fisher", "m8_yield", "m9_liquidity", "m10_garch", "m11_var",
+    "m7_fisher", "m9_liquidity", "m10_garch", "m11_var",
     "m12_jump", "m13_funding", "m14_skew", "m15_concentration",
     "m16_regime_ml", "m17_granger", "m18_entropy", "m19_mutual_info",
     "m20_obi", "m21_trade_flow", "m22_spread", "m23_liquidity",

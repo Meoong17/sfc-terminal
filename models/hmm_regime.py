@@ -641,7 +641,12 @@ def main():
             fng = float(latest.get("fng", 50.0) or 50.0) / 100.0
 
             latest_features = np.array(
-                [[daily_return, dvol, sfc, rsi, fng]], dtype=np.float64
+                # FIX (audit 2026-11-27): this used an undefined name `sfc` in
+                # the third slot (FEATURE_COLS = [btc_24h, dvol, m2_yoy, rsi,
+                # fng]), so `python models/hmm_regime.py` always raised
+                # NameError at the demo-prediction step. The slot belongs to the
+                # m2_yoy feature computed two lines above.
+                [[daily_return, dvol, m2, rsi, fng]], dtype=np.float64
             )
             prediction = detector.predict(latest_features)
 

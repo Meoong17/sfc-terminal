@@ -53,6 +53,18 @@ collect_with_retry() {
 
 collect_with_retry
 
+
+# ── v2 quant engine (BIM/FLQD) — display-only telemetry, never touches the score ──
+if [ "$COLLECT_RESULT" = "ok" ]; then
+    timeout 60 $PYTHON scripts/fetch_flow_data.py >> sfc-pipeline.log 2>&1 || log "⚠ flow fetch failed (engine keeps previous flows)"
+    timeout 90 $PYTHON scripts/fetch_cross_asset.py >> sfc-pipeline.log 2>&1 || log "⚠ cross-asset fetch failed (engine keeps previous proxies)"
+    if timeout 60 $PYTHON scripts/run_quant_engine.py >> sfc-pipeline.log 2>&1; then
+        log "Quant engine refreshed (data/quant_engine_results.json)"
+    else
+        log "⚠ Quant engine failed — dashboard keeps previous engine output"
+    fi
+fi
+
 # REMOVED (2026-07): paper_trader.py execution — Paper Trading has been
 # removed; SFC Terminal is now an analysis-only tool. trading/paper_trader.py
 # is left in place (harmless, unused) rather than deleted, in case any other

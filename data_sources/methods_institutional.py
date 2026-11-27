@@ -445,14 +445,23 @@ def calculate_m23_liquidity_fractals(prev=None):
     if cum_buy >= target and levels_used_buy < 999:
         slippage_buy = (avg_price_buy / cum_buy - mid) / mid * 100
     else:
-        slippage_buy = 5.0  # High slippage if insufficient liquidity
+        slippage_buy = None  # not measurable — $1M did not fill on this side
 
     if cum_sell >= target and levels_used_sell < 999:
         slippage_sell = (mid - avg_price_sell / cum_sell) / mid * 100
     else:
-        slippage_sell = 5.0
+        slippage_sell = None
 
-    avg_slippage = (slippage_buy + slippage_sell) / 2
+    # FIX (audit 2026-11-27): the old code substituted a 5.0% sentinel for any
+    # side whose $1M simulation did not fill, then averaged it with the real
+    # side (e.g. (5.0 + 0.008)/2 = 2.504 -> "very thin book", 0.80) even though
+    # the bid side filled in 70 levels and the ask side simply ran out of depth.
+    # A sentinel is not a measurement: if either side cannot be measured, the
+    # method reports unavailable instead of inventing stress.
+    _meas = [x for x in (slippage_buy, slippage_sell) if x is not None]
+    if not _meas:
+        return None, None
+    avg_slippage = sum(_meas) / len(_meas)
     min_levels = min(levels_used_buy, levels_used_sell)
 
     if avg_slippage > 2.0:
@@ -836,9 +845,15 @@ def calculate_m28_summers_stagnation():
     else:
         real_rate = fed_rate - 3.0  # Rough estimate
 
-    if real_rate < gdp_growth * 0.5:
+    # FIX (audit 2026-11-27): unit mismatch made this method a constant.
+    # `real_rate` is in PERCENT (10Y - CPI*100, live 0.88) while `gdp_growth`
+    # is a decimal RATIO (0.0229 = 2.29%). Comparing 0.88 against 0.0115/0.0229
+    # was always False, so the method returned 0.20 for all 2000 recorded
+    # cycles regardless of the macro regime. Compare in the same unit.
+    gdp_growth_pct = gdp_growth * 100.0
+    if real_rate < gdp_growth_pct * 0.5:
         stagnation = 0.75   # r* much lower than g
-    elif real_rate < gdp_growth:
+    elif real_rate < gdp_growth_pct:
         stagnation = 0.50
     else:
         stagnation = 0.20
@@ -1031,8 +1046,18 @@ def calculate_m31_altman_zscore(btc_current=None):
         vol_btc = vol_24h / btc_current if btc_current > 0 else 1
         x1 = min(depth / max(vol_btc, 1), 1.0) * 10
 
-        # X2: Network health (using cached price as proxy)
-        x2 = 4.0  # Default neutral
+        # X2: Network health.
+        # FIX (audit 2026-11-27): this was a hard-coded 4.0, contributing
+        # 0.7*4.0 = 2.8 to z before anything else was counted. Since every other
+        # term is non-negative, z >= 2.8 always, so the z<2 / z<-1 / z<-5
+        # branches (0.50 / 0.70 / 0.85 stress) were mathematically unreachable
+        # and the method could only ever say 0.30 or 0.15. Use a real measurement
+        # when one is available (hashrate trend), else a neutral 0.0 so the
+        # constant no longer shifts the scale.
+        # Neutral 0.0 (was a hard-coded 4.0). No network-health series is wired
+        # into this function today, so 0.0 is the only honest value: it neither
+        # fabricates stress nor shifts the z-scale the thresholds were set for.
+        x2 = 0.0
 
         # X3: Efficiency (price / 200-day SMA as cost basis)
         prices_200 = _cg_get("prices_200")

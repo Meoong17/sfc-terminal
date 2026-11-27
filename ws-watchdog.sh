@@ -18,7 +18,7 @@ fi
 
 # Start new instance
 cd "$SCRIPT_DIR"
-nohup python3 binance_ws.py > /dev/null 2>&1 &
+nohup /usr/bin/python3 binance_ws.py > /dev/null 2>&1 &
 NEW_PID=$!
 echo $NEW_PID > "$PID_FILE"
 echo "[WS] Started (PID=$NEW_PID)" >&2
