@@ -5329,6 +5329,59 @@ try:
         "scoring_impact": "NONE (context/display only)",
         "validation": (_ca.get("meta", {}) or {}).get("validation"),
     }
+    # ── HTML panel (dirender index.html lewat ${d.cross_asset_html}) ──
+    def _esc(_v):
+        return (str(_v).replace("&", "&amp;").replace("<", "&lt;")
+                .replace(">", "&gt;").replace('"', "&quot;"))
+
+    _ca_models = _ca.get("models", {}) or {}
+    _m1 = _ca_models.get("ml_pt_gate", {}) or {}
+    _m3 = _ca_models.get("bim_etf", {}) or {}
+    _m4 = _ca_models.get("tr_ssa", {}) or {}
+    _status_col = {"CONTRACTION_LOCK": "var(--red)", "NEUTRAL_CHOP": "var(--amber)",
+                   "EXPANSION": "var(--green)"}.get(_m1.get("status"), "var(--text-2)")
+    _gates_html = "".join(
+        '<div class="info-row"><span class="info-k">Gate %s · %s</span>'
+        '<span class="info-v" style="color:%s">%s</span></div>'
+        '<div style="font-size:9px;color:var(--text-3);line-height:1.45;margin:0 0 6px">%s</div>'
+        % (_g.get("gate"), _esc(_g.get("name")),
+           "var(--green)" if _g.get("pass") else "var(--red)",
+           "PASS" if _g.get("pass") else "FAIL",
+           _esc(_g.get("detail")))
+        for _g in (_m3.get("gates") or []))
+    _band = _m4.get("allocation_band_pct") or {}
+    _cash = _band.get("cash_like_pct") or [None, None]
+    _rent = _band.get("tactical_rental_pct") or [None, None]
+    out["cross_asset_html"] = (
+        '<div class="grid-3" style="gap:14px">'
+        '<div>'
+        '<div style="font-size:9px;color:var(--text-3);letter-spacing:.06em;margin-bottom:6px">MACRO REGIME GATE</div>'
+        '<div style="font-size:19px;font-weight:600;color:%s">%s</div>'
+        '<div style="font-size:9px;color:var(--text-3);line-height:1.5;margin-top:6px">'
+        'policy trap: %s · yield/OAS: %s</div>'
+        '<div style="font-size:9px;color:var(--text-3);line-height:1.5;margin-top:6px">'
+        'AI credit (ACBI): <span style="color:var(--text-2)">%s</span> — needs CDS / 144A bond data, '
+        'not available free</div>'
+        '</div>'
+        '<div>'
+        '<div style="font-size:9px;color:var(--text-3);letter-spacing:.06em;margin-bottom:6px">'
+        'BOTTOM GATES · %s/%s</div>%s</div>'
+        '<div>'
+        '<div style="font-size:9px;color:var(--text-3);letter-spacing:.06em;margin-bottom:6px">ALLOCATION RULE (display)</div>'
+        '<div style="font-size:11px;color:var(--text-2);line-height:1.5">%s</div>'
+        '<div class="info-row"><span class="info-k">Cash-like</span><span class="info-v">%s%%–%s%%</span></div>'
+        '<div class="info-row"><span class="info-k">Tactical rental</span><span class="info-v">%s%%–%s%%</span></div>'
+        '<div style="font-size:8px;color:var(--text-3);line-height:1.5;margin-top:8px">'
+        'Context only — not in SFC score. Gate thresholds are hand-set and not walk-forward validated; '
+        'historical test: macro lock −6.6pp fwd 30d (supported), ETF gate +6.1pp (supported), '
+        '200W-SMA gate −7.4pp (state descriptor, not a buy trigger).</div>'
+        '</div></div>'
+    ) % (_status_col, _esc(_m1.get("status")),
+         _esc(_m1.get("flags", {}).get("policy_trap")),
+         _esc(_m1.get("flags", {}).get("yield_oas_regime")),
+         _esc(_ca_models.get("acbi", {}).get("status")),
+         _m3.get("gates_passed"), _m3.get("gates_total"), _gates_html,
+         _esc(_m4.get("mode")), _cash[0], _cash[1], _rent[0], _rent[1])
 except Exception as _ca_e:
     print(f"[CrossAsset] state tidak tersedia: {_ca_e}", file=sys.stderr)
 
