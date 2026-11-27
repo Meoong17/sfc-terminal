@@ -5306,6 +5306,32 @@ try:
 except Exception as _l4_e:
     out["l4"] = {"error": str(_l4_e)}
 
+# ── cross-asset gates (A.docx: ML-PT Gate, BIM gates, TR-SSA) ────────────
+# Context/display only: nilai ini TIDAK dipakai di sfc_pct/sfc_effective, zona,
+# confidence, maupun bobot faktor. Sumber: data/cross_asset_state.json yang
+# ditulis analysis/cross_asset_gates.py pada siklus yang sama.
+try:
+    with open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                           "data", "cross_asset_state.json")) as _ca_f:
+        _ca = json.load(_ca_f)
+    out["cross_asset"] = {
+        "generated_at": _ca.get("generated_at"),
+        "ml_pt_status": (_ca.get("models", {}).get("ml_pt_gate", {}) or {}).get("status"),
+        "policy_trap": ((_ca.get("models", {}).get("ml_pt_gate", {}) or {}).get("flags", {}) or {}).get("policy_trap"),
+        "yield_oas_regime": ((_ca.get("models", {}).get("ml_pt_gate", {}) or {}).get("flags", {}) or {}).get("yield_oas_regime"),
+        "liquidity_drain": ((_ca.get("models", {}).get("ml_pt_gate", {}) or {}).get("flags", {}) or {}).get("cross_asset_liquidity_drain"),
+        "acbi_status": (_ca.get("models", {}).get("acbi", {}) or {}).get("status"),
+        "bim_gates_passed": (_ca.get("models", {}).get("bim_etf", {}) or {}).get("gates_passed"),
+        "bim_gates_total": (_ca.get("models", {}).get("bim_etf", {}) or {}).get("gates_total"),
+        "bim_gates": (_ca.get("models", {}).get("bim_etf", {}) or {}).get("gates"),
+        "allocation_mode": (_ca.get("models", {}).get("tr_ssa", {}) or {}).get("mode"),
+        "allocation_band_pct": (_ca.get("models", {}).get("tr_ssa", {}) or {}).get("allocation_band_pct"),
+        "scoring_impact": "NONE (context/display only)",
+        "validation": (_ca.get("meta", {}) or {}).get("validation"),
+    }
+except Exception as _ca_e:
+    print(f"[CrossAsset] state tidak tersedia: {_ca_e}", file=sys.stderr)
+
 out = _json_safe(out)
 
 

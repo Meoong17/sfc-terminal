@@ -1,0 +1,129 @@
+{
+ "generated_at": "2026-11-27T08:30:58.563029Z",
+ "source_design": "A.docx \u2014 Cross-Asset Liquidity & Structural Regime Engine",
+ "models": {
+  "ml_pt_gate": {
+   "model": "ML-PT Gate",
+   "status": "CONTRACTION_LOCK",
+   "inputs": {
+    "core_pce_yoy_pct": 3.26,
+    "core_pce_mom_annualized_pct": 3.57,
+    "real_pce_mom_pct": -0.03,
+    "us10y_pct": 4.91,
+    "us10y_chg_30d_bps": -9.0,
+    "curve_20s30s_bps": -3.0,
+    "hy_oas_pct": 3.72,
+    "hy_oas_chg_30d_bps": 34.0,
+    "dxy": 103.76,
+    "usdjpy": 158.76,
+    "gold_usd": null,
+    "gold_chg_30d_pct": null,
+    "silver_usd": null,
+    "silver_chg_30d_pct": null,
+    "as_of": {
+     "pce": "2026-10-01",
+     "us10y": "2026-11-24",
+     "hy_oas": "2026-11-24"
+    }
+   },
+   "flags": {
+    "policy_trap": "BOXED_IN_HAWKISH",
+    "yield_oas_regime": "DEFENSIVE_FLIGHT_TO_QUALITY",
+    "cross_asset_liquidity_drain": null,
+    "drain_basis": "dxy_only_partial"
+   },
+   "reason": "Core PCE 3.26% YoY (annualized MoM 3.57%), real PCE -0.03% MoM; US10Y 4.91% (-9.0 bps/30d); HY OAS 3.72% (+34.0 bps/30d); 20s30s -3.0 bps; DXY 103.76; gold None% / silver None% (30d)"
+  },
+  "acbi": {
+   "model": "ACBI (AI Credit Bifurcation)",
+   "status": "UNAVAILABLE",
+   "reason": "Butuh CDS Tier-1 (MSFT/GOOGL/AMZN/META/NVDA), Oracle 5Y CDS, dan harga obligasi tunai 144A (CRWV/TRACTC). Tidak ada sumber gratis/tepercaya; menggantinya dengan HY OAS/LQD lalu menamainya ACBI = sinyal karangan."
+  },
+  "bim_etf": {
+   "model": "BIM-ETF Bottom Gates",
+   "gates": [
+    {
+     "gate": 1,
+     "name": "ETF Exhaustion",
+     "pass": false,
+     "detail": "15D net flow -4.95B USD (~-82,912 BTC); IBIT \u22650 pada 0/5 hari terakhir (-541.1M, -544.7M, -509.3M, -175.3M, -329.7M)",
+     "fail_reason": "IBIT belum 3 hari berturut net inflow"
+    },
+    {
+     "gate": 2,
+     "name": "Leverage Flush",
+     "pass": false,
+     "detail": "OI 97,703 BTC vs puncak 90D 112,718 (-13.3%); funding 3D mean +0.0058%/8h",
+     "fail_reason": "OI belum ter-flush \u2264 -15% dari puncak 90D atau funding masih positif"
+    },
+    {
+     "gate": 3,
+     "name": "Spot Absorption",
+     "pass": false,
+     "detail": "harga 7D min 58,952 vs 7D sebelumnya 63,068; CVD min -675,691,631 vs -417,210,974 (USD kumulatif 14D)",
+     "fail_reason": "belum ada higher low CVD saat harga lower low"
+    },
+    {
+     "gate": 4,
+     "name": "Structure Reclaim",
+     "pass": false,
+     "detail": "harga 59,720 vs 200W SMA 68,201 (-12.4%)",
+     "fail_reason": "harga masih di bawah 200W SMA"
+    }
+   ],
+   "gates_passed": 0,
+   "gates_total": 4,
+   "status": "0/4 GATES",
+   "inputs": {
+    "etf_net_15d_usd": -4951500000,
+    "etf_net_15d_btc_est": -82912.0,
+    "ibit_last5_usd_m": [
+     -541.1,
+     -544.7,
+     -509.3,
+     -175.3,
+     -329.7
+    ],
+    "oi_now_btc": 97703.189,
+    "oi_peak_90d_btc": 112717.545,
+    "oi_drawdown_pct": -13.32,
+    "funding_3d_mean_pct_8h": 0.0058,
+    "cvd_low7_usd": -675691631.0,
+    "price": 59719.98,
+    "sma200w": 68201.0,
+    "dvol": 43.25
+   }
+  },
+  "tr_ssa": {
+   "model": "TR-SSA Allocator",
+   "mode": "CAPITAL_PRESERVATION_&_RENTALS",
+   "allocation_band_pct": {
+    "cash_like_pct": [
+     80,
+     90
+    ],
+    "tactical_rental_pct": [
+     10,
+     20
+    ]
+   },
+   "note": "Rezim kontraksi + gerbang bottom belum terpenuhi: prioritaskan likuiditas. Posisi rental hanya transaksi pendek (mean-reversion ke resistensi), dilarang dikonversi jadi posisi panjang selama CVD agregat belum positif.",
+   "sector_rules": {
+    "avoid": [
+     "token AI/DePIN GPU bersubsidi emisi atau narasi kelangkaan komputasi",
+     "memecoin tanpa dukungan likuiditas makro"
+    ],
+    "priority_when_gates_ge_3": [
+     "BTC sebagai penyerap likuiditas pertama",
+     "protokol dengan pendapatan biaya organik non-subsidi"
+    ]
+   },
+   "disclaimer": "Aturan display, bukan saran investasi; tidak masuk sfc_effective."
+  }
+ },
+ "meta": {
+  "scoring_impact": "NONE \u2014 konteks/display only, tidak dipakai di sfc_effective",
+  "validation": "Ambang gerbang ditetapkan tangan dari definisi dokumen dan BELUM walk-forward validated. Jangan dipakai sebagai klaim prediktif sampai diuji pada riwayat (HY OAS 1997+, ETF 2024+, OI/CVD 2026+).",
+  "gates_summary": "0/4"
+ }
+}

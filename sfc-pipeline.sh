@@ -51,6 +51,11 @@ collect_with_retry() {
   return 1
 }
 
+# ── cross-asset gates (context/display only — tidak menyentuh skor) ──────
+# Dijalankan SEBELUM collect.py supaya state siklus ini ikut terbit di data.json.
+timeout 90 $PYTHON analysis/cross_asset_gates.py >> sfc-pipeline.log 2>&1 \
+    || log "⚠ cross-asset gates failed (state keeps previous file)"
+
 collect_with_retry
 
 
