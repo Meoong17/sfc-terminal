@@ -5307,6 +5307,49 @@ except Exception as _l4_e:
     out["l4"] = {"error": str(_l4_e)}
 
 out = _json_safe(out)
+
+
+def _append_live_history(_out):
+    """Arsip abadi skor live per siklus (audit 2026-11-27).
+
+    Kenapa: walk-forward pada skor live TIDAK mungkin dilakukan dengan data yang
+    ada — `data_collection.json` menyimpan metode mentah hanya 2000 baris (~12
+    hari, rolling), sehingga riwayat komposit hilang terus-menerus. Dua percobaan
+    rekonstruksi (proxy 3-input dan core+ETF) terbukti tidak melacak angka terbit
+    (MAE ~20 pp, korelasi negatif), jadi ambang zona tidak boleh dikalibrasi dari
+    keduanya. Satu-satunya jalan adalah menyimpan skor yang benar-benar terbit
+    sejak sekarang, sehingga 3-6 bulan lagi validasi bisa dilakukan pada data asli.
+
+    Biaya: satu baris JSON per siklus, append-only, dipangkas ke 300k baris
+    terakhir (~2.3 tahun @5 menit). Tidak menyentuh skor.
+    """
+    try:
+        rec = {
+            "ts": _out.get("ts"),
+            "sfc": _out.get("sfc_effective"),
+            "sfc_base": _out.get("sfc_base"),
+            "zone": _out.get("zone"),
+            "conf": _out.get("composite_confidence"),
+            "regime": _out.get("regime"),
+            "g_m1m6": round(m1m6_avg, 4) if m1m6_avg is not None else None,
+            "g_m7m19": round(new_avg, 4) if new_avg is not None else None,
+            "g_m20m31": round(inst_avg_value, 4) if inst_avg_value is not None else None,
+            "p1": round(p1, 4), "p2": round(p2, 4), "p3": round(p3, 4),
+            "m1": _out.get("m1_klr"), "m2": _out.get("m2_logit"),
+            "m3": _out.get("m3_bayes"), "m4": _out.get("m4_ewc"),
+            "m5": _out.get("m5_qreg"), "m6": _out.get("m6_regime_score"),
+            "hmm_ok": _out.get("hmm_available"),
+            "wfv_gap30": _out.get("wfv_gap_30d"),
+        }
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "live_sfc_history.jsonl")
+        with open(path, "a") as f:
+            f.write(json.dumps(rec, allow_nan=False) + "\n")
+    except Exception as _lh_e:
+        print(f"[History] append gagal: {_lh_e}", file=sys.stderr)
+
+
+_append_live_history(out)
+
 print(json.dumps(out, indent=2, allow_nan=False))
 btc_str = f"${btc:,.0f}" if btc is not None else "N/A"
 rsi_str = f"{rsi_14m}" if rsi_14m is not None else "N/A"
